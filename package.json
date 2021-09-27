@@ -1,0 +1,25 @@
+{
+  "name": "dro",
+  "version": "1.0.0",
+  "description": "Dynamic range order",
+  "main": "build/main/index.js",
+  "scripts": {
+    "start:dev": "nodemon"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@uniswap/sdk-core": "^3.0.1",
+    "@uniswap/v3-core": "^1.0.0",
+    "@uniswap/v3-sdk": "^3.5.1",
+    "ethers": "^5.4.7",
+    "i": "^0.3.7",
+    "typescript": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^16.10.1",
+    "nodemon": "^2.0.13",
+    "ts-node": "^10.2.1",
+    "tslib": "^2.3.1"
+  }
+}

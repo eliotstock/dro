@@ -1,0 +1,8 @@
+build
+node_modules
+test
+src/**.js
+coverage
+*.log
+yarn.lock
+.env
