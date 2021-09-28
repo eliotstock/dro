@@ -33,7 +33,7 @@ import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/i
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
 
 // Width of the range relative to the current price.
-const RANGE_WIDTH = 0.03;
+const RANGE_WIDTH = 0.02;
 
 // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
 // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
@@ -174,6 +174,7 @@ async function onBlock(...args: Array<any>) {
 
   // Log the bloc k number first
   let logLine = "#" + args;
+  let logThisBlock = false;
 
   // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
   const priceInUsdc = poolEthUsdcForRangeOrder.token1Price.toFixed(2);
@@ -181,6 +182,7 @@ async function onBlock(...args: Array<any>) {
   // Only log the price when it changes.
   if (dro.priceUsdc != priceInUsdc) {
     logLine += " " + priceInUsdc + " USDC.";
+    logThisBlock = true;
   }
 
   dro.priceUsdc = priceInUsdc;
@@ -209,7 +211,7 @@ async function onBlock(...args: Array<any>) {
     logLine += " In range.";
   }
 
-  console.log(logLine);
+  if (logThisBlock) console.log(logLine);
 }
 
 async function main() {
