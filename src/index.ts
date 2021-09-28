@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { nearestUsableTick, Pool, Position } from "@uniswap/v3-sdk";
+import { nearestUsableTick, Pool, Position, tickToPrice } from "@uniswap/v3-sdk";
 import { Token, CurrencyAmount, Percent } from "@uniswap/sdk-core";
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json";
 
@@ -33,7 +33,7 @@ import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/i
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
 
 // Width of the range relative to the current price.
-const RANGE_WIDTH = 0.02;
+const RANGE_WIDTH = 0.01;
 
 // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
 // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
@@ -140,14 +140,18 @@ async function getPoolState() {
   return PoolState;
 }
 
-function minMaxTicks(currentTick: number, rangeWdidth: number, tickSpacing: number) {
-  let minTick = currentTick - ((rangeWdidth / 2) * currentTick);
+function minMaxTicks(currentTick: number, rangeWidth: number, tickSpacing: number) {
+  console.log("rangeWidth / 2: ", rangeWidth / 2);
+  console.log("(rangeWidth / 2) * currentTick: ", (rangeWidth / 2) * currentTick);
+  console.log("minTick: ", currentTick - ((rangeWidth / 2) * currentTick));
+
+  let minTick = currentTick - ((rangeWidth / 2) * currentTick);
   minTick = nearestUsableTick(Math.round(minTick), tickSpacing);
 
-  let maxTick = currentTick + ((rangeWdidth / 2) * currentTick);
+  let maxTick = currentTick + ((rangeWidth / 2) * currentTick);
   maxTick = nearestUsableTick(Math.round(maxTick), tickSpacing);
 
-  // console.log("Ticks: " + minTick + " < " + currentTick + " < " + maxTick);
+  console.log("Ticks: " + minTick + " < " + currentTick + " < " + maxTick);
 
   return [minTick, maxTick];
 }
@@ -191,10 +195,19 @@ async function onBlock(...args: Array<any>) {
     // Tick spacing for the ETH/USDC 0.30% pool is 60.
     const [minTick, maxTick] = minMaxTicks(state.tick, RANGE_WIDTH, dro.poolImmutables.tickSpacing);
 
-    logLine += " Out of range. New range: " + minTick + " - " + maxTick + ".";
-
     dro.minTick = minTick;
     dro.maxTick = maxTick;
+
+    // tickToPrice() implementation: https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
+    const minUsdc = tickToPrice(dro.weth, dro.usdc, minTick).toFixed(2);
+    const maxUsdc = tickToPrice(dro.weth, dro.usdc, maxTick).toFixed(2);
+
+    // console.log("Min USDC: ", tickToPrice(dro.weth, dro.usdc, minTick));
+    // console.log("Max USDC: ", tickToPrice(dro.weth, dro.usdc, maxTick));
+
+    // TODO: These are round the wrong way and way too wide. Half of 1% below 3,000 should be 2,985.
+    // Could the tick spacing of 60 be wrong?
+    logLine += " Out of range. New range: " + minUsdc + " USDC - " + maxUsdc + " USDC.";
 
     // Liquidity can be a JSBI, a string or a number.
 
