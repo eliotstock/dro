@@ -86,6 +86,7 @@ interface DRO {
   poolImmutables: Immutables,
   usdc: Token,
   weth: Token,
+  priceUsdc: string,
   minTick: number,
   maxTick: number
 }
@@ -171,10 +172,18 @@ async function onBlock(...args: Array<any>) {
     state.tick
   );
 
+  // Log the bloc k number first
+  let logLine = "#" + args;
+
   // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
   const priceInUsdc = poolEthUsdcForRangeOrder.token1Price.toFixed(2);
+  
+  // Only log the price when it changes.
+  if (dro.priceUsdc != priceInUsdc) {
+    logLine += " " + priceInUsdc + " USDC.";
+  }
 
-  let logLine = "#" + args + " " + priceInUsdc + " USDC.";
+  dro.priceUsdc = priceInUsdc;
 
   if (oor) {
     // Tick spacing for the ETH/USDC 0.30% pool is 60.
@@ -211,6 +220,7 @@ async function main() {
     poolImmutables: i,
     usdc: new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
     weth: new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
+    priceUsdc: "unknown",
     minTick: 0,
     maxTick: 0
   };
