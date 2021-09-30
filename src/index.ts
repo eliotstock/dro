@@ -2,10 +2,10 @@ import { ethers } from "ethers";
 import { nearestUsableTick, Pool, Position, priceToClosestTick, tickToPrice } from "@uniswap/v3-sdk";
 import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core";
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json";
+import moment from 'moment';
 
 // TODO
 // ----
-
 // (P2) Mint a new liquidity position (but fail because no local account) centred on the current price, providing half ETH and half USDC
 // (P2) Remove an existing liquidity position (but fail because no local account)
 // (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
@@ -28,6 +28,7 @@ import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/i
 // (P1) Show the new range min and max in terms of USDC rather than ticks
 // (P1) Get the current price in the pool synchronously and in terms of the quote currency
 // (P1) Know when we're out of range, indirectly, based on the current price in the pool and the current min/max, which we'll store for now
+// (P1) Timestamps in logging
 // (P2) Execute everything on every new block by subscribing to "block""
 // (P3) Understand whether executing on every block is going to spend the free quota at Infura
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
@@ -178,9 +179,10 @@ async function onBlock(...args: Array<any>) {
     state.tick
   );
 
-  // Log the block number first
-  let logLine = "#" + args;
+  // Log the timestamp and block number first
   let logThisBlock = false;
+  let logLine = moment().format("MM-DD-HH:mm:ss");
+  logLine += " #" + args;
 
   // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
   const priceInUsdc = poolEthUsdcForRangeOrder.token1Price.toFixed(2);
