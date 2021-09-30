@@ -238,14 +238,14 @@ async function main() {
   // Note that .01% is one basis point ("bip"), so every tick is a single bip change in price.
   // But the tick spacing in our pool is 60, so we'd be wise to make our range width a multiple of
   // that.
-  // Percent   bips (ticks)
-  // -------   ------------
-  //    0.6%             60
-  //    1.2%            120
-  //    1.8%            180
-  //    2.4%            240
+  // Percent   bips (ticks)   Observations
+  // -------   ------------   ------------
+  //    0.6%             60   NFW. Re-ranging 8 times during a 4% hourly bar.
+  //    1.2%            120   NFW. Re-ranging 7 times in 8 hours.
+  //    1.8%            180   Re-ranged 3 times in 11 hours in a non-volatile market.
+  //    2.4%            240   Testing now.
   //    3.0%            300
-  const rangeWidthTicks = 0.006 / 0.0001;
+  const rangeWidthTicks = 0.024 / 0.0001;
   console.log("Range width in ticks: " + rangeWidthTicks);
 
   dro = new DRO(i,
