@@ -1,12 +1,14 @@
 import { ethers } from "ethers";
-import { nearestUsableTick, Pool, Position, priceToClosestTick, tickToPrice } from "@uniswap/v3-sdk";
+import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, tickToPrice } from "@uniswap/v3-sdk";
 import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core";
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json";
+import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
 import moment from 'moment';
 
 // TODO
 // ----
 // (P2) Mint a new liquidity position (but fail because no local account) centred on the current price, providing half ETH and half USDC
+// (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Remove an existing liquidity position (but fail because no local account)
 // (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P2) Execute a swap for a known amount of ETH (half our account balance, less some savings for execution)
@@ -33,6 +35,9 @@ import moment from 'moment';
 // (P3) Understand whether executing on every block is going to spend the free quota at Infura
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
 
+// Account that will hold the Uniswap v3 position NFT
+// const DRO_ADDR = "0x0EEc9b15a6E978E89B2d0007fb00351Bdcf1527D";
+
 // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
 // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
 const ENDPOINT_HTTPS = "https://mainnet.infura.io/v3/84a44395cd9a413b9c903d8bd0f9b39a";
@@ -48,9 +53,13 @@ const PROVIDER = new ethers.providers.JsonRpcProvider(ENDPOINT);
 // This is the pool into which we enter a range order. It is NOT the pool in which we execute swaps.
 const POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8";
 
-// uSDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
+// USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
 // This is the pool in which we execute our swaps.
 const POOL_ADDR_ETH_USDC_FOR_SWAPS = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640";
+
+// Position manager contract. Address taken from https://github.com/Uniswap/v3-periphery/blob/main/deploys.md
+// and checked against transactions executed on the Uniswap dApp.
+const POSITION_MANAGER_ADDR = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
 
 const poolContract = new ethers.Contract(
   POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER,
@@ -58,8 +67,17 @@ const poolContract = new ethers.Contract(
   PROVIDER
 );
 
+let nonfungiblePositionManagerContract = new ethers.Contract(
+  POSITION_MANAGER_ADDR,
+  NonfungiblePositionManagerABI,
+  PROVIDER
+);
+
 // Single, global instance of the DRO class.
 let dro: DRO;
+
+// Etheres wallet
+let w: ethers.Wallet;
 
 interface Immutables {
   factory: string;
@@ -168,6 +186,7 @@ async function getPoolState() {
 async function onBlock(...args: Array<any>) {
   const state = await getPoolState();
 
+  // Are we now out of range?
   const oor = dro.outOfRange(state.tick);
 
   const poolEthUsdcForRangeOrder = new Pool(
@@ -185,7 +204,7 @@ async function onBlock(...args: Array<any>) {
   logLine += " #" + args;
 
   // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
-  const priceInUsdc = poolEthUsdcForRangeOrder.token1Price.toFixed(2);
+  const priceInUsdc: string = poolEthUsdcForRangeOrder.token1Price.toFixed(2);
   
   // Only log the price when it changes.
   if (dro.priceUsdc != priceInUsdc) {
@@ -196,7 +215,7 @@ async function onBlock(...args: Array<any>) {
   dro.priceUsdc = priceInUsdc;
 
   if (oor) {
-    // Tick spacing for the ETH/USDC 0.30% pool is 60.
+    // Find our new range around the current price.
     const [minTick, maxTick] = dro.newRange(state.tick);
 
     dro.minTick = minTick;
@@ -211,13 +230,37 @@ async function onBlock(...args: Array<any>) {
     logLine += " Out of range. New range: " + minUsdc + " USDC - " + maxUsdc + " USDC.";
 
     // Liquidity can be a JSBI, a string or a number.
+    // TODO: For all but the very first minting of a position, the liquidity will be based on the
+    // balance in our account after we just removed liquidity from the out of range position.
 
     const position = new Position({
       pool: poolEthUsdcForRangeOrder,
-      liquidity: 0, //state.liquidity.mul(0.0002),
+      liquidity: 1, // Integer
       tickLower: minTick,
       tickUpper: maxTick
     });
+
+    const { amount0: amount0Desired, amount1: amount1Desired } = position.mintAmounts
+    console.log("Amounts desired: ", amount0Desired.toString(), amount1Desired.toString())
+
+    const mintOptions: MintOptions = {
+      slippageTolerance: new Percent(50, 10_000), // 0.005%
+      deadline: moment().unix() + 180, // 3 minutes from now
+      recipient: w.address,
+      createPool: false
+    };
+
+    // addCallParameters() implementation:
+    //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
+    const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions);
+
+    console.log("calldata: ", calldata);
+    console.log("value: ", value);
+
+    // console.log("nonfungiblePositionManagerContract: ", nonfungiblePositionManagerContract);
+    // Solidity source for mint(): https://github.com/Uniswap/v3-periphery/blob/v1.0.0/contracts/NonfungiblePositionManager.sol#L128
+    const out = await nonfungiblePositionManagerContract.mint(calldata);
+    console.log("out: ", out);
 
     // TODO: Continue with https://docs.uniswap.org/sdk/guides/liquidity/minting.
   }
@@ -245,6 +288,16 @@ async function main() {
   //    3.6%            360
   const rangeWidthTicks = 0.030 / 0.0001;
   console.log("Range width in ticks: " + rangeWidthTicks);
+
+  // Create a new random wallet and connect to our provider.
+  w = ethers.Wallet.createRandom();
+  w = w.connect(PROVIDER);
+
+  console.log("Wallet: ", w.address);
+  console.log("Mnemonic: ", w.mnemonic.phrase);
+
+  // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString());
+  nonfungiblePositionManagerContract = nonfungiblePositionManagerContract.connect(w);
 
   try {
     // Get the pool's immutables once only.
