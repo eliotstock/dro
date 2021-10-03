@@ -229,9 +229,6 @@ async function onBlock(...args: Array<any>) {
 }
 
 async function main() {
-  // Get the pool's immutables once only.
-  const i = await getPoolImmutables();
-
   // From the Uniswap v3 whitepaper:
   //   "Ticks are all 1.0001 to an integer power, which means each tick is .01% away from the next
   //    tick."
@@ -243,15 +240,25 @@ async function main() {
   //    0.6%             60   NFW. Re-ranging 8 times during a 4% hourly bar.
   //    1.2%            120   NFW. Re-ranging 7 times in 8 hours.
   //    1.8%            180   Re-ranged 3 times in 11 hours in a non-volatile market.
-  //    2.4%            240   Testing now.
-  //    3.0%            300
-  const rangeWidthTicks = 0.024 / 0.0001;
+  //    2.4%            240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
+  //    3.0%            300   Testing
+  //    3.6%            360
+  const rangeWidthTicks = 0.030 / 0.0001;
   console.log("Range width in ticks: " + rangeWidthTicks);
 
-  dro = new DRO(i,
-    new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
-    new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
-    rangeWidthTicks);
+  try {
+    // Get the pool's immutables once only.
+    const i = await getPoolImmutables();
+
+    dro = new DRO(i,
+      new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
+      new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
+      rangeWidthTicks);
+  }
+  catch(e) {
+    // Probably network error thrown by getPoolImmutables().
+    console.error(e);
+  }
 
   // Get a callback to onBlock() on every new block.
   PROVIDER.on('block', onBlock);
