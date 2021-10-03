@@ -2,7 +2,7 @@ import { ethers } from "ethers";
 import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, tickToPrice } from "@uniswap/v3-sdk";
 import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core";
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json";
-import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
+// import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
 import moment from 'moment';
 
 // TODO
@@ -67,11 +67,11 @@ const poolContract = new ethers.Contract(
   PROVIDER
 );
 
-let nonfungiblePositionManagerContract = new ethers.Contract(
-  POSITION_MANAGER_ADDR,
-  NonfungiblePositionManagerABI,
-  PROVIDER
-);
+// let nonfungiblePositionManagerContract = new ethers.Contract(
+//   POSITION_MANAGER_ADDR,
+//   NonfungiblePositionManagerABI,
+//   PROVIDER
+// );
 
 // Single, global instance of the DRO class.
 let dro: DRO;
@@ -254,15 +254,33 @@ async function onBlock(...args: Array<any>) {
     //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
     const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions);
 
-    console.log("calldata: ", calldata);
-    console.log("value: ", value);
+    // console.log("calldata: ", calldata);
+    // console.log("value: ", value);
 
     // console.log("nonfungiblePositionManagerContract: ", nonfungiblePositionManagerContract);
     // Solidity source for mint(): https://github.com/Uniswap/v3-periphery/blob/v1.0.0/contracts/NonfungiblePositionManager.sol#L128
-    const out = await nonfungiblePositionManagerContract.mint(calldata);
-    console.log("out: ", out);
+    // TODO: Fix:
+    // Error: invalid ENS name (argument="name", value=undefined, code=INVALID_ARGUMENT, version=providers/5.4.5)
+    // const out = await nonfungiblePositionManagerContract.mint(calldata);
+    // console.log("out: ", out);
+    const nonce = await w.getTransactionCount("latest");
+    console.log("nonce: ", nonce);
 
-    // TODO: Continue with https://docs.uniswap.org/sdk/guides/liquidity/minting.
+    const tx = {
+      from: w.address,
+      to: POSITION_MANAGER_ADDR,
+      value: ethers.utils.parseEther("0"),
+      nonce: nonce,
+      gasLimit: ethers.utils.hexlify(100_000),
+      gasPrice: ethers.utils.hexlify(100_000), // TODO: This is probably quite wrong.
+      data: calldata
+    };
+
+    // Currently failing with insufficient funds, which is as expected.
+    // w.sendTransaction(tx).then((transaction) => {
+    //   console.dir(transaction)
+    //   console.log("Send finished!")
+    // }).catch(console.error);
   }
   else {
     logLine += " In range.";
@@ -297,7 +315,7 @@ async function main() {
   console.log("Mnemonic: ", w.mnemonic.phrase);
 
   // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString());
-  nonfungiblePositionManagerContract = nonfungiblePositionManagerContract.connect(w);
+  // nonfungiblePositionManagerContract = nonfungiblePositionManagerContract.connect(w);
 
   try {
     // Get the pool's immutables once only.
