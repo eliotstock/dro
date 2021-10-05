@@ -3,6 +3,7 @@ import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Posit
 import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core";
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json";
 // import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
+import JSBI from 'jsbi';
 import moment from 'moment';
 
 // TODO
@@ -51,6 +52,7 @@ const PROVIDER = new ethers.providers.JsonRpcProvider(ENDPOINT);
 
 // USDC/ETH pool with 0.3% fee: https://info.uniswap.org/#/pools/0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8
 // This is the pool into which we enter a range order. It is NOT the pool in which we execute swaps.
+// UI for adding liquidity to this pool: https://app.uniswap.org/#/add/ETH/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/3000
 const POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8";
 
 // USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
@@ -229,19 +231,36 @@ async function onBlock(...args: Array<any>) {
 
     logLine += " Out of range. New range: " + minUsdc + " USDC - " + maxUsdc + " USDC.";
 
-    // Liquidity can be a JSBI, a string or a number.
-    // TODO: For all but the very first minting of a position, the liquidity will be based on the
-    // balance in our account after we just removed liquidity from the out of range position.
+    // If we know L, the liquidity:
+    // const position = new Position({
+    //   pool: poolEthUsdcForRangeOrder,
+    //   liquidity: 10, // Integer. L is sqrt(k) where y * x = k.
+    //   tickLower: minTick,
+    //   tickUpper: maxTick
+    // });
 
-    const position = new Position({
+
+    // console.log("Decimals: ", dro.usdc.decimals, "(USDC)", dro.weth.decimals, "(WETH)")
+
+    // TODO: Get these from our account balance, leaving some ETH for gas and swap costs.
+    // TODO: Use JSBI here, but with exponents. These are overflowing a Javascript number type right now.
+    const amountUsdc: number = 3385.00 * 10 ^ dro.usdc.decimals; // 6 decimals
+    const amountEth: number = 1.00 * 10 ^ dro.weth.decimals; // 18 decimals
+
+    // We don't know L, the liquidity, but we do know how much ETH and how much USDC we'd like to add.
+    const position = Position.fromAmounts({
       pool: poolEthUsdcForRangeOrder,
-      liquidity: 1, // Integer
       tickLower: minTick,
-      tickUpper: maxTick
+      tickUpper: maxTick,
+      //        3037677745
+      amount0: "3377990000",
+      //                 1         
+      //        9876543210987654321
+      amount1: "1000000000000000000", // 18 zeros.
+      useFullPrecision: true
     });
 
-    const { amount0: amount0Desired, amount1: amount1Desired } = position.mintAmounts
-    console.log("Amounts desired: ", amount0Desired.toString(), amount1Desired.toString())
+    console.log("Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
 
     const mintOptions: MintOptions = {
       slippageTolerance: new Percent(50, 10_000), // 0.005%
@@ -257,12 +276,6 @@ async function onBlock(...args: Array<any>) {
     // console.log("calldata: ", calldata);
     // console.log("value: ", value);
 
-    // console.log("nonfungiblePositionManagerContract: ", nonfungiblePositionManagerContract);
-    // Solidity source for mint(): https://github.com/Uniswap/v3-periphery/blob/v1.0.0/contracts/NonfungiblePositionManager.sol#L128
-    // TODO: Fix:
-    // Error: invalid ENS name (argument="name", value=undefined, code=INVALID_ARGUMENT, version=providers/5.4.5)
-    // const out = await nonfungiblePositionManagerContract.mint(calldata);
-    // console.log("out: ", out);
     const nonce = await w.getTransactionCount("latest");
     console.log("nonce: ", nonce);
 
@@ -277,6 +290,7 @@ async function onBlock(...args: Array<any>) {
     };
 
     // Currently failing with insufficient funds, which is as expected.
+    // TODO: Switch to Kovan, fund the account with USDC and ETH or WETH and test.
     // w.sendTransaction(tx).then((transaction) => {
     //   console.dir(transaction)
     //   console.log("Send finished!")
@@ -302,9 +316,13 @@ async function main() {
   //    1.2%            120   NFW. Re-ranging 7 times in 8 hours.
   //    1.8%            180   Re-ranged 3 times in 11 hours in a non-volatile market.
   //    2.4%            240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
-  //    3.0%            300   Testing
-  //    3.6%            360
-  const rangeWidthTicks = 0.030 / 0.0001;
+  //    3.0%            300   Re-ranged 5 times in 16 hours on a 6% daily bar.
+  //    3.6%            360   Testing now.
+  //    4.2%            420
+  //    4.8%            480
+  //    5.4%            540
+  //    6.0%            600
+  const rangeWidthTicks = 0.036 / 0.0001;
   console.log("Range width in ticks: " + rangeWidthTicks);
 
   // Create a new random wallet and connect to our provider.
