@@ -1,14 +1,16 @@
+import { config } from 'dotenv'
 import { ethers } from "ethers"
 import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, tickToPrice } from "@uniswap/v3-sdk"
 import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
-// import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
 import JSBI from 'jsbi'
 import moment from 'moment'
 
+// Read our .env file
+config()
+
 // TODO
 // ----
-// (P2) Mint a new liquidity position (but fail because no local account) centred on the current price, providing half ETH and half USDC
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Remove an existing liquidity position (but fail because no local account)
 // (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
@@ -22,8 +24,6 @@ import moment from 'moment'
 // (P3) Know the current price of gas
 // (P3) Don't re-range when the current price of gas is over a constant threshold
 
-// (P4) Get things like the Infura endpoint URL from a .env file using dotenv()
-
 // Done
 // ----
 
@@ -33,20 +33,20 @@ import moment from 'moment'
 // (P1) Know when we're out of range, indirectly, based on the current price in the pool and the current min/max, which we'll store for now
 // (P1) Timestamps in logging
 // (P2) Execute everything on every new block by subscribing to "block""
+// (P2) Mint a new liquidity position (but fail because no balances in account) centred on the current price, providing half ETH and half USDC
 // (P3) Understand whether executing on every block is going to spend the free quota at Infura
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
 
-// Account that will hold the Uniswap v3 position NFT
-// const DRO_ADDR = "0x0EEc9b15a6E978E89B2d0007fb00351Bdcf1527D"
-
 // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
 // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
-const ENDPOINT_HTTPS = "https://mainnet.infura.io/v3/84a44395cd9a413b9c903d8bd0f9b39a"
-const ENDPOINT_WSS = "wss://mainnet.infura.io/ws/v3/84a44395cd9a413b9c903d8bd0f9b39a"
-const ENDPOINT = ENDPOINT_HTTPS
+const ENDPOINT_MAINNET = "https://mainnet.infura.io/v3/84a44395cd9a413b9c903d8bd0f9b39a"
+const ENDPOINT_KOVAN = "https://kovan.infura.io/v3/84a44395cd9a413b9c903d8bd0f9b39a"
+const ENDPOINT = ENDPOINT_KOVAN
 
 // Ethereum mainnet
-const CHAIN_ID = 1
+const CHAIN_ID_MAINNET = 1
+const CHAIN_ID_KOVAN = 42
+const CHAIN_ID = CHAIN_ID_KOVAN
 
 const PROVIDER = new ethers.providers.JsonRpcProvider(ENDPOINT)
 
@@ -69,16 +69,10 @@ const poolContract = new ethers.Contract(
   PROVIDER
 )
 
-// let nonfungiblePositionManagerContract = new ethers.Contract(
-//   POSITION_MANAGER_ADDR,
-//   NonfungiblePositionManagerABI,
-//   PROVIDER
-// )
-
 // Single, global instance of the DRO class.
 let dro: DRO
 
-// Etheres wallet
+// Ethers.js wallet
 let w: ethers.Wallet
 
 interface Immutables {
@@ -161,13 +155,6 @@ async function getPoolState() {
     poolContract.liquidity(),
     poolContract.slot0(),
   ])
-
-  // slot[0] at this point is not that useful:
-  // console.log("Pool state slot 0: ", slot[0])
-  // BigNumber {
-  //   _hex: '0x461e1227bff1bfd4f8cfbee9ef21',
-  //   _isBigNumber: true
-  // }
 
   const PoolState: State = {
     liquidity,
@@ -324,15 +311,20 @@ async function main() {
   const rangeWidthTicks = 0.036 / 0.0001
   console.log("Range width in ticks: " + rangeWidthTicks)
 
-  // Create a new random wallet and connect to our provider.
-  w = ethers.Wallet.createRandom()
-  w = w.connect(PROVIDER)
+  // Check .env file and create Ethers.js wallet from mnemonic in it.
+  const mnemonic = process.env.DRO_ACCOUNT_MNEMONIC
 
-  console.log("Wallet: ", w.address)
-  console.log("Mnemonic: ", w.mnemonic.phrase)
+  if (mnemonic == undefined) {
+    console.error("No .env file or no mnemonic in it.")
+    process.exit()
+  }
+
+  // Account that will hold the Uniswap v3 position NFT
+  w = ethers.Wallet.fromMnemonic(mnemonic)
+  w = w.connect(PROVIDER)
+  console.log("DRO account: ", w.address)
 
   // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString())
-  // nonfungiblePositionManagerContract = nonfungiblePositionManagerContract.connect(w)
 
   try {
     // Get the pool's immutables once only.
