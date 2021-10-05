@@ -1,10 +1,10 @@
-import { ethers } from "ethers";
-import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, tickToPrice } from "@uniswap/v3-sdk";
-import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core";
-import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json";
-// import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
-import JSBI from 'jsbi';
-import moment from 'moment';
+import { ethers } from "ethers"
+import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, tickToPrice } from "@uniswap/v3-sdk"
+import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core"
+import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
+// import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
+import JSBI from 'jsbi'
+import moment from 'moment'
 
 // TODO
 // ----
@@ -37,100 +37,100 @@ import moment from 'moment';
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
 
 // Account that will hold the Uniswap v3 position NFT
-// const DRO_ADDR = "0x0EEc9b15a6E978E89B2d0007fb00351Bdcf1527D";
+// const DRO_ADDR = "0x0EEc9b15a6E978E89B2d0007fb00351Bdcf1527D"
 
 // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
 // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
-const ENDPOINT_HTTPS = "https://mainnet.infura.io/v3/84a44395cd9a413b9c903d8bd0f9b39a";
-const ENDPOINT_WSS = "wss://mainnet.infura.io/ws/v3/84a44395cd9a413b9c903d8bd0f9b39a";
-const ENDPOINT = ENDPOINT_HTTPS;
+const ENDPOINT_HTTPS = "https://mainnet.infura.io/v3/84a44395cd9a413b9c903d8bd0f9b39a"
+const ENDPOINT_WSS = "wss://mainnet.infura.io/ws/v3/84a44395cd9a413b9c903d8bd0f9b39a"
+const ENDPOINT = ENDPOINT_HTTPS
 
 // Ethereum mainnet
-const CHAIN_ID = 1;
+const CHAIN_ID = 1
 
-const PROVIDER = new ethers.providers.JsonRpcProvider(ENDPOINT);
+const PROVIDER = new ethers.providers.JsonRpcProvider(ENDPOINT)
 
 // USDC/ETH pool with 0.3% fee: https://info.uniswap.org/#/pools/0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8
 // This is the pool into which we enter a range order. It is NOT the pool in which we execute swaps.
 // UI for adding liquidity to this pool: https://app.uniswap.org/#/add/ETH/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/3000
-const POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8";
+const POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
 
 // USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
 // This is the pool in which we execute our swaps.
-const POOL_ADDR_ETH_USDC_FOR_SWAPS = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640";
+const POOL_ADDR_ETH_USDC_FOR_SWAPS = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
 
 // Position manager contract. Address taken from https://github.com/Uniswap/v3-periphery/blob/main/deploys.md
 // and checked against transactions executed on the Uniswap dApp.
-const POSITION_MANAGER_ADDR = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
+const POSITION_MANAGER_ADDR = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
 
 const poolContract = new ethers.Contract(
   POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER,
   IUniswapV3PoolABI,
   PROVIDER
-);
+)
 
 // let nonfungiblePositionManagerContract = new ethers.Contract(
 //   POSITION_MANAGER_ADDR,
 //   NonfungiblePositionManagerABI,
 //   PROVIDER
-// );
+// )
 
 // Single, global instance of the DRO class.
-let dro: DRO;
+let dro: DRO
 
 // Etheres wallet
-let w: ethers.Wallet;
+let w: ethers.Wallet
 
 interface Immutables {
-  factory: string;
-  token0: string;
-  token1: string;
-  fee: number;
-  tickSpacing: number;
-  maxLiquidityPerTick: ethers.BigNumber;
+  factory: string
+  token0: string
+  token1: string
+  fee: number
+  tickSpacing: number
+  maxLiquidityPerTick: ethers.BigNumber
 }
 
 interface State {
-  liquidity: ethers.BigNumber;
-  sqrtPriceX96: ethers.BigNumber;
-  tick: number;
-  observationIndex: number;
-  observationCardinality: number;
-  observationCardinalityNext: number;
-  feeProtocol: number;
-  unlocked: boolean;
+  liquidity: ethers.BigNumber
+  sqrtPriceX96: ethers.BigNumber
+  tick: number
+  observationIndex: number
+  observationCardinality: number
+  observationCardinalityNext: number
+  feeProtocol: number
+  unlocked: boolean
 }
 
 class DRO {
-  readonly poolImmutables: Immutables;
-  readonly usdc: Token;
-  readonly weth: Token;
-  priceUsdc: string = "unknown";
-  minTick: number = 0;
-  maxTick: number = 0;
-  rangeWidthTicks = 0;
+  readonly poolImmutables: Immutables
+  readonly usdc: Token
+  readonly weth: Token
+  priceUsdc: string = "unknown"
+  minTick: number = 0
+  maxTick: number = 0
+  rangeWidthTicks = 0
 
   constructor(_poolImmutables: Immutables, _usdc: Token, _weth: Token, _rangeWidthTicks: number) {
-    this.poolImmutables = _poolImmutables;
-    this.usdc = _usdc;
-    this.weth = _weth;
-    this.rangeWidthTicks = _rangeWidthTicks;
+    this.poolImmutables = _poolImmutables
+    this.usdc = _usdc
+    this.weth = _weth
+    this.rangeWidthTicks = _rangeWidthTicks
   }
 
   outOfRange(currentTick: number) {
-    return currentTick < this.minTick || currentTick > this.maxTick;
+    return currentTick < this.minTick || currentTick > this.maxTick
   }
 
   // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
   // returned here can be quite different to rangeWidthTicks.
   newRange(currentTick: number) {
     const minTick = nearestUsableTick(Math.round(currentTick - (this.rangeWidthTicks / 2)),
-      this.poolImmutables.tickSpacing);
+      this.poolImmutables.tickSpacing)
 
     const maxTick = nearestUsableTick(Math.round(currentTick + (this.rangeWidthTicks / 2)),
-      this.poolImmutables.tickSpacing);
+      this.poolImmutables.tickSpacing)
 
-    return [minTick, maxTick];
+    return [minTick, maxTick]
   }
 }
 
@@ -143,7 +143,7 @@ async function getPoolImmutables() {
       poolContract.fee(),
       poolContract.tickSpacing(),
       poolContract.maxLiquidityPerTick(),
-    ]);
+    ])
 
   const immutables: Immutables = {
     factory,
@@ -152,18 +152,18 @@ async function getPoolImmutables() {
     fee,
     tickSpacing,
     maxLiquidityPerTick,
-  };
-  return immutables;
+  }
+  return immutables
 }
 
 async function getPoolState() {
   const [liquidity, slot] = await Promise.all([
     poolContract.liquidity(),
     poolContract.slot0(),
-  ]);
+  ])
 
   // slot[0] at this point is not that useful:
-  // console.log("Pool state slot 0: ", slot[0]);
+  // console.log("Pool state slot 0: ", slot[0])
   // BigNumber {
   //   _hex: '0x461e1227bff1bfd4f8cfbee9ef21',
   //   _isBigNumber: true
@@ -178,18 +178,18 @@ async function getPoolState() {
     observationCardinalityNext: slot[4],
     feeProtocol: slot[5],
     unlocked: slot[6],
-  };
+  }
 
-  return PoolState;
+  return PoolState
 }
 
 // Ethers.js listener:
-// export type Listener = (...args: Array<any>) => void;
+// export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
-  const state = await getPoolState();
+  const state = await getPoolState()
 
   // Are we now out of range?
-  const oor = dro.outOfRange(state.tick);
+  const oor = dro.outOfRange(state.tick)
 
   const poolEthUsdcForRangeOrder = new Pool(
     dro.usdc,
@@ -198,38 +198,38 @@ async function onBlock(...args: Array<any>) {
     state.sqrtPriceX96.toString(),
     state.liquidity.toString(),
     state.tick
-  );
+  )
 
   // Log the timestamp and block number first
-  let logThisBlock = false;
-  let logLine = moment().format("MM-DD-HH:mm:ss");
-  logLine += " #" + args;
+  let logThisBlock = false
+  let logLine = moment().format("MM-DD-HH:mm:ss")
+  logLine += " #" + args
 
   // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
-  const priceInUsdc: string = poolEthUsdcForRangeOrder.token1Price.toFixed(2);
+  const priceInUsdc: string = poolEthUsdcForRangeOrder.token1Price.toFixed(2)
   
   // Only log the price when it changes.
   if (dro.priceUsdc != priceInUsdc) {
-    logLine += " " + priceInUsdc + " USDC.";
-    logThisBlock = true;
+    logLine += " " + priceInUsdc + " USDC."
+    logThisBlock = true
   }
 
-  dro.priceUsdc = priceInUsdc;
+  dro.priceUsdc = priceInUsdc
 
   if (oor) {
     // Find our new range around the current price.
-    const [minTick, maxTick] = dro.newRange(state.tick);
+    const [minTick, maxTick] = dro.newRange(state.tick)
 
-    dro.minTick = minTick;
-    dro.maxTick = maxTick;
+    dro.minTick = minTick
+    dro.maxTick = maxTick
 
     // tickToPrice() implementation:
     //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
     // Note that minimum USDC value per ETH corresponds to the maximum tick value and vice versa.
-    const minUsdc = tickToPrice(dro.weth, dro.usdc, maxTick).toFixed(2);
-    const maxUsdc = tickToPrice(dro.weth, dro.usdc, minTick).toFixed(2);
+    const minUsdc = tickToPrice(dro.weth, dro.usdc, maxTick).toFixed(2)
+    const maxUsdc = tickToPrice(dro.weth, dro.usdc, minTick).toFixed(2)
 
-    logLine += " Out of range. New range: " + minUsdc + " USDC - " + maxUsdc + " USDC.";
+    logLine += " Out of range. New range: " + minUsdc + " USDC - " + maxUsdc + " USDC."
 
     // If we know L, the liquidity:
     // const position = new Position({
@@ -237,15 +237,14 @@ async function onBlock(...args: Array<any>) {
     //   liquidity: 10, // Integer. L is sqrt(k) where y * x = k.
     //   tickLower: minTick,
     //   tickUpper: maxTick
-    // });
-
+    // })
 
     // console.log("Decimals: ", dro.usdc.decimals, "(USDC)", dro.weth.decimals, "(WETH)")
 
     // TODO: Get these from our account balance, leaving some ETH for gas and swap costs.
     // TODO: Use JSBI here, but with exponents. These are overflowing a Javascript number type right now.
-    const amountUsdc: number = 3385.00 * 10 ^ dro.usdc.decimals; // 6 decimals
-    const amountEth: number = 1.00 * 10 ^ dro.weth.decimals; // 18 decimals
+    const amountUsdc: number = 3385.00 * 10 ^ dro.usdc.decimals // 6 decimals
+    const amountEth: number = 1.00 * 10 ^ dro.weth.decimals // 18 decimals
 
     // We don't know L, the liquidity, but we do know how much ETH and how much USDC we'd like to add.
     const position = Position.fromAmounts({
@@ -258,7 +257,7 @@ async function onBlock(...args: Array<any>) {
       //        9876543210987654321
       amount1: "1000000000000000000", // 18 zeros.
       useFullPrecision: true
-    });
+    })
 
     console.log("Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
 
@@ -267,17 +266,17 @@ async function onBlock(...args: Array<any>) {
       deadline: moment().unix() + 180, // 3 minutes from now
       recipient: w.address,
       createPool: false
-    };
+    }
 
     // addCallParameters() implementation:
     //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
-    const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions);
+    const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
 
-    // console.log("calldata: ", calldata);
-    // console.log("value: ", value);
+    // console.log("calldata: ", calldata)
+    // console.log("value: ", value)
 
-    const nonce = await w.getTransactionCount("latest");
-    console.log("nonce: ", nonce);
+    const nonce = await w.getTransactionCount("latest")
+    console.log("nonce: ", nonce)
 
     const tx = {
       from: w.address,
@@ -287,20 +286,20 @@ async function onBlock(...args: Array<any>) {
       gasLimit: ethers.utils.hexlify(100_000),
       gasPrice: ethers.utils.hexlify(100_000), // TODO: This is probably quite wrong.
       data: calldata
-    };
+    }
 
     // Currently failing with insufficient funds, which is as expected.
     // TODO: Switch to Kovan, fund the account with USDC and ETH or WETH and test.
     // w.sendTransaction(tx).then((transaction) => {
     //   console.dir(transaction)
     //   console.log("Send finished!")
-    // }).catch(console.error);
+    // }).catch(console.error)
   }
   else {
-    logLine += " In range.";
+    logLine += " In range."
   }
 
-  if (logThisBlock) console.log(logLine);
+  if (logThisBlock) console.log(logLine)
 }
 
 async function main() {
@@ -322,35 +321,35 @@ async function main() {
   //    4.8%            480
   //    5.4%            540
   //    6.0%            600
-  const rangeWidthTicks = 0.036 / 0.0001;
-  console.log("Range width in ticks: " + rangeWidthTicks);
+  const rangeWidthTicks = 0.036 / 0.0001
+  console.log("Range width in ticks: " + rangeWidthTicks)
 
   // Create a new random wallet and connect to our provider.
-  w = ethers.Wallet.createRandom();
-  w = w.connect(PROVIDER);
+  w = ethers.Wallet.createRandom()
+  w = w.connect(PROVIDER)
 
-  console.log("Wallet: ", w.address);
-  console.log("Mnemonic: ", w.mnemonic.phrase);
+  console.log("Wallet: ", w.address)
+  console.log("Mnemonic: ", w.mnemonic.phrase)
 
-  // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString());
-  // nonfungiblePositionManagerContract = nonfungiblePositionManagerContract.connect(w);
+  // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString())
+  // nonfungiblePositionManagerContract = nonfungiblePositionManagerContract.connect(w)
 
   try {
     // Get the pool's immutables once only.
-    const i = await getPoolImmutables();
+    const i = await getPoolImmutables()
 
     dro = new DRO(i,
       new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
       new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
-      rangeWidthTicks);
+      rangeWidthTicks)
   }
   catch(e) {
     // Probably network error thrown by getPoolImmutables().
-    console.error(e);
+    console.error(e)
   }
 
   // Get a callback to onBlock() on every new block.
-  PROVIDER.on('block', onBlock);
+  PROVIDER.on('block', onBlock)
 }
   
-main().catch(console.error);
+main().catch(console.error)
