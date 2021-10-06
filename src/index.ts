@@ -332,7 +332,9 @@ async function main() {
   const mnemonic = process.env.DRO_ACCOUNT_MNEMONIC
 
   if (mnemonic == undefined) {
-    console.error("No .env file or no mnemonic in it.")
+    console.error("No .env file or no mnemonic in it. If you need one for testing, try this one.")
+    w = ethers.Wallet.createRandom()
+    console.error(w.mnemonic.phrase)
     process.exit()
   }
 
