@@ -173,6 +173,15 @@ class DRO {
       return
     }
 
+    // TODO: If we're collecting fees in ETH not WETH, which we may do in order to has some for
+    // gas, note this from the Uniswap docs:
+    //   When collecting fees in ETH, you must precompute the fees owed to protect against
+    //   reentrancy attacks. In order to set a safety check, set the minimum fees owed in
+    //   expectedCurrencyOwed0 and expectedCurrencyOwed1. To calculate this, quote the collect
+    //   function and store the amounts. The interface does similar behavior here
+    //   https://github.com/Uniswap/interface/blob/eff512deb8f0ab832eb8d1834f6d1a20219257d0/src/hooks/useV3PositionFees.ts#L32
+    // This means we need a callStatic on the collect() function on POSITION_MANAGER_ADDR.
+
     const collectOptions: CollectOptions = {
       tokenId: this.tokenId,
       expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(this.usdc, 0),
