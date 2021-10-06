@@ -1,8 +1,9 @@
 import { config } from 'dotenv'
 import { ethers } from "ethers"
-import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, tickToPrice } from "@uniswap/v3-sdk"
+import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, Route, tickToPrice } from "@uniswap/v3-sdk"
 import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
+import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
 import JSBI from 'jsbi'
 import moment from 'moment'
 
@@ -41,12 +42,12 @@ config()
 // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
 const ENDPOINT_MAINNET = "https://mainnet.infura.io/v3/84a44395cd9a413b9c903d8bd0f9b39a"
 const ENDPOINT_KOVAN = "https://kovan.infura.io/v3/84a44395cd9a413b9c903d8bd0f9b39a"
-const ENDPOINT = ENDPOINT_KOVAN
+const ENDPOINT = ENDPOINT_MAINNET
 
 // Ethereum mainnet
 const CHAIN_ID_MAINNET = 1
 const CHAIN_ID_KOVAN = 42
-const CHAIN_ID = CHAIN_ID_KOVAN
+const CHAIN_ID = CHAIN_ID_MAINNET
 
 const PROVIDER = new ethers.providers.JsonRpcProvider(ENDPOINT)
 
@@ -60,12 +61,28 @@ const POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER = "0x8ad599c3a0ff1de082011efddc58f1908e
 const POOL_ADDR_ETH_USDC_FOR_SWAPS = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
 
 // Position manager contract. Address taken from https://github.com/Uniswap/v3-periphery/blob/main/deploys.md
-// and checked against transactions executed on the Uniswap dApp.
+// and checked against transactions executed on the Uniswap dApp. Same address on testnets.
 const POSITION_MANAGER_ADDR = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
 
-const poolContract = new ethers.Contract(
+// Quoter contract. Address taken from https://github.com/Uniswap/v3-periphery/blob/main/deploys.md
+// Same address on testnets.
+const QUOTER_ADDR = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6"
+
+const poolForRangeOrderContract = new ethers.Contract(
   POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER,
   IUniswapV3PoolABI,
+  PROVIDER
+)
+
+const poolForSwapsContract = new ethers.Contract(
+  POOL_ADDR_ETH_USDC_FOR_SWAPS,
+  IUniswapV3PoolABI,
+  PROVIDER
+)
+
+const quoterContract = new ethers.Contract(
+  QUOTER_ADDR,
+  QuoterABI,
   PROVIDER
 )
 
@@ -128,7 +145,7 @@ class DRO {
   }
 }
 
-async function getPoolImmutables() {
+async function getPoolImmutables(poolContract: ethers.Contract) {
   const [factory, token0, token1, fee, tickSpacing, maxLiquidityPerTick] =
     await Promise.all([
       poolContract.factory(),
@@ -150,7 +167,7 @@ async function getPoolImmutables() {
   return immutables
 }
 
-async function getPoolState() {
+async function getPoolState(poolContract: ethers.Contract) {
   const [liquidity, slot] = await Promise.all([
     poolContract.liquidity(),
     poolContract.slot0(),
@@ -173,7 +190,7 @@ async function getPoolState() {
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
-  const state = await getPoolState()
+  const state = await getPoolState(poolForRangeOrderContract)
 
   // Are we now out of range?
   const oor = dro.outOfRange(state.tick)
@@ -296,18 +313,18 @@ async function main() {
   // Note that .01% is one basis point ("bip"), so every tick is a single bip change in price.
   // But the tick spacing in our pool is 60, so we'd be wise to make our range width a multiple of
   // that.
-  // Percent   bips (ticks)   Observations
-  // -------   ------------   ------------
-  //    0.6%             60   NFW. Re-ranging 8 times during a 4% hourly bar.
-  //    1.2%            120   NFW. Re-ranging 7 times in 8 hours.
-  //    1.8%            180   Re-ranged 3 times in 11 hours in a non-volatile market.
-  //    2.4%            240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
-  //    3.0%            300   Re-ranged 5 times in 16 hours on a 6% daily bar.
-  //    3.6%            360   Testing now.
-  //    4.2%            420
-  //    4.8%            480
-  //    5.4%            540
-  //    6.0%            600
+  // Percent   bps (ticks)   Observations
+  // -------   -----------   ------------
+  //    0.6%            60   NFW. Re-ranging 8 times during a 4% hourly bar.
+  //    1.2%           120   NFW. Re-ranging 7 times in 8 hours.
+  //    1.8%           180   Re-ranged 3 times in 11 hours in a non-volatile market.
+  //    2.4%           240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
+  //    3.0%           300   Re-ranged 5 times in 16 hours on a 6% daily bar.
+  //    3.6%           360   Testing now. Re-ranged 1 time in 24 hours on a 4% daily bar.
+  //    4.2%           420
+  //    4.8%           480
+  //    5.4%           540
+  //    6.0%           600
   const rangeWidthTicks = 0.036 / 0.0001
   console.log("Range width in ticks: " + rangeWidthTicks)
 
@@ -328,12 +345,36 @@ async function main() {
 
   try {
     // Get the pool's immutables once only.
-    const i = await getPoolImmutables()
+    const i = await getPoolImmutables(poolForRangeOrderContract)
 
     dro = new DRO(i,
       new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
       new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
       rangeWidthTicks)
+
+      // TODO: Move all the below swap stuff out of here and into a function called only when we're out of range.
+      const quotedAmountOut = await quoterContract.callStatic.quoteExactInputSingle(
+        i.token0, // USDC
+        i.token1, // ETH
+        i.fee,
+        "3500", // USDC
+        0 // sqrtPriceLimitX96
+      )
+
+      console.log("Quoted price: ", quotedAmountOut)
+
+      const state = await getPoolState(poolForSwapsContract)
+
+      const poolEthUsdcForSwaps = new Pool(
+        dro.usdc,
+        dro.weth,
+        dro.poolImmutables.fee,
+        state.sqrtPriceX96.toString(),
+        state.liquidity.toString(),
+        state.tick
+      )
+
+      const swapRoute = new Route([poolEthUsdcForSwaps], dro.usdc, dro.weth)
   }
   catch(e) {
     // Probably network error thrown by getPoolImmutables().
