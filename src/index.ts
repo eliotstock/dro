@@ -1,17 +1,19 @@
 import { config } from 'dotenv'
 import { ethers } from "ethers"
-import { MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, Route, tickToPrice } from "@uniswap/v3-sdk"
-import { Token, CurrencyAmount, Percent, Price, Fraction } from "@uniswap/sdk-core"
+import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, RemoveLiquidityOptions, Route, tickToPrice } from "@uniswap/v3-sdk"
+import { Token, CurrencyAmount, Percent, Price, Fraction, BigintIsh } from "@uniswap/sdk-core"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
 import JSBI from 'jsbi'
 import moment from 'moment'
+import { Collection } from 'typescript'
 
 // Read our .env file
 config()
 
 // TODO
 // ----
+// (P1) Know what our current balance of both WETH and USDC is, right after removing liquidity
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Remove an existing liquidity position (but fail because no local account)
 // (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
@@ -68,6 +70,18 @@ const POSITION_MANAGER_ADDR = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
 // Same address on testnets.
 const QUOTER_ADDR = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6"
 
+// On all transactions, set the deadline to 3 minutes from now
+const DEADLINE_SECONDS = 180
+
+const SLIPPAGE_TOLERANCE = new Percent(50, 10_000) // 0.005%
+
+const GAS_LIMIT = ethers.utils.hexlify(100_000)
+
+const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
+
+// TODO: This is probably quite wrong.
+const GAS_PRICE = ethers.utils.hexlify(100_000)
+
 const poolForRangeOrderContract = new ethers.Contract(
   POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER,
   IUniswapV3PoolABI,
@@ -120,6 +134,8 @@ class DRO {
   minTick: number = 0
   maxTick: number = 0
   rangeWidthTicks = 0
+  position?: Position
+  tokenId?: BigintIsh
 
   constructor(_poolImmutables: Immutables, _usdc: Token, _weth: Token, _rangeWidthTicks: number) {
     this.poolImmutables = _poolImmutables
@@ -134,14 +150,151 @@ class DRO {
 
   // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
   // returned here can be quite different to rangeWidthTicks.
-  newRange(currentTick: number) {
-    const minTick = nearestUsableTick(Math.round(currentTick - (this.rangeWidthTicks / 2)),
+  setNewRangeCenteredOn(currentTick: number) {
+    this.minTick = nearestUsableTick(Math.round(currentTick - (this.rangeWidthTicks / 2)),
       this.poolImmutables.tickSpacing)
 
-    const maxTick = nearestUsableTick(Math.round(currentTick + (this.rangeWidthTicks / 2)),
+    this.maxTick = nearestUsableTick(Math.round(currentTick + (this.rangeWidthTicks / 2)),
       this.poolImmutables.tickSpacing)
 
-    return [minTick, maxTick]
+    // tickToPrice() implementation:
+    //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
+    // Note that minimum USDC value per ETH corresponds to the maximum tick value and vice versa.
+    const minUsdc = tickToPrice(dro.weth, dro.usdc, this.maxTick).toFixed(2)
+    const maxUsdc = tickToPrice(dro.weth, dro.usdc, this.minTick).toFixed(2)
+
+    console.log("New range: " + minUsdc + " USDC - " + maxUsdc + " USDC.")
+  }
+
+  async removeLiquidity() {
+    if (!this.position || !this.tokenId) {
+      console.error("Not in a position yet.")
+      return
+    }
+
+    if (!w.address) {
+      console.error("No account address yet")
+      return
+    }
+
+    const collectOptions: CollectOptions = {
+      tokenId: this.tokenId,
+      expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(this.usdc, 0),
+      expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(this.weth, 0),
+      recipient: w.address
+    }
+
+    const removeLiquidityOptions: RemoveLiquidityOptions = {
+      tokenId: this.tokenId,
+      liquidityPercentage: new Percent(1), // 100%
+      slippageTolerance: SLIPPAGE_TOLERANCE,
+      deadline: moment().unix() + DEADLINE_SECONDS,
+      collectOptions: collectOptions
+    }
+
+    const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position, removeLiquidityOptions)
+
+    const nonce = await w.getTransactionCount("latest")
+    console.log("nonce: ", nonce)
+
+    const tx = {
+      from: w.address,
+      to: POSITION_MANAGER_ADDR,
+      value: VALUE_ZERO_ETHER,
+      nonce: nonce,
+      gasLimit: GAS_LIMIT,
+      gasPrice: GAS_PRICE,
+      data: calldata
+    }
+
+    // TODO: Switch to Kovan, fund the account with USDC and WETH and test.
+    // w.sendTransaction(tx).then((transaction) => {
+    //   console.dir(transaction)
+    //   console.log("Send finished!")
+    // }).catch(console.error)
+  }
+
+  async addLiquidity(poolState: State) {
+    if (!this.position || !this.tokenId) {
+      console.error("Not in a position yet.")
+      return
+    }
+
+    if (!w.address) {
+      console.error("No account address yet")
+      return
+    }
+
+    // We can't instantiate this pool instance until we have the pool state.
+    const poolEthUsdcForRangeOrder = new Pool(
+      dro.usdc,
+      dro.weth,
+      dro.poolImmutables.fee,
+      poolState.sqrtPriceX96.toString(),
+      poolState.liquidity.toString(),
+      poolState.tick
+    )
+
+    // If we know L, the liquidity:
+    // const position = new Position({
+    //   pool: poolEthUsdcForRangeOrder,
+    //   liquidity: 10, // Integer. L is sqrt(k) where y * x = k.
+    //   tickLower: minTick,
+    //   tickUpper: maxTick
+    // })
+
+    // console.log("Decimals: ", dro.usdc.decimals, "(USDC)", dro.weth.decimals, "(WETH)")
+
+    // TODO: Get these from our account balance, leaving some ETH for gas and swap costs.
+    // TODO: Use JSBI here, but with exponents. These are overflowing a Javascript number type right now.
+    const amountUsdc: number = 3385.00 * 10 ^ dro.usdc.decimals // 6 decimals
+    const amountEth: number = 1.00 * 10 ^ dro.weth.decimals // 18 decimals
+
+    // We don't know L, the liquidity, but we do know how much ETH and how much USDC we'd like to add.
+    const position = Position.fromAmounts({
+      pool: poolEthUsdcForRangeOrder,
+      tickLower: this.minTick,
+      tickUpper: this.maxTick,
+      amount0: "3377990000",
+      amount1: "1000000000000000000", // 18 zeros.
+      useFullPrecision: true
+    })
+
+    console.log("Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
+
+    const mintOptions: MintOptions = {
+      slippageTolerance: SLIPPAGE_TOLERANCE,
+      deadline: moment().unix() + DEADLINE_SECONDS,
+      recipient: w.address,
+      createPool: false
+    }
+
+    // addCallParameters() implementation:
+    //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
+    const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
+
+    // console.log("calldata: ", calldata)
+    // console.log("value: ", value)
+
+    const nonce = await w.getTransactionCount("latest")
+    console.log("nonce: ", nonce)
+
+    const tx = {
+      from: w.address,
+      to: POSITION_MANAGER_ADDR,
+      value: VALUE_ZERO_ETHER,
+      nonce: nonce,
+      gasLimit: GAS_LIMIT,
+      gasPrice: GAS_PRICE,
+      data: calldata
+    }
+
+    // Currently failing with insufficient funds, which is as expected.
+    // TODO: Switch to Kovan, fund the account with USDC and WETH and test.
+    // w.sendTransaction(tx).then((transaction) => {
+    //   console.dir(transaction)
+    //   console.log("Send finished!")
+    // }).catch(console.error)
   }
 }
 
@@ -164,6 +317,7 @@ async function getPoolImmutables(poolContract: ethers.Contract) {
     tickSpacing,
     maxLiquidityPerTick,
   }
+
   return immutables
 }
 
@@ -173,7 +327,7 @@ async function getPoolState(poolContract: ethers.Contract) {
     poolContract.slot0(),
   ])
 
-  const PoolState: State = {
+  const poolState: State = {
     liquidity,
     sqrtPriceX96: slot[0],
     tick: slot[1],
@@ -184,24 +338,24 @@ async function getPoolState(poolContract: ethers.Contract) {
     unlocked: slot[6],
   }
 
-  return PoolState
+  return poolState
 }
 
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
-  const state = await getPoolState(poolForRangeOrderContract)
+  const poolState = await getPoolState(poolForRangeOrderContract)
 
   // Are we now out of range?
-  const oor = dro.outOfRange(state.tick)
+  const oor = dro.outOfRange(poolState.tick)
 
   const poolEthUsdcForRangeOrder = new Pool(
     dro.usdc,
     dro.weth,
     dro.poolImmutables.fee,
-    state.sqrtPriceX96.toString(),
-    state.liquidity.toString(),
-    state.tick
+    poolState.sqrtPriceX96.toString(),
+    poolState.liquidity.toString(),
+    poolState.tick
   )
 
   // Log the timestamp and block number first
@@ -221,83 +375,14 @@ async function onBlock(...args: Array<any>) {
   dro.priceUsdc = priceInUsdc
 
   if (oor) {
+    // Remove all of our liquidity now and burn the NFT for our position.
+    await dro.removeLiquidity()
+
     // Find our new range around the current price.
-    const [minTick, maxTick] = dro.newRange(state.tick)
+    dro.setNewRangeCenteredOn(poolState.tick)
 
-    dro.minTick = minTick
-    dro.maxTick = maxTick
-
-    // tickToPrice() implementation:
-    //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
-    // Note that minimum USDC value per ETH corresponds to the maximum tick value and vice versa.
-    const minUsdc = tickToPrice(dro.weth, dro.usdc, maxTick).toFixed(2)
-    const maxUsdc = tickToPrice(dro.weth, dro.usdc, minTick).toFixed(2)
-
-    logLine += " Out of range. New range: " + minUsdc + " USDC - " + maxUsdc + " USDC."
-
-    // If we know L, the liquidity:
-    // const position = new Position({
-    //   pool: poolEthUsdcForRangeOrder,
-    //   liquidity: 10, // Integer. L is sqrt(k) where y * x = k.
-    //   tickLower: minTick,
-    //   tickUpper: maxTick
-    // })
-
-    // console.log("Decimals: ", dro.usdc.decimals, "(USDC)", dro.weth.decimals, "(WETH)")
-
-    // TODO: Get these from our account balance, leaving some ETH for gas and swap costs.
-    // TODO: Use JSBI here, but with exponents. These are overflowing a Javascript number type right now.
-    const amountUsdc: number = 3385.00 * 10 ^ dro.usdc.decimals // 6 decimals
-    const amountEth: number = 1.00 * 10 ^ dro.weth.decimals // 18 decimals
-
-    // We don't know L, the liquidity, but we do know how much ETH and how much USDC we'd like to add.
-    const position = Position.fromAmounts({
-      pool: poolEthUsdcForRangeOrder,
-      tickLower: minTick,
-      tickUpper: maxTick,
-      //        3037677745
-      amount0: "3377990000",
-      //                 1         
-      //        9876543210987654321
-      amount1: "1000000000000000000", // 18 zeros.
-      useFullPrecision: true
-    })
-
-    console.log("Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
-
-    const mintOptions: MintOptions = {
-      slippageTolerance: new Percent(50, 10_000), // 0.005%
-      deadline: moment().unix() + 180, // 3 minutes from now
-      recipient: w.address,
-      createPool: false
-    }
-
-    // addCallParameters() implementation:
-    //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
-    const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
-
-    // console.log("calldata: ", calldata)
-    // console.log("value: ", value)
-
-    const nonce = await w.getTransactionCount("latest")
-    console.log("nonce: ", nonce)
-
-    const tx = {
-      from: w.address,
-      to: POSITION_MANAGER_ADDR,
-      value: ethers.utils.parseEther("0"),
-      nonce: nonce,
-      gasLimit: ethers.utils.hexlify(100_000),
-      gasPrice: ethers.utils.hexlify(100_000), // TODO: This is probably quite wrong.
-      data: calldata
-    }
-
-    // Currently failing with insufficient funds, which is as expected.
-    // TODO: Switch to Kovan, fund the account with USDC and ETH or WETH and test.
-    // w.sendTransaction(tx).then((transaction) => {
-    //   console.dir(transaction)
-    //   console.log("Send finished!")
-    // }).catch(console.error)
+    // Add all our WETH and USDC to a new liquidity position.
+    await dro.addLiquidity(poolState)
   }
   else {
     logLine += " In range."
@@ -349,21 +434,27 @@ async function main() {
     // Get the pool's immutables once only.
     const i = await getPoolImmutables(poolForRangeOrderContract)
 
+    // console.log("Token 0 address: ", i.token0)
+    // console.log("Token 1 address: ", i.token1)
+
     dro = new DRO(i,
       new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
       new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
       rangeWidthTicks)
 
       // TODO: Move all the below swap stuff out of here and into a function called only when we're out of range.
-      const quotedAmountOut = await quoterContract.callStatic.quoteExactInputSingle(
-        i.token0, // USDC
-        i.token1, // ETH
-        i.fee,
-        "3500", // USDC
+      const usdcIn = "3375560000" // USDC, 6 decimals
+
+      const quotedWethOut = await quoterContract.callStatic.quoteExactInputSingle(
+        i.token0, // Token in: USDC
+        i.token1, // Token out: WETH
+        i.fee, // 0.30%
+        usdcIn, // Amount in, USDC (6 decimals)
         0 // sqrtPriceLimitX96
       )
 
-      console.log("Quoted price: ", quotedAmountOut)
+      // Given 3_375_560_000, currently returns 996_997_221_346_111_279, ie. approx. 1 * 10^18 wei.
+      console.log("Swapping " + usdcIn + " USDC will get us " + quotedWethOut.toString() + " WETH")
 
       const state = await getPoolState(poolForSwapsContract)
 
