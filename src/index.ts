@@ -8,9 +8,6 @@ import JSBI from 'jsbi'
 import moment from 'moment'
 import { Collection } from 'typescript'
 
-// Read our .env file
-config()
-
 // TODO
 // ----
 // (P1) Know what our current balance of both WETH and USDC is, right after removing liquidity
@@ -20,16 +17,12 @@ config()
 // (P2) Execute a swap for a known amount of ETH (half our account balance, less some savings for execution)
 // (P2) Execute a swap for a known amount of USDC (half our account balance)
 // (P2) Keep track of how much ETH to keep on hand for gas and swap costs
-
-// (P3) Know how to create a new account locally in geth and secure the private key (or destroy it if the seed phrase is secure), eg. enter seed phrase or password on process start every time
-// (P3) Have this script execute using the local geth-created account, using an Ethers.js Signer
 // (P3) Build the URL of the position, based on the serial number, and log it
 // (P3) Know the current price of gas
 // (P3) Don't re-range when the current price of gas is over a constant threshold
 
 // Done
 // ----
-
 // (P1) Fix the range width arithmetic
 // (P1) Show the new range min and max in terms of USDC rather than ticks
 // (P1) Get the current price in the pool synchronously and in terms of the quote currency
@@ -39,6 +32,11 @@ config()
 // (P2) Mint a new liquidity position (but fail because no balances in account) centred on the current price, providing half ETH and half USDC
 // (P3) Understand whether executing on every block is going to spend the free quota at Infura
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
+// (P3) Have this script execute transactions using the local account, using an Ethers.js Signer
+// (P3) Know how to create a new account locally and secure the private key (or destroy it if the mnemonic is secure), eg. enter mnemonic on process start every time
+
+// Read our .env file
+config()
 
 // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
 // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
@@ -82,13 +80,13 @@ const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
 // TODO: This is probably quite wrong.
 const GAS_PRICE = ethers.utils.hexlify(100_000)
 
-const poolForRangeOrderContract = new ethers.Contract(
+const rangeOrderPoolContract = new ethers.Contract(
   POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER,
   IUniswapV3PoolABI,
   PROVIDER
 )
 
-const poolForSwapsContract = new ethers.Contract(
+const swapsPoolContract = new ethers.Contract(
   POOL_ADDR_ETH_USDC_FOR_SWAPS,
   IUniswapV3PoolABI,
   PROVIDER
@@ -103,7 +101,7 @@ const quoterContract = new ethers.Contract(
 // Single, global instance of the DRO class.
 let dro: DRO
 
-// Ethers.js wallet
+// Single, global Ethers.js wallet (account).
 let w: ethers.Wallet
 
 interface Immutables {
@@ -173,7 +171,7 @@ class DRO {
     }
 
     if (!w.address) {
-      console.error("No account address yet")
+      console.error("No account address yet.")
       return
     }
 
@@ -214,14 +212,50 @@ class DRO {
     // }).catch(console.error)
   }
 
-  async addLiquidity(poolState: State) {
-    if (!this.position || !this.tokenId) {
-      console.error("Not in a position yet.")
+  async swap(swapPoolState: State) {
+    if (this.position || this.tokenId) {
+      console.error("Still in a position. Remove liquidity first.")
       return
     }
 
     if (!w.address) {
-      console.error("No account address yet")
+      console.error("No account address yet.")
+      return
+    }
+
+    const usdcIn = "3375560000" // USDC, 6 decimals
+
+    const quotedWethOut = await quoterContract.callStatic.quoteExactInputSingle(
+      this.poolImmutables.token0, // Token in: USDC
+      this.poolImmutables.token1, // Token out: WETH
+      this.poolImmutables.fee, // 0.30%
+      usdcIn, // Amount in, USDC (6 decimals)
+      0 // sqrtPriceLimitX96
+    )
+
+    // Given 3_375_560_000, currently returns 996_997_221_346_111_279, ie. approx. 1 * 10^18 wei.
+    console.log("Swapping " + usdcIn + " USDC will get us " + quotedWethOut.toString() + " WETH")
+
+    const poolEthUsdcForSwaps = new Pool(
+      dro.usdc,
+      dro.weth,
+      dro.poolImmutables.fee,
+      swapPoolState.sqrtPriceX96.toString(),
+      swapPoolState.liquidity.toString(),
+      swapPoolState.tick
+    )
+
+    const swapRoute = new Route([poolEthUsdcForSwaps], dro.usdc, dro.weth)
+  }
+
+  async addLiquidity(poolState: State) {
+    if (this.position || this.tokenId) {
+      console.error("Already in a position. Remove liquidity and swap first.")
+      return
+    }
+
+    if (!w.address) {
+      console.error("No account address yet.")
       return
     }
 
@@ -298,6 +332,25 @@ class DRO {
   }
 }
 
+function initAccount(): ethers.Wallet {
+    // Check .env file and create Ethers.js wallet from mnemonic in it.
+    const mnemonic = process.env.DRO_ACCOUNT_MNEMONIC
+
+    if (mnemonic == undefined) {
+      console.error("No .env file or no mnemonic in it. If you need one for testing, try this one.")
+      const randomWallet = ethers.Wallet.createRandom()
+      console.error(randomWallet.mnemonic.phrase)
+      process.exit()
+    }
+  
+    // Account that will hold the Uniswap v3 position NFT
+    let wallet: ethers.Wallet = ethers.Wallet.fromMnemonic(mnemonic)
+    wallet = wallet.connect(PROVIDER)
+    console.log("DRO account: ", wallet.address)
+
+    return wallet
+}
+
 async function getPoolImmutables(poolContract: ethers.Contract) {
   const [factory, token0, token1, fee, tickSpacing, maxLiquidityPerTick] =
     await Promise.all([
@@ -344,18 +397,18 @@ async function getPoolState(poolContract: ethers.Contract) {
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
-  const poolState = await getPoolState(poolForRangeOrderContract)
+  const rangeOrderPoolState = await getPoolState(rangeOrderPoolContract)
 
   // Are we now out of range?
-  const oor = dro.outOfRange(poolState.tick)
+  const outOfRange = dro.outOfRange(rangeOrderPoolState.tick)
 
   const poolEthUsdcForRangeOrder = new Pool(
     dro.usdc,
     dro.weth,
     dro.poolImmutables.fee,
-    poolState.sqrtPriceX96.toString(),
-    poolState.liquidity.toString(),
-    poolState.tick
+    rangeOrderPoolState.sqrtPriceX96.toString(),
+    rangeOrderPoolState.liquidity.toString(),
+    rangeOrderPoolState.tick
   )
 
   // Log the timestamp and block number first
@@ -374,15 +427,19 @@ async function onBlock(...args: Array<any>) {
 
   dro.priceUsdc = priceInUsdc
 
-  if (oor) {
+  if (outOfRange) {
     // Remove all of our liquidity now and burn the NFT for our position.
     await dro.removeLiquidity()
 
     // Find our new range around the current price.
-    dro.setNewRangeCenteredOn(poolState.tick)
+    dro.setNewRangeCenteredOn(rangeOrderPoolState.tick)
+
+    // Swap half our assets to the other asset so that we have equal value of assets.
+    const swapPoolState = await getPoolState(swapsPoolContract)
+    await dro.swap(swapPoolState)
 
     // Add all our WETH and USDC to a new liquidity position.
-    await dro.addLiquidity(poolState)
+    await dro.addLiquidity(rangeOrderPoolState)
   }
   else {
     logLine += " In range."
@@ -413,61 +470,18 @@ async function main() {
   const rangeWidthTicks = 0.036 / 0.0001
   console.log("Range width in ticks: " + rangeWidthTicks)
 
-  // Check .env file and create Ethers.js wallet from mnemonic in it.
-  const mnemonic = process.env.DRO_ACCOUNT_MNEMONIC
-
-  if (mnemonic == undefined) {
-    console.error("No .env file or no mnemonic in it. If you need one for testing, try this one.")
-    w = ethers.Wallet.createRandom()
-    console.error(w.mnemonic.phrase)
-    process.exit()
-  }
-
-  // Account that will hold the Uniswap v3 position NFT
-  w = ethers.Wallet.fromMnemonic(mnemonic)
-  w = w.connect(PROVIDER)
-  console.log("DRO account: ", w.address)
+  w = initAccount()
 
   // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString())
 
   try {
-    // Get the pool's immutables once only.
-    const i = await getPoolImmutables(poolForRangeOrderContract)
-
-    // console.log("Token 0 address: ", i.token0)
-    // console.log("Token 1 address: ", i.token1)
+    // Get the range order pool's immutables once only.
+    const i = await getPoolImmutables(rangeOrderPoolContract)
 
     dro = new DRO(i,
       new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
       new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
       rangeWidthTicks)
-
-      // TODO: Move all the below swap stuff out of here and into a function called only when we're out of range.
-      const usdcIn = "3375560000" // USDC, 6 decimals
-
-      const quotedWethOut = await quoterContract.callStatic.quoteExactInputSingle(
-        i.token0, // Token in: USDC
-        i.token1, // Token out: WETH
-        i.fee, // 0.30%
-        usdcIn, // Amount in, USDC (6 decimals)
-        0 // sqrtPriceLimitX96
-      )
-
-      // Given 3_375_560_000, currently returns 996_997_221_346_111_279, ie. approx. 1 * 10^18 wei.
-      console.log("Swapping " + usdcIn + " USDC will get us " + quotedWethOut.toString() + " WETH")
-
-      const state = await getPoolState(poolForSwapsContract)
-
-      const poolEthUsdcForSwaps = new Pool(
-        dro.usdc,
-        dro.weth,
-        dro.poolImmutables.fee,
-        state.sqrtPriceX96.toString(),
-        state.liquidity.toString(),
-        state.tick
-      )
-
-      const swapRoute = new Route([poolEthUsdcForSwaps], dro.usdc, dro.weth)
   }
   catch(e) {
     // Probably network error thrown by getPoolImmutables().
