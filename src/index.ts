@@ -1,7 +1,7 @@
 import { config } from 'dotenv'
 import { ethers } from "ethers"
-import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, priceToClosestTick, RemoveLiquidityOptions, Route, tickToPrice } from "@uniswap/v3-sdk"
-import { Token, CurrencyAmount, Percent, Price, Fraction, BigintIsh } from "@uniswap/sdk-core"
+import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, tickToPrice } from "@uniswap/v3-sdk"
+import { Token, CurrencyAmount, Percent, BigintIsh } from "@uniswap/sdk-core"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
 import moment from 'moment'
