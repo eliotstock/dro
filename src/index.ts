@@ -4,9 +4,7 @@ import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionMana
 import { Token, CurrencyAmount, Percent, Price, Fraction, BigintIsh } from "@uniswap/sdk-core"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
-import JSBI from 'jsbi'
 import moment from 'moment'
-import { Collection } from 'typescript'
 
 // TODO
 // ----
