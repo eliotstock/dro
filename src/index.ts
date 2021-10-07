@@ -1,16 +1,18 @@
 import { config } from 'dotenv'
 import { ethers } from "ethers"
+import { BigNumber } from '@ethersproject/bignumber'
 import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, tickToPrice } from "@uniswap/v3-sdk"
 import { Token, CurrencyAmount, Percent, BigintIsh } from "@uniswap/sdk-core"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
+import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
 import moment from 'moment'
 
 // TODO
 // ----
-// (P1) Know what our current balance of both WETH and USDC is, right after removing liquidity
+// (P1) Know what our current balance of ETH, WETH and USDC is, right after removing liquidity
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
-// (P2) Remove an existing liquidity position (but fail because no local account)
+// (P2) Remove an existing liquidity position (but fail because no position yet)
 // (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P2) Execute a swap for a known amount of ETH (half our account balance, less some savings for execution)
 // (P2) Execute a swap for a known amount of USDC (half our account balance)
@@ -96,6 +98,12 @@ const quoterContract = new ethers.Contract(
   PROVIDER
 )
 
+const positionManagerContract = new ethers.Contract(
+  POSITION_MANAGER_ADDR,
+  NonfungiblePositionManagerABI,
+  PROVIDER
+)
+
 // Single, global instance of the DRO class.
 let dro: DRO
 
@@ -132,6 +140,8 @@ class DRO {
   rangeWidthTicks = 0
   position?: Position
   tokenId?: BigintIsh
+  unclaimedFeesUsdc?: BigintIsh
+  unclaimedFeesWeth?: BigintIsh
 
   constructor(_poolImmutables: Immutables, _usdc: Token, _weth: Token, _rangeWidthTicks: number) {
     this.poolImmutables = _poolImmutables
@@ -162,30 +172,76 @@ class DRO {
     console.log("New range: " + minUsdc + " USDC - " + maxUsdc + " USDC.")
   }
 
-  async removeLiquidity() {
+  // Checking unclaimed fees is a nice-to-have for the logs but essential if we want to actually
+  // claim fees in ETH at the time of removing liquidity. The docs say:
+  //   When collecting fees in ETH, you must precompute the fees owed to protect against
+  //   reentrancy attacks. In order to set a safety check, set the minimum fees owed in
+  //   expectedCurrencyOwed0 and expectedCurrencyOwed1. To calculate this, quote the collect
+  //   function and store the amounts. The interface does similar behavior here
+  //   https://github.com/Uniswap/interface/blob/eff512deb8f0ab832eb8d1834f6d1a20219257d0/src/hooks/useV3PositionFees.ts#L32
+  async checkUnclaimedFees() {
     if (!this.position || !this.tokenId) {
-      console.error("Not in a position yet.")
+      console.error("Can't check unclaimed fees. Not in a position yet.")
       return
     }
 
     if (!w.address) {
-      console.error("No account address yet.")
+      console.error("Can't check unclaimed fees. No account address yet.")
       return
     }
 
-    // TODO: If we're collecting fees in ETH not WETH, which we may do in order to has some for
-    // gas, note this from the Uniswap docs:
-    //   When collecting fees in ETH, you must precompute the fees owed to protect against
-    //   reentrancy attacks. In order to set a safety check, set the minimum fees owed in
-    //   expectedCurrencyOwed0 and expectedCurrencyOwed1. To calculate this, quote the collect
-    //   function and store the amounts. The interface does similar behavior here
-    //   https://github.com/Uniswap/interface/blob/eff512deb8f0ab832eb8d1834f6d1a20219257d0/src/hooks/useV3PositionFees.ts#L32
-    // This means we need a callStatic on the collect() function on POSITION_MANAGER_ADDR.
+    const MAX_UINT128 = BigNumber.from(2).pow(128).sub(1)
+
+    // TODO: Set this once we know the real underlying type of tokenId. BigintIsh is no use.
+    // const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
+    const tokenIdHexString = "todo"
+
+    // const collectOptions: CollectOptions = {
+    //   tokenId: this.tokenId,
+    //   expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(this.usdc, 0),
+    //   expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(this.weth, 0),
+    //   recipient: w.address
+    // }
+
+    // const { calldata, value } = NonfungiblePositionManager.collectCallParameters(collectOptions)
+
+    positionManagerContract.callStatic.collect({
+      tokenId: tokenIdHexString,
+      recipient: w.address,
+      amount0Max: MAX_UINT128,
+      amount1Max: MAX_UINT128,
+    },
+    { from: w.address })
+    .then((results) => {
+      this.unclaimedFeesUsdc = results.amount0
+      this.unclaimedFeesWeth = results.amount1
+
+      console.log("Unclaimed fees: " + this.unclaimedFeesUsdc + " USDC, " + this.unclaimedFeesWeth + " WETH")
+    })
+  }
+
+  async removeLiquidity() {
+    if (!this.position || !this.tokenId) {
+      console.error("Can't remove liquidity. Not in a position yet.")
+      return
+    }
+
+    if (!w.address) {
+      console.error("Can't remove liquidity. No account address yet.")
+      return
+    }
+
+    // If we're only ever collecting fees in WETH and USDC, then the expectedCurrencyOwed0 and
+    // expectedCurrencyOwed1 can be zero (CurrencyAmount.fromRawAmount(this.usdc, 0). But if we
+    // ever want fees in ETH, which we may do to cover gas costs, then we need to get these
+    // using a callStatic on collect() ahead of time.
+    const expectedCurrencyOwed0 = CurrencyAmount.fromRawAmount(this.usdc, this.unclaimedFeesUsdc ?? 0)
+    const expectedCurrencyOwed1 = CurrencyAmount.fromRawAmount(this.weth, this.unclaimedFeesWeth ?? 0)
 
     const collectOptions: CollectOptions = {
       tokenId: this.tokenId,
-      expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(this.usdc, 0),
-      expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(this.weth, 0),
+      expectedCurrencyOwed0: expectedCurrencyOwed0,
+      expectedCurrencyOwed1: expectedCurrencyOwed1,
       recipient: w.address
     }
 
@@ -221,12 +277,12 @@ class DRO {
 
   async swap(swapPoolState: State) {
     if (this.position || this.tokenId) {
-      console.error("Still in a position. Remove liquidity first.")
+      console.error("Refusing to swap. Still in a position. Remove liquidity first.")
       return
     }
 
     if (!w.address) {
-      console.error("No account address yet.")
+      console.error("Refusing to swap. No account address yet.")
       return
     }
 
@@ -257,12 +313,12 @@ class DRO {
 
   async addLiquidity(poolState: State) {
     if (this.position || this.tokenId) {
-      console.error("Already in a position. Remove liquidity and swap first.")
+      console.error("Can't add liquidity. Already in a position. Remove liquidity and swap first.")
       return
     }
 
     if (!w.address) {
-      console.error("No account address yet.")
+      console.error("Can't add liquidity. No account address yet.")
       return
     }
 
@@ -336,6 +392,8 @@ class DRO {
     //   console.dir(transaction)
     //   console.log("Send finished!")
     // }).catch(console.error)
+
+    // TODO: Set the token ID on the dro instance.
   }
 }
 
@@ -460,8 +518,8 @@ async function main() {
   //   "Ticks are all 1.0001 to an integer power, which means each tick is .01% away from the next
   //    tick."
   // Note that .01% is one basis point ("bip"), so every tick is a single bip change in price.
-  // But the tick spacing in our pool is 60, so we'd be wise to make our range width a multiple of
-  // that.
+  // But the tick spacing in our pool is 60, so our range width must be a multiple of that.
+  //
   // Percent   bps (ticks)   Observations
   // -------   -----------   ------------
   //    0.6%            60   NFW. Re-ranging 8 times during a 4% hourly bar.
@@ -469,12 +527,12 @@ async function main() {
   //    1.8%           180   Re-ranged 3 times in 11 hours in a non-volatile market.
   //    2.4%           240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
   //    3.0%           300   Re-ranged 5 times in 16 hours on a 6% daily bar.
-  //    3.6%           360   Testing now. Re-ranged 1 time in 24 hours on a 4% daily bar.
-  //    4.2%           420
+  //    3.6%           360   Re-ranged 7 times in 34 hours on a 8% daily bar.
+  //    4.2%           420   Testing now.
   //    4.8%           480
   //    5.4%           540
   //    6.0%           600
-  const rangeWidthTicks = 0.036 / 0.0001
+  const rangeWidthTicks = 0.042 / 0.0001
   console.log("Range width in ticks: " + rangeWidthTicks)
 
   w = initAccount()
