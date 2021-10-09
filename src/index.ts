@@ -55,10 +55,17 @@ const PROVIDER = new ethers.providers.JsonRpcProvider(ENDPOINT)
 // This is the pool into which we enter a range order. It is NOT the pool in which we execute swaps.
 // UI for adding liquidity to this pool: https://app.uniswap.org/#/add/ETH/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/3000
 const POOL_ADDR_ETH_USDC_FOR_RANGE_ORDER = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
+// TODO: On Kovan this is 0x877BD57CAF5A8620f06E80688070f23f091dF3b1
 
 // USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
 // This is the pool in which we execute our swaps.
 const POOL_ADDR_ETH_USDC_FOR_SWAPS = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
+// TODO: On Kovan there is no 0.05% pool for these tokens. Just use the 0.30% fee pool instead.
+
+// TODO: USDC on mainnet: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+// TODO: WETH on mainnet: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+// TODO: USDC on Kovan: 0xe22da380ee6b445bb8273c81944adeb6e8450422
+// TODO: WETH on Kovan: 0xd0A1E359811322d97991E03f863a0C30C2cF029C
 
 // Position manager contract. Address taken from https://github.com/Uniswap/v3-periphery/blob/main/deploys.md
 // and checked against transactions executed on the Uniswap dApp. Same address on testnets.
@@ -302,7 +309,7 @@ class DRO {
     const poolEthUsdcForSwaps = new Pool(
       dro.usdc,
       dro.weth,
-      dro.poolImmutables.fee,
+      dro.poolImmutables.fee, // TODO: Wrong. The fee is 0.05% here, not 0.30%.
       swapPoolState.sqrtPriceX96.toString(),
       swapPoolState.liquidity.toString(),
       swapPoolState.tick
@@ -547,6 +554,10 @@ async function main() {
       new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
       new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
       rangeWidthTicks)
+
+      console.log("USDC: ", i.token0)
+      console.log("WETH: ", i.token1)
+      console.log("Fee: ", i.fee)
   }
   catch(e) {
     // Probably network error thrown by getPoolImmutables().
