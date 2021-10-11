@@ -5,8 +5,9 @@ import { Token, CurrencyAmount, Percent, BigintIsh } from "@uniswap/sdk-core"
 import { ethers } from 'ethers'
 import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
 import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
+import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import moment from 'moment'
-import { Immutables, State } from './uniswap'
+import { Immutables, State, getPoolImmutables, getPoolState } from './uniswap'
 import { useConfig } from './config'
 
 // Read our .env file
@@ -24,15 +25,20 @@ export class DRO {
     readonly owner: ethers.Wallet
     readonly provider: ethers.providers.Provider
     readonly chainConfig: any
-    readonly poolImmutables: Immutables
-    readonly usdc: Token
-    readonly weth: Token
     readonly quoterContract: ethers.Contract
     readonly positionManagerContract: ethers.Contract
+    poolImmutables?: Immutables
+    usdc?: Token
+    weth?: Token
     priceUsdc: string = "unknown"
     minTick: number = 0
     maxTick: number = 0
     rangeWidthTicks = 0
+    rangeOrderPoolContract: ethers.Contract
+    rangeOrderPoolState?: State
+    rangeOrderPool?: Pool
+    swapPoolContract: ethers.Contract
+    swapPoolState?: State
     position?: Position
     tokenId?: BigintIsh
     unclaimedFeesUsdc?: BigintIsh
@@ -40,18 +46,11 @@ export class DRO {
   
     constructor(
         _owner: ethers.Wallet,
-        _provider: ethers.providers.Provider,
         _chainConfig: any,
-        _poolImmutables: Immutables,
-        _usdc: Token,
-        _weth: Token,
         _rangeWidthTicks: number) {
         this.owner = _owner
-        this.provider = _provider
+        this.provider = _chainConfig.provider()
         this.chainConfig = _chainConfig
-        this.poolImmutables = _poolImmutables
-        this.usdc = _usdc
-        this.weth = _weth
         this.rangeWidthTicks = _rangeWidthTicks
 
         this.quoterContract = new ethers.Contract(
@@ -65,19 +64,71 @@ export class DRO {
             NonfungiblePositionManagerABI,
             this.provider
         )
+
+        this.rangeOrderPoolContract = new ethers.Contract(
+            this.chainConfig.addrPoolRangeOrder,
+            IUniswapV3PoolABI,
+            this.chainConfig.provider()
+        )
+
+        this.swapPoolContract = new ethers.Contract(
+            this.chainConfig.addrPoolSwaps,
+            IUniswapV3PoolABI,
+            this.chainConfig.provider()
+        )
+    }
+
+    async init() {
+      // Get the range order pool's immutables once only.
+      this.poolImmutables = await getPoolImmutables(this.rangeOrderPoolContract)
+
+      this.usdc = new Token(this.chainConfig.chainId, this.poolImmutables.token0, 6, "USDC", "USD Coin")
+
+      this.weth = new Token(this.chainConfig.chainId, this.poolImmutables.token1, 18, "WETH", "Wrapped Ether")
+
+      console.log("USDC: ", this.poolImmutables.token0)
+      console.log("WETH: ", this.poolImmutables.token1)
+      console.log("Fee: ", this.poolImmutables.fee)
+    }
+
+    async updatePoolState() {
+        if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+
+        this.rangeOrderPoolState = await getPoolState(this.rangeOrderPoolContract)
+
+        // The pool depends on the pool state so we need to reconstruct it every time the state changes.
+        this.rangeOrderPool = new Pool(
+          this.usdc,
+          this.weth,
+          this.poolImmutables.fee,
+          this.rangeOrderPoolState.sqrtPriceX96.toString(),
+          this.rangeOrderPoolState.liquidity.toString(),
+          this.rangeOrderPoolState.tick
+        )
+
+        // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
+        this.priceUsdc = this.rangeOrderPool.token1Price.toFixed(2)
+
+        this.swapPoolState = await getPoolState(this.swapPoolContract)
     }
   
-    outOfRange(currentTick: number) {
-      return currentTick < this.minTick || currentTick > this.maxTick
+    outOfRange() {
+        return this.rangeOrderPoolState && (
+            this.rangeOrderPoolState.tick < this.minTick ||
+            this.rangeOrderPoolState.tick > this.maxTick)
     }
   
     // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
     // returned here can be quite different to rangeWidthTicks.
-    setNewRangeCenteredOn(currentTick: number) {
-      this.minTick = nearestUsableTick(Math.round(currentTick - (this.rangeWidthTicks / 2)),
+    updateRange() {
+      if (this.rangeOrderPoolState == undefined) throw "Not updatePoolState()ed"
+
+      if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+
+      this.minTick = nearestUsableTick(Math.round(this.rangeOrderPoolState.tick - (this.rangeWidthTicks / 2)),
         this.poolImmutables.tickSpacing)
   
-      this.maxTick = nearestUsableTick(Math.round(currentTick + (this.rangeWidthTicks / 2)),
+      this.maxTick = nearestUsableTick(Math.round(this.rangeOrderPoolState.tick + (this.rangeWidthTicks / 2)),
         this.poolImmutables.tickSpacing)
   
       // tickToPrice() implementation:
@@ -137,6 +188,8 @@ export class DRO {
         console.error("Can't remove liquidity. Not in a position yet.")
         return
       }
+
+      if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
   
       // If we're only ever collecting fees in WETH and USDC, then the expectedCurrencyOwed0 and
       // expectedCurrencyOwed1 can be zero (CurrencyAmount.fromRawAmount(this.usdc, 0). But if we
@@ -182,12 +235,13 @@ export class DRO {
       // }).catch(console.error)
     }
   
-    async swap(swapPoolState: State) {
+    async swap() {
       if (this.position || this.tokenId) {
         console.error("Refusing to swap. Still in a position. Remove liquidity first.")
         return
       }
 
+      if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
   
       const usdcIn = "3375560000" // USDC, 6 decimals
   
@@ -201,33 +255,41 @@ export class DRO {
   
       // Given 3_375_560_000, currently returns 996_997_221_346_111_279, ie. approx. 1 * 10^18 wei.
       console.log("Swapping " + usdcIn + " USDC will get us " + quotedWethOut.toString() + " WETH")
+
+      if (this.swapPoolState == undefined) return
   
       const poolEthUsdcForSwaps = new Pool(
         this.usdc,
         this.weth,
         this.poolImmutables.fee, // TODO: Wrong. The fee is 0.05% here, not 0.30%.
-        swapPoolState.sqrtPriceX96.toString(),
-        swapPoolState.liquidity.toString(),
-        swapPoolState.tick
+        this.swapPoolState.sqrtPriceX96.toString(),
+        this.swapPoolState.liquidity.toString(),
+        this.swapPoolState.tick
       )
   
       const swapRoute = new Route([poolEthUsdcForSwaps], this.usdc, this.weth)
+
+      // TODO: Execute swap.
     }
   
-    async addLiquidity(poolState: State) {
+    async addLiquidity() {
       if (this.position || this.tokenId) {
         console.error("Can't add liquidity. Already in a position. Remove liquidity and swap first.")
         return
       }
+
+      if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+
+      if (this.rangeOrderPoolState == undefined) throw "Not updatePoolState()ed"
   
       // We can't instantiate this pool instance until we have the pool state.
       const poolEthUsdcForRangeOrder = new Pool(
         this.usdc,
         this.weth,
         this.poolImmutables.fee,
-        poolState.sqrtPriceX96.toString(),
-        poolState.liquidity.toString(),
-        poolState.tick
+        this.rangeOrderPoolState.sqrtPriceX96.toString(),
+        this.rangeOrderPoolState.liquidity.toString(),
+        this.rangeOrderPoolState.tick
       )
   
       // If we know L, the liquidity:

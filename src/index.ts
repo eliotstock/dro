@@ -1,12 +1,8 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
-import { Pool } from "@uniswap/v3-sdk"
-import { Token } from "@uniswap/sdk-core"
-import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
-import moment from 'moment'
 import { useConfig } from './config'
-import { getPoolImmutables, getPoolState } from './uniswap'
 import { DRO } from './dro'
+import moment from 'moment'
 
 // TODO
 // ----
@@ -41,30 +37,19 @@ config()
 // Static config that doesn't belong in the .env file.
 const CONFIG = useConfig()
 
-// To switch to another chain, these lines should be all we need to update.
-const PROVIDER = CONFIG.ethereumMainnet.provider()
-const CHAIN_ID = CONFIG.ethereumMainnet.chainId
+// To switch to another chain, this line should be all we need to change.
 const CHAIN_CONFIG = CONFIG.ethereumMainnet
-
-const rangeOrderPoolContract = new ethers.Contract(
-  CHAIN_CONFIG.addrPoolRangeOrder,
-  IUniswapV3PoolABI,
-  PROVIDER
-)
-
-const swapsPoolContract = new ethers.Contract(
-  CHAIN_CONFIG.addrPoolSwaps,
-  IUniswapV3PoolABI,
-  PROVIDER
-)
 
 // Single, global instance of the DRO class.
 let dro: DRO
 
 // Single, global Ethers.js wallet (account).
-let w: ethers.Wallet
+let wallet: ethers.Wallet
 
-function initAccount(): ethers.Wallet {
+// Single, global USDC price in the range order pool.
+let price: string
+
+function initWallet(): ethers.Wallet {
     // Check .env file and create Ethers.js wallet from mnemonic in it.
     const mnemonic = process.env.DRO_ACCOUNT_MNEMONIC
 
@@ -77,7 +62,7 @@ function initAccount(): ethers.Wallet {
   
     // Account that will hold the Uniswap v3 position NFT
     let wallet: ethers.Wallet = ethers.Wallet.fromMnemonic(mnemonic)
-    wallet = wallet.connect(PROVIDER)
+    wallet = wallet.connect(CHAIN_CONFIG.provider())
     console.log("DRO account: ", wallet.address)
 
     return wallet
@@ -86,49 +71,33 @@ function initAccount(): ethers.Wallet {
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
-  const rangeOrderPoolState = await getPoolState(rangeOrderPoolContract)
-
-  // Are we now out of range?
-  const outOfRange = dro.outOfRange(rangeOrderPoolState.tick)
-
-  const poolEthUsdcForRangeOrder = new Pool(
-    dro.usdc,
-    dro.weth,
-    dro.poolImmutables.fee,
-    rangeOrderPoolState.sqrtPriceX96.toString(),
-    rangeOrderPoolState.liquidity.toString(),
-    rangeOrderPoolState.tick
-  )
+  await dro.updatePoolState()
 
   // Log the timestamp and block number first
   let logThisBlock = false
   let logLine = moment().format("MM-DD-HH:mm:ss")
   logLine += " #" + args
-
-  // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
-  const priceInUsdc: string = poolEthUsdcForRangeOrder.token1Price.toFixed(2)
   
   // Only log the price when it changes.
-  if (dro.priceUsdc != priceInUsdc) {
-    logLine += " " + priceInUsdc + " USDC."
+  if (dro.priceUsdc != price) {
+    logLine += " " + dro.priceUsdc + " USDC."
     logThisBlock = true
   }
+  price = dro.priceUsdc
 
-  dro.priceUsdc = priceInUsdc
-
-  if (outOfRange) {
+  // Are we now out of range?
+  if (dro.outOfRange()) {
     // Remove all of our liquidity now and burn the NFT for our position.
     await dro.removeLiquidity()
 
     // Find our new range around the current price.
-    dro.setNewRangeCenteredOn(rangeOrderPoolState.tick)
+    dro.updateRange()
 
     // Swap half our assets to the other asset so that we have equal value of assets.
-    const swapPoolState = await getPoolState(swapsPoolContract)
-    await dro.swap(swapPoolState)
+    await dro.swap()
 
     // Add all our WETH and USDC to a new liquidity position.
-    await dro.addLiquidity(rangeOrderPoolState)
+    await dro.addLiquidity()
   }
   else {
     logLine += " In range."
@@ -159,25 +128,14 @@ async function main() {
   const rangeWidthTicks = 0.048 / 0.0001
   console.log("Range width in ticks: " + rangeWidthTicks)
 
-  w = initAccount()
+  wallet = initWallet()
 
   // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString())
 
   try {
-    // Get the range order pool's immutables once only.
-    const i = await getPoolImmutables(rangeOrderPoolContract)
+    dro = new DRO(wallet, CHAIN_CONFIG, rangeWidthTicks)
 
-    dro = new DRO(w,
-      PROVIDER,
-      CHAIN_CONFIG,
-      i,
-      new Token(CHAIN_ID, i.token0, 6, "USDC", "USD Coin"),
-      new Token(CHAIN_ID, i.token1, 18, "WETH", "Wrapped Ether"),
-      rangeWidthTicks)
-
-      console.log("USDC: ", i.token0)
-      console.log("WETH: ", i.token1)
-      console.log("Fee: ", i.fee)
+    await dro.init()
   }
   catch(e) {
     // Probably network error thrown by getPoolImmutables().
@@ -185,7 +143,7 @@ async function main() {
   }
 
   // Get a callback to onBlock() on every new block.
-  PROVIDER.on('block', onBlock)
+  CHAIN_CONFIG.provider().on('block', onBlock)
 }
   
 main().catch(console.error)
