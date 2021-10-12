@@ -6,6 +6,8 @@ import { Percent } from '@uniswap/sdk-core'
 config()
 
 export function useConfig() {
+    if (process.env.INFURA_PROJECT_ID == undefined) throw "No INFURA_PROJECT_ID in .env file."
+
     const c = {
         ethereumMainnet: {
             chainId: 1,
@@ -52,6 +54,12 @@ export function useConfig() {
 
             addrTokenWeth: "0xd0A1E359811322d97991E03f863a0C30C2cF029C",
 
+            // This can be found by querying the factory contract on Kovan in Etherscan:
+            //   https://kovan.etherscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984#readContract
+            // Use the two token addresses above and a fee of 3000 (for 0.30%)
+            // TODO: This pool has no liquidity and a price of 0.00 USDC. Consider creating our own
+            // pool just for testing by calling factory.createPool():
+            //   https://github.com/Uniswap/v3-core/blob/v1.0.0/contracts/UniswapV3Factory.sol#L35
             addrPoolRangeOrder: "0x877BD57CAF5A8620f06E80688070f23f091dF3b1",
 
             // On Kovan there is no 0.05% pool for these tokens. Just use the 0.30% fee pool instead.

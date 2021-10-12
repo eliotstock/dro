@@ -38,7 +38,7 @@ config()
 const CONFIG = useConfig()
 
 // To switch to another chain, this line should be all we need to change.
-const CHAIN_CONFIG = CONFIG.ethereumMainnet
+const CHAIN_CONFIG = CONFIG.ethereumKovan
 
 // Single, global instance of the DRO class.
 let dro: DRO

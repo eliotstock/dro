@@ -9,6 +9,8 @@ import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/i
 import moment from 'moment'
 import { Immutables, State, getPoolImmutables, getPoolState } from './uniswap'
 import { useConfig } from './config'
+import invariant from 'tiny-invariant'
+import { TickMath } from '@uniswap/v3-sdk/'
 
 // Read our .env file
 config()
@@ -106,6 +108,9 @@ export class DRO {
           this.rangeOrderPoolState.tick
         )
 
+        // Check that the tick value won't cause nearestUsableTick() to fail later. Testnets might have strange prices.
+        invariant(this.rangeOrderPoolState.tick >= TickMath.MIN_TICK && this.rangeOrderPoolState.tick <= TickMath.MAX_TICK, 'TICK_BOUND')
+
         // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
         this.priceUsdc = this.rangeOrderPool.token1Price.toFixed(2)
 
@@ -125,11 +130,15 @@ export class DRO {
 
       if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
-      this.minTick = nearestUsableTick(Math.round(this.rangeOrderPoolState.tick - (this.rangeWidthTicks / 2)),
-        this.poolImmutables.tickSpacing)
+      this.minTick = Math.round(this.rangeOrderPoolState.tick - (this.rangeWidthTicks / 2))
+      // Don't go under MIN_TICK, which can happen on testnets.
+      this.minTick = Math.max(this.minTick, TickMath.MIN_TICK)
+      this.minTick = nearestUsableTick(this.minTick, this.poolImmutables.tickSpacing)
   
-      this.maxTick = nearestUsableTick(Math.round(this.rangeOrderPoolState.tick + (this.rangeWidthTicks / 2)),
-        this.poolImmutables.tickSpacing)
+      this.maxTick = Math.round(this.rangeOrderPoolState.tick + (this.rangeWidthTicks / 2))
+      // Don't go over MAX_TICK, which can happen on testnets.
+      this.maxTick = Math.min(this.maxTick, TickMath.MAX_TICK)
+      this.maxTick = nearestUsableTick(this.maxTick, this.poolImmutables.tickSpacing)
   
       // tickToPrice() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
