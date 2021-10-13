@@ -88,9 +88,9 @@ export class DRO {
 
       this.weth = new Token(this.chainConfig.chainId, this.poolImmutables.token1, 18, "WETH", "Wrapped Ether")
 
-      console.log("USDC: ", this.poolImmutables.token0)
-      console.log("WETH: ", this.poolImmutables.token1)
-      console.log("Fee: ", this.poolImmutables.fee)
+      // console.log("USDC: ", this.poolImmutables.token0)
+      // console.log("WETH: ", this.poolImmutables.token1)
+      // console.log("Fee: ", this.poolImmutables.fee)
     }
 
     async updatePoolState() {

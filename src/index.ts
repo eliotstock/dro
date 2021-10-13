@@ -1,12 +1,12 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { useConfig } from './config'
+import { useWallet, getUsdcBalance, getWethBalance } from './wallet'
 import { DRO } from './dro'
 import moment from 'moment'
 
 // TODO
 // ----
-// (P1) Know what our current balance of ETH, WETH and USDC is, right after removing liquidity
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Remove an existing liquidity position (but fail because no position yet)
 // (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
@@ -19,6 +19,7 @@ import moment from 'moment'
 
 // Done
 // ----
+// (P1) Know what our current balance of ETH, WETH and USDC is, right after removing liquidity
 // (P1) Fix the range width arithmetic
 // (P1) Show the new range min and max in terms of USDC rather than ticks
 // (P1) Get the current price in the pool synchronously and in terms of the quote currency
@@ -49,25 +50,6 @@ let wallet: ethers.Wallet
 // Single, global USDC price in the range order pool.
 let price: string
 
-function initWallet(): ethers.Wallet {
-    // Check .env file and create Ethers.js wallet from mnemonic in it.
-    const mnemonic = process.env.DRO_ACCOUNT_MNEMONIC
-
-    if (mnemonic == undefined) {
-      console.error("No .env file or no mnemonic in it. If you need one for testing, try this one.")
-      const randomWallet = ethers.Wallet.createRandom()
-      console.error(randomWallet.mnemonic.phrase)
-      process.exit()
-    }
-  
-    // Account that will hold the Uniswap v3 position NFT
-    let wallet: ethers.Wallet = ethers.Wallet.fromMnemonic(mnemonic)
-    wallet = wallet.connect(CHAIN_CONFIG.provider())
-    console.log("DRO account: ", wallet.address)
-
-    return wallet
-}
-
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
@@ -89,6 +71,13 @@ async function onBlock(...args: Array<any>) {
   if (dro.outOfRange()) {
     // Remove all of our liquidity now and burn the NFT for our position.
     await dro.removeLiquidity()
+
+    // Take note of what assets we now hold
+    const usdcBalance = await getUsdcBalance(CHAIN_CONFIG, wallet)
+    const wethBalance = await getWethBalance(CHAIN_CONFIG, wallet)
+    const ethBalance = ethers.utils.formatEther(await wallet.getBalance("latest"))
+
+    console.log("Balances: USDC: " + usdcBalance.toString() + ", WETH: " + wethBalance.toString() + ", ETH: " + ethBalance)
 
     // Find our new range around the current price.
     dro.updateRange()
@@ -128,7 +117,7 @@ async function main() {
   const rangeWidthTicks = 0.048 / 0.0001
   console.log("Range width in ticks: " + rangeWidthTicks)
 
-  wallet = initWallet()
+  wallet = useWallet(CHAIN_CONFIG.provider())
 
   // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString())
 

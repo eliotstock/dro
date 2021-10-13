@@ -12,6 +12,8 @@ export function useConfig() {
         ethereumMainnet: {
             chainId: 1,
 
+            isTestnet: false,
+
             // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
             // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
             endpoint: "https://mainnet.infura.io/v3/" + process.env.INFURA_PROJECT_ID,
@@ -44,26 +46,31 @@ export function useConfig() {
         ethereumKovan: {
             chainId: 42,
 
+            isTestnet: true,
+
             endpoint: "https://kovan.infura.io/v3/" + process.env.INFURA_PROJECT_ID,
 
             provider() {
                 return new ethers.providers.JsonRpcProvider(this.endpoint)
             },
 
+            // I have 1K of this USDC on Kovan in a work account.
             addrTokenUsdc: "0xe22da380ee6b445bb8273c81944adeb6e8450422",
 
             addrTokenWeth: "0xd0A1E359811322d97991E03f863a0C30C2cF029C",
 
             // This can be found by querying the factory contract on Kovan in Etherscan:
             //   https://kovan.etherscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984#readContract
-            // Use the two token addresses above and a fee of 3000 (for 0.30%)
-            // TODO: This pool has no liquidity and a price of 0.00 USDC. Consider creating our own
-            // pool just for testing by calling factory.createPool():
+            // Use the two token addresses above. The pool with a fee of 3000 (for 0.30%),
+            // 0x877BD57CAF5A8620f06E80688070f23f091dF3b1 has no liquidity, adding some is near
+            // impossible from Etherscan and there's no dapp on Kovan.
+            // The 0.05% fee pool has liquidity. Use that instead.
+            // If that fails consider creating a new pool with a different USDC contract:
             //   https://github.com/Uniswap/v3-core/blob/v1.0.0/contracts/UniswapV3Factory.sol#L35
-            addrPoolRangeOrder: "0x877BD57CAF5A8620f06E80688070f23f091dF3b1",
+            addrPoolRangeOrder: "0xD31910c6aeAEF00F51C9e0f4F5Dca102f94F7cF5",
 
-            // On Kovan there is no 0.05% pool for these tokens. Just use the 0.30% fee pool instead.
-            addrPoolSwaps: "0x877BD57CAF5A8620f06E80688070f23f091dF3b1",
+            // Would normally be different to the range order pool, but is the same on Kovan.
+            addrPoolSwaps: "0xD31910c6aeAEF00F51C9e0f4F5Dca102f94F7cF5",
 
             gasLimit: ethers.utils.hexlify(100_000),
 
