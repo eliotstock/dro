@@ -1,4 +1,5 @@
 import { ethers } from 'ethers'
+import { BigNumber } from '@ethersproject/bignumber'
 import { abi as ERC20ABI } from './abi/erc20.json'
 
 export function useWallet(provider: ethers.providers.Provider): ethers.Wallet {
@@ -31,7 +32,7 @@ export async function getUsdcBalance(chainConfig: any, wallet: ethers.Wallet): P
 
     // USDC has 6 decimals. We should really get this from the contract but it's another call and
     // our ABI is incomplete.
-    return balance.div(1_000_000).toNumber()
+    return balance.div(BigNumber.from(10).pow(6)).toNumber()
 }
 
 export async function getWethBalance(chainConfig: any, wallet: ethers.Wallet): Promise<number> {
@@ -44,5 +45,5 @@ export async function getWethBalance(chainConfig: any, wallet: ethers.Wallet): P
     const balance = await wethContract.balanceOf(wallet.address)
 
     // WETH has 18 decimals. Ditto the above.
-    return balance.div(ethers.BigNumber.from(10).pow(18)).toNumber()
+    return balance.div(BigNumber.from(10).pow(18)).toNumber()
 }
