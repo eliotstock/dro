@@ -1,7 +1,6 @@
 import { config } from 'dotenv'
-import { ethers } from 'ethers'
 import { useConfig } from './config'
-import { useWallet, getUsdcBalance, getWethBalance } from './wallet'
+import { EthUsdcWallet } from './wallet'
 import { DRO } from './dro'
 import moment from 'moment'
 
@@ -44,8 +43,8 @@ const CHAIN_CONFIG = CONFIG.ethereumKovan
 // Single, global instance of the DRO class.
 let dro: DRO
 
-// Single, global Ethers.js wallet (account).
-let wallet: ethers.Wallet
+// Single, global Ethers.js wallet subclass instance (account).
+let wallet: EthUsdcWallet
 
 // Single, global USDC price in the range order pool.
 let price: string
@@ -73,11 +72,7 @@ async function onBlock(...args: Array<any>) {
     await dro.removeLiquidity()
 
     // Take note of what assets we now hold
-    const usdcBalance = await getUsdcBalance(CHAIN_CONFIG, wallet)
-    const wethBalance = await getWethBalance(CHAIN_CONFIG, wallet)
-    const ethBalance = ethers.utils.formatEther(await wallet.getBalance("latest"))
-
-    console.log("Balances: USDC: " + usdcBalance.toString() + ", WETH: " + wethBalance.toString() + ", ETH: " + ethBalance)
+    wallet.logBalances()
 
     // Find our new range around the current price.
     dro.updateRange()
@@ -117,7 +112,7 @@ async function main() {
   const rangeWidthTicks = 0.048 / 0.0001
   console.log("Range width in ticks: " + rangeWidthTicks)
 
-  wallet = useWallet(CHAIN_CONFIG.provider())
+  wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
 
   // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString())
 

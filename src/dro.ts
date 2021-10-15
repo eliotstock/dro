@@ -9,6 +9,7 @@ import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/i
 import moment from 'moment'
 import { Immutables, State, getPoolImmutables, getPoolState } from './uniswap'
 import { useConfig } from './config'
+import { EthUsdcWallet } from './wallet'
 import invariant from 'tiny-invariant'
 import { TickMath } from '@uniswap/v3-sdk/'
 
@@ -24,7 +25,7 @@ const DEADLINE_SECONDS = 180
 const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
 
 export class DRO {
-    readonly owner: ethers.Wallet
+    readonly owner: EthUsdcWallet
     readonly provider: ethers.providers.Provider
     readonly chainConfig: any
     readonly quoterContract: ethers.Contract
@@ -47,7 +48,7 @@ export class DRO {
     unclaimedFeesWeth?: BigintIsh
   
     constructor(
-        _owner: ethers.Wallet,
+        _owner: EthUsdcWallet,
         _chainConfig: any,
         _rangeWidthTicks: number) {
         this.owner = _owner
@@ -282,47 +283,24 @@ export class DRO {
     }
   
     async addLiquidity() {
-      if (this.position || this.tokenId) {
-        console.error("Can't add liquidity. Already in a position. Remove liquidity and swap first.")
-        return
-      }
-
       if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
-      if (this.rangeOrderPoolState == undefined) throw "Not updatePoolState()ed"
+      if (this.rangeOrderPoolState == undefined || this.rangeOrderPool == undefined) throw "Not updatePoolState()ed"
+
+      if (this.position || this.tokenId)
+        throw "Can't add liquidity. Already in a position. Remove liquidity and swap first."
   
-      // We can't instantiate this pool instance until we have the pool state.
-      const poolEthUsdcForRangeOrder = new Pool(
-        this.usdc,
-        this.weth,
-        this.poolImmutables.fee,
-        this.rangeOrderPoolState.sqrtPriceX96.toString(),
-        this.rangeOrderPoolState.liquidity.toString(),
-        this.rangeOrderPoolState.tick
-      )
+      // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
+      const amountUsdc = (await this.owner.usdc()).toString()
+      const amountWeth = (await this.owner.weth()).toString()
   
-      // If we know L, the liquidity:
-      // const position = new Position({
-      //   pool: poolEthUsdcForRangeOrder,
-      //   liquidity: 10, // Integer. L is sqrt(k) where y * x = k.
-      //   tickLower: minTick,
-      //   tickUpper: maxTick
-      // })
-  
-      // console.log("Decimals: ", dro.usdc.decimals, "(USDC)", dro.weth.decimals, "(WETH)")
-  
-      // TODO: Get these from our account balance, leaving some ETH for gas and swap costs.
-      // TODO: Use JSBI here, but with exponents. These are overflowing a Javascript number type right now.
-      const amountUsdc: number = 3385.00 * 10 ^ this.usdc.decimals // 6 decimals
-      const amountEth: number = 1.00 * 10 ^ this.weth.decimals // 18 decimals
-  
-      // We don't know L, the liquidity, but we do know how much ETH and how much USDC we'd like to add.
+      // We don't know L, the liquidity, but we do know how much WETH and how much USDC we'd like to add.
       const position = Position.fromAmounts({
-        pool: poolEthUsdcForRangeOrder,
+        pool: this.rangeOrderPool,
         tickLower: this.minTick,
         tickUpper: this.maxTick,
-        amount0: "3377990000",
-        amount1: "1000000000000000000", // 18 zeros.
+        amount0: amountUsdc,
+        amount1: amountWeth,
         useFullPrecision: true
       })
   
@@ -355,13 +333,36 @@ export class DRO {
         data: calldata
       }
   
-      // Currently failing with insufficient funds, which is as expected.
-      // TODO: Switch to Kovan, fund the account with USDC and WETH and test.
-      // w.sendTransaction(tx).then((transaction) => {
-      //   console.dir(transaction)
-      //   console.log("Send finished!")
-      // }).catch(console.error)
+      // Send the transaction to the provider
+      this.owner.sendTransaction(tx).then((transaction: any) => {
+        console.dir(transaction)
+        console.log("Send finished!")
+      }).catch(console.error)
   
-      // TODO: Set the token ID on the dro instance.
+      // TODO: This is failing. No position is created.
+      /*
+        {
+          type: 2,
+          chainId: 42,
+          nonce: 0,
+          maxPriorityFeePerGas: BigNumber { _hex: '0x0186a0', _isBigNumber: true },
+          maxFeePerGas: BigNumber { _hex: '0x0186a0', _isBigNumber: true },
+          gasPrice: null,
+          gasLimit: BigNumber { _hex: '0x0186a0', _isBigNumber: true },
+          to: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+          value: BigNumber { _hex: '0x00', _isBigNumber: true },
+          data: '0x88316456000000000000000000000000d0a1e359811322d97991e03f863a0c30c2cf029c000000000000000000000000e22da380ee6b445bb8273c81944adeb6e845042200000000000000000000000000000000000000000000000000000000000001f4fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd0bb6fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd0d960000000000000000000000000000000000000000000000000000000005f5e0ca00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000004b967be00000000000000000000000000000000000000000000000000000000000000010000000000000000000000001ee071ec8ad0768256ab32c8ba61d99a39ef84a4000000000000000000000000000000000000000000000000000000006169487d',
+          accessList: [],
+          hash: '0x116c846c6454a182f27aa771fae0fefe9ac953337e849ff41b723b174b432a7a',
+          v: 0,
+          r: '0xdd8084a3356d48bd798ec75b7d26371b5a17c24e791ee9aca006f72c8e9625ca',
+          s: '0x45d4e517ea36d8c9c1aa7980df324619c3a2fbffdbd2dbe85be7643290a2ceaa',
+          from: '0x1EE071ec8aD0768256Ab32c8bA61d99A39ef84a4',
+          confirmations: 0,
+          wait: [Function (anonymous)]
+        }
+      */
+
+      // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the token ID.
     }
   }
