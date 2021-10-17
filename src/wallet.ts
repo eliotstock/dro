@@ -80,4 +80,14 @@ export class EthUsdcWallet extends ethers.Wallet {
 
         console.log("  ETH ", ethers.utils.formatEther(ethBalance))
     }
+
+    // TODO: FIx:
+    //   Error: sending a transaction requires a signer (operation="sendTransaction", code=UNSUPPORTED_OPERATION, version=contracts/5.4.1)
+    async approveAll() {
+        const usdcBalance = await this.usdc()
+        await this.usdcContract.approve(this.address, usdcBalance)
+
+        const wethBalance = await this.weth()
+        await this.wethContract.approve(this.address, wethBalance)
+    }
 }

@@ -3,6 +3,7 @@ import { BigNumber } from '@ethersproject/bignumber'
 import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, tickToPrice } from "@uniswap/v3-sdk"
 import { Token, CurrencyAmount, Percent, BigintIsh } from "@uniswap/sdk-core"
 import { ethers } from 'ethers'
+import { TransactionResponse, TransactionReceipt } from "@ethersproject/abstract-provider";
 import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
 import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
@@ -92,6 +93,8 @@ export class DRO {
       // console.log("USDC: ", this.poolImmutables.token0)
       // console.log("WETH: ", this.poolImmutables.token1)
       // console.log("Fee: ", this.poolImmutables.fee)
+
+      await this.owner.approveAll()
     }
 
     async updatePoolState() {
@@ -233,7 +236,7 @@ export class DRO {
         to: CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
-        gasLimit: this.chainConfig.gasLimit,
+        gasLimit: CONFIG.gasLimit,
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
@@ -323,45 +326,26 @@ export class DRO {
       const nonce = await this.owner.getTransactionCount("latest")
       console.log("nonce: ", nonce)
   
-      const tx = {
+      const txRequest = {
         from: this.owner.address,
         to: CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
-        gasLimit: this.chainConfig.gasLimit,
+        gasLimit: CONFIG.gasLimit,
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
   
-      // Send the transaction to the provider
-      this.owner.sendTransaction(tx).then((transaction: any) => {
-        console.dir(transaction)
-        console.log("Send finished!")
-      }).catch(console.error)
+      // Send the transaction to the provider.
+      const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
+
+      console.log("TX response: ", txResponse)
+
+      const txReceipt: TransactionReceipt = await txResponse.wait()
+
+      console.dir(txReceipt)
   
       // TODO: This is failing. No position is created.
-      /*
-        {
-          type: 2,
-          chainId: 42,
-          nonce: 0,
-          maxPriorityFeePerGas: BigNumber { _hex: '0x0186a0', _isBigNumber: true },
-          maxFeePerGas: BigNumber { _hex: '0x0186a0', _isBigNumber: true },
-          gasPrice: null,
-          gasLimit: BigNumber { _hex: '0x0186a0', _isBigNumber: true },
-          to: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
-          value: BigNumber { _hex: '0x00', _isBigNumber: true },
-          data: '0x88316456000000000000000000000000d0a1e359811322d97991e03f863a0c30c2cf029c000000000000000000000000e22da380ee6b445bb8273c81944adeb6e845042200000000000000000000000000000000000000000000000000000000000001f4fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd0bb6fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd0d960000000000000000000000000000000000000000000000000000000005f5e0ca00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000004b967be00000000000000000000000000000000000000000000000000000000000000010000000000000000000000001ee071ec8ad0768256ab32c8ba61d99a39ef84a4000000000000000000000000000000000000000000000000000000006169487d',
-          accessList: [],
-          hash: '0x116c846c6454a182f27aa771fae0fefe9ac953337e849ff41b723b174b432a7a',
-          v: 0,
-          r: '0xdd8084a3356d48bd798ec75b7d26371b5a17c24e791ee9aca006f72c8e9625ca',
-          s: '0x45d4e517ea36d8c9c1aa7980df324619c3a2fbffdbd2dbe85be7643290a2ceaa',
-          from: '0x1EE071ec8aD0768256Ab32c8bA61d99A39ef84a4',
-          confirmations: 0,
-          wait: [Function (anonymous)]
-        }
-      */
 
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the token ID.
     }

@@ -35,12 +35,11 @@ export function useConfig() {
             // This is the pool in which we execute our swaps.
             addrPoolSwaps: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
 
-            gasLimit: ethers.utils.hexlify(100_000),
+            slippageTolerance: new Percent(50, 10_000), // 0.005%
 
-            // TODO: This is probably quite wrong.
-            gasPrice: ethers.utils.hexlify(100_000),
-
-            slippageTolerance: new Percent(50, 10_000) // 0.005%
+            // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
+            // specify here. Typical range: 30 - 200 gwei.
+            gasPrice: ethers.utils.parseUnits("100", "gwei"),
         },
 
         ethereumKovan: {
@@ -72,12 +71,11 @@ export function useConfig() {
             // Would normally be different to the range order pool, but is the same on Kovan.
             addrPoolSwaps: "0xD31910c6aeAEF00F51C9e0f4F5Dca102f94F7cF5",
 
-            gasLimit: ethers.utils.hexlify(100_000),
+            slippageTolerance: new Percent(50, 10_000), // 0.005%
 
-            // TODO: This is probably quite wrong.
-            gasPrice: ethers.utils.hexlify(100_000),
-
-            slippageTolerance: new Percent(50, 10_000) // 0.005%
+            // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
+            // specify here. Typical range: 30 - 200 gwei.
+            gasPrice: ethers.utils.parseUnits("100", "gwei"),
         },
 
         // The rest of these contracts are deployed at the same address on all chains.
@@ -86,6 +84,9 @@ export function useConfig() {
         addrPositionManager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
 
         addrQuoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
+
+        // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
+        gasLimit: ethers.utils.hexlify(450_000),
     }
     
     return c

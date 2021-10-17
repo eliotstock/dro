@@ -7,7 +7,7 @@
 1. Put a value for each of these variables in an `.env` file:
     1. `DRO_ACCOUNT_MNEMONIC`
     1. `INFURA_PROJECT_ID`
-1. `npm run start:dev`
+1. `npm run start`
 
 ## Build a Raspberry Pi Ubuntu Server machine to run this
 

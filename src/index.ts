@@ -114,8 +114,6 @@ async function main() {
 
   wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
 
-  // console.log("Gas: ", (await w.getGasPrice()).div(10^9).toString())
-
   try {
     dro = new DRO(wallet, CHAIN_CONFIG, rangeWidthTicks)
 
