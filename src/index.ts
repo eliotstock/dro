@@ -38,7 +38,7 @@ config()
 const CONFIG = useConfig()
 
 // To switch to another chain, this line should be all we need to change.
-const CHAIN_CONFIG = CONFIG.ethereumKovan
+const CHAIN_CONFIG = CONFIG.ethereumMainnet
 
 // Single, global instance of the DRO class.
 let dro: DRO
@@ -125,7 +125,7 @@ async function main() {
   }
 
   // Get a callback to onBlock() on every new block.
-  CHAIN_CONFIG.provider().on('block', onBlock)
+  // CHAIN_CONFIG.provider().on('block', onBlock)
 }
   
 main().catch(console.error)

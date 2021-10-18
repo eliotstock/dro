@@ -72,13 +72,13 @@ export class DRO {
         this.rangeOrderPoolContract = new ethers.Contract(
             this.chainConfig.addrPoolRangeOrder,
             IUniswapV3PoolABI,
-            this.chainConfig.provider()
+            this.provider
         )
 
         this.swapPoolContract = new ethers.Contract(
             this.chainConfig.addrPoolSwaps,
             IUniswapV3PoolABI,
-            this.chainConfig.provider()
+            this.provider
         )
     }
 
@@ -93,6 +93,33 @@ export class DRO {
       // console.log("USDC: ", this.poolImmutables.token0)
       // console.log("WETH: ", this.poolImmutables.token1)
       // console.log("Fee: ", this.poolImmutables.fee)
+
+      // Event emitted here:
+      //   https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol#L786
+      // and defined here:
+      //   https://github.com/Uniswap/v3-core/blob/main/contracts/interfaces/pool/IUniswapV3PoolEvents.sol#L72
+      this.rangeOrderPoolContract.on('Swap', (sender, recipient, amount0, amount1, sqrtPriceX96, liquidity, tick) => {
+        if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+
+        const price = tickToPrice(this.weth, this.usdc, tick).toFixed(2)
+        console.log("Swap price:", price)
+      })
+
+      // Example of extracting the price from a historical transaction log.
+      // console.log("Parsing log")
+      // const rangeOrderPoolInterface = new ethers.utils.Interface(
+      //   IUniswapV3PoolABI
+      // )
+      // const logsTopics = ["0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67",
+      //   "0x000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564",
+      //   "0x000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564"]
+      // const logsData = "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffff8dcd9a2000000000000000000000000000000000000000000000000007c58508723800000000000000000000000000000000000000042f6fac2e8d93171810499824dd6000000000000000000000000000000000000000000000000000139d797d3bfe0000000000000000000000000000000000000000000000000000000000002f9b4"
+      // const parsedLog = rangeOrderPoolInterface.parseLog({topics: logsTopics, data: logsData})
+      // console.dir(parsedLog)
+      // const tick = parsedLog.args["tick"]
+      // console.log("Tick: ", tick)
+      // const price = tickToPrice(this.weth, this.usdc, tick).toFixed(2)
+      // console.log("Price: ", price)
 
       await this.owner.approveAll()
     }
