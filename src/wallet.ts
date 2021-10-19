@@ -48,6 +48,12 @@ export class EthUsdcWallet extends ethers.Wallet {
 
         let w = new EthUsdcWallet(usdcContract, wethContract, s.privateKey, chainConfig.provider())
 
+        // Contracts need to be connected to a signer, not just a provider, in order to call
+        // approve() on them. connect() returns a connected wallet but has no effect on the
+        // wallet on which it is called.
+        w.usdcContract = w.usdcContract.connect(w)
+        w.wethContract = w.wethContract.connect(w)
+
         console.log("DRO account: ", w.address)
 
         return w
@@ -81,15 +87,13 @@ export class EthUsdcWallet extends ethers.Wallet {
         console.log("  ETH ", ethers.utils.formatEther(ethBalance))
     }
 
-    // TODO: Fix:
-    //   Error: sending a transaction requires a signer (operation="sendTransaction", code=UNSUPPORTED_OPERATION, version=contracts/5.4.1)
     async approveAll() {
-        this.usdcContract.connect(this)
-        const usdcBalance = await this.usdc()
-        await this.usdcContract.approve(this.address, usdcBalance)
+        // const usdcBalance = await this.usdc()
+        console.log("Approving spending of max USDC")
+        await this.usdcContract.approve(this.address, ethers.constants.MaxUint256)
 
-        this.wethContract.connect(this)
-        const wethBalance = await this.weth()
-        await this.wethContract.approve(this.address, wethBalance)
+        // const wethBalance = await this.weth()
+        console.log("Approving spending of max WETH")
+        await this.wethContract.approve(this.address, ethers.constants.MaxUint256)
     }
 }
