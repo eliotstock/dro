@@ -323,6 +323,9 @@ export class DRO {
       // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
       const amountUsdc = (await this.owner.usdc()).toString()
       const amountWeth = (await this.owner.weth()).toString()
+      const amountEth = (await this.owner.getBalance()).toString()
+
+      console.log("addLiquidity(): Amounts available: ", amountUsdc, " USDC", amountWeth, " WETH", amountEth, " ETH")
   
       // We don't know L, the liquidity, but we do know how much WETH and how much USDC we'd like to add.
       const position = Position.fromAmounts({
@@ -334,7 +337,7 @@ export class DRO {
         useFullPrecision: true
       })
   
-      console.log("Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
+      console.log("addLiquidity(): Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
   
       const mintOptions: MintOptions = {
         slippageTolerance: this.chainConfig.slippageTolerance,
@@ -351,12 +354,14 @@ export class DRO {
       // console.log("value: ", value)
   
       const nonce = await this.owner.getTransactionCount("latest")
-      console.log("nonce: ", nonce)
+      // console.log("nonce: ", nonce)
   
+      // TODO: Are we sending ETH or WETH or both? Top up ETH balance on Kovan and test.
       const txRequest = {
         from: this.owner.address,
         to: CONFIG.addrPositionManager,
-        value: VALUE_ZERO_ETHER,
+        // value: VALUE_ZERO_ETHER,
+        value: amountEth,
         nonce: nonce,
         gasLimit: CONFIG.gasLimit,
         gasPrice: this.chainConfig.gasPrice,
@@ -366,13 +371,13 @@ export class DRO {
       // Send the transaction to the provider.
       const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
 
-      console.log("TX response: ", txResponse)
+      console.log("addLiquidity() TX response: ", txResponse)
 
       const txReceipt: TransactionReceipt = await txResponse.wait()
 
       console.dir(txReceipt)
   
-      // TODO: This is failing. No position is created.
+      // TODO: This is failing. No position is created. Try turning on tracing. Are we using all the gas we can ever supply? Why?
 
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the token ID.
     }
