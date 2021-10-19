@@ -1,7 +1,7 @@
 import { config } from 'dotenv'
 import { BigNumber } from '@ethersproject/bignumber'
-import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, tickToPrice } from "@uniswap/v3-sdk"
-import { Token, CurrencyAmount, Percent, BigintIsh } from "@uniswap/sdk-core"
+import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, tickToPrice, Trade } from "@uniswap/v3-sdk"
+import { Token, CurrencyAmount, Percent, BigintIsh, TradeType } from "@uniswap/sdk-core"
 import { ethers } from 'ethers'
 import { TransactionResponse, TransactionReceipt } from "@ethersproject/abstract-provider";
 import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
@@ -121,7 +121,8 @@ export class DRO {
       // const price = tickToPrice(this.weth, this.usdc, tick).toFixed(2)
       // console.log("Price: ", price)
 
-      await this.owner.approveAll()
+      // TODO: Put back once nonce error debugged.
+      // await this.owner.approveAll()
     }
 
     async updatePoolState() {
@@ -282,34 +283,73 @@ export class DRO {
       }
 
       if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+
+      if (this.swapPoolState == undefined) throw "No swap pool state"
+
+      const swapPoolFee = await this.swapPoolContract.fee()
+      console.log("swapPoolFee: ", swapPoolFee)
+
+      // Assume we're swapping our entire WETH balance for USDC for now.
+      const weth = await this.owner.weth()
   
-      const usdcIn = "3375560000" // USDC, 6 decimals
-  
-      const quotedWethOut = await this.quoterContract.callStatic.quoteExactInputSingle(
-        this.poolImmutables.token0, // Token in: USDC
-        this.poolImmutables.token1, // Token out: WETH
-        this.poolImmutables.fee, // 0.30%
-        usdcIn, // Amount in, USDC (6 decimals)
+      const quotedUsdcOut = await this.quoterContract.callStatic.quoteExactInputSingle(
+        this.poolImmutables.token1, // Token in: WETH
+        this.poolImmutables.token0, // Token out: USDC
+        swapPoolFee, // 0.05%
+        weth, // Amount in, WETH (18 decimals), BigNumber
         0 // sqrtPriceLimitX96
       )
   
       // Given 3_375_560_000, currently returns 996_997_221_346_111_279, ie. approx. 1 * 10^18 wei.
-      console.log("Swapping " + usdcIn + " USDC will get us " + quotedWethOut.toString() + " WETH")
-
-      if (this.swapPoolState == undefined) return
+      console.log("Swapping " + weth + " WETH will get us " + quotedUsdcOut.toString() + " USDC")
   
+      // The pool depends on the pool state so we need to reconstruct it every time the state changes.
       const poolEthUsdcForSwaps = new Pool(
         this.usdc,
         this.weth,
-        this.poolImmutables.fee, // TODO: Wrong. The fee is 0.05% here, not 0.30%.
+        swapPoolFee, // 0.05%
         this.swapPoolState.sqrtPriceX96.toString(),
         this.swapPoolState.liquidity.toString(),
         this.swapPoolState.tick
       )
   
-      const swapRoute = new Route([poolEthUsdcForSwaps], this.usdc, this.weth)
+      // The order of the tokens here is important. Input first.
+      const swapRoute = new Route([poolEthUsdcForSwaps], this.weth, this.usdc)
 
-      // TODO: Execute swap.
+      const uncheckedTrade = await Trade.createUncheckedTrade({
+        route: swapRoute,
+        inputAmount: CurrencyAmount.fromRawAmount(this.weth, weth.toString()),
+        outputAmount: CurrencyAmount.fromRawAmount(this.usdc, quotedUsdcOut.toString()),
+        tradeType: TradeType.EXACT_INPUT,
+      });
+      console.log("Trade:")
+      console.dir(uncheckedTrade)
+
+      // TODO: Execute swap directly on the pool contract, skipping the router.
+      // See: https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol#L596
+      // We may need to calculate the sqrtPriceLimitX96 based on the unchecked trade object.
+      this.swapPoolContract = this.swapPoolContract.connect(this.owner)
+
+      // The direction of the swap, true for token0 to token1, false for token1 to token0
+      const zeroForOne = true
+
+      // The amount of the swap, which implicitly configures the swap as exact input (positive), or exact output (negative)
+      const amountSpecified = 1
+
+      // The Q64.96 sqrt price limit. If zero for one, the price cannot be less than this value after the swap. If one for zero, the price cannot be greater than this value after the swap
+      const sqrtPriceLimitX96 = 1
+
+      // Any data to be passed through to the callback
+      const data = 0x0
+
+      // TODO: Fails with UNPREDICTABLE_GAS_LIMIT. Execute this using the same approach as the other methods, ie:
+      //   await this.owner.sendTransaction(txRequest)
+      await this.swapPoolContract.swap(this.owner.address, // Recipient
+        zeroForOne,
+        amountSpecified,
+        sqrtPriceLimitX96,
+        data
+      )
     }
   
     async addLiquidity() {
@@ -350,18 +390,16 @@ export class DRO {
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
       const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
   
-      // console.log("calldata: ", calldata)
-      // console.log("value: ", value)
+      console.log("calldata: ", calldata)
   
       const nonce = await this.owner.getTransactionCount("latest")
-      // console.log("nonce: ", nonce)
   
-      // TODO: Are we sending ETH or WETH or both? Top up ETH balance on Kovan and test.
+      // Sending WETH, not ETH, no value is zero here. WETH amount is in the call data.
       const txRequest = {
         from: this.owner.address,
         to: CONFIG.addrPositionManager,
-        // value: VALUE_ZERO_ETHER,
-        value: amountEth,
+        value: VALUE_ZERO_ETHER,
+        // value: amountEth,
         nonce: nonce,
         gasLimit: CONFIG.gasLimit,
         gasPrice: this.chainConfig.gasPrice,
@@ -372,12 +410,20 @@ export class DRO {
       const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
 
       console.log("addLiquidity() TX response: ", txResponse)
+      console.log("addLiquidity() Max fee per gas: ", txResponse.maxFeePerGas?.toString()) // 100_000_000_000 wei or 100 gwei
+      console.log("addLiquidity() Gas limit: ", txResponse.gasLimit?.toString()) // 450_000
 
       const txReceipt: TransactionReceipt = await txResponse.wait()
 
+      console.log("addLiquidity() TX receipt:")
       console.dir(txReceipt)
+      console.log("addLiquidity(): Effective gas price: ", txReceipt.effectiveGasPrice.toString())
   
-      // TODO: This is failing. No position is created. Try turning on tracing. Are we using all the gas we can ever supply? Why?
+      // TODO: This is failing. No position is created.
+      //   Can we turn on tracing? Does Infura support it?
+      //   If not can we run geth locally and test with tracing on?
+      //   Are we running out of gas? Is Kovan unrealistic for gas cost?
+      //   Would this actually work on Mainnet?
 
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the token ID.
     }

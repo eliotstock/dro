@@ -81,7 +81,8 @@ async function onBlock(...args: Array<any>) {
     await dro.swap()
 
     // Add all our WETH and USDC to a new liquidity position.
-    await dro.addLiquidity()
+    // TODO: Put back once swaps working
+    // await dro.addLiquidity()
   }
   else {
     logLine += " In range."
