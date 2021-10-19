@@ -330,6 +330,8 @@ export class DRO {
       // We may need to calculate the sqrtPriceLimitX96 based on the unchecked trade object.
       this.swapPoolContract = this.swapPoolContract.connect(this.owner)
 
+      const recipient = this.owner.address
+
       // The direction of the swap, true for token0 to token1, false for token1 to token0
       const zeroForOne = true
 
@@ -342,14 +344,57 @@ export class DRO {
       // Any data to be passed through to the callback
       const data = 0x0
 
+      // TODO: Fix:
+      /*
+        reason: 'types/values length mismatch',
+        code: 'INVALID_ARGUMENT',
+        count: { types: 5, values: 1 },
+      */
+      const calldata: string = this.swapPoolContract.interface.encodeFunctionData('swap', [
+          recipient,
+          zeroForOne,
+          amountSpecified,
+          sqrtPriceLimitX96,
+          data
+      ])
+
+      console.log("calldata: ", calldata)
+  
+      const nonce = await this.owner.getTransactionCount("latest")
+  
+      // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
+      const txRequest = {
+        from: this.owner.address,
+        to: this.chainConfig.addrPoolSwaps,
+        value: VALUE_ZERO_ETHER,
+        nonce: nonce,
+        gasLimit: CONFIG.gasLimit,
+        gasPrice: this.chainConfig.gasPrice,
+        data: calldata
+      }
+
+      // Send the transaction to the provider.
+      const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
+
+      console.log("swap() TX response: ", txResponse)
+      console.log("swap() Max fee per gas: ", txResponse.maxFeePerGas?.toString()) // 100_000_000_000 wei or 100 gwei
+      console.log("swap() Gas limit: ", txResponse.gasLimit?.toString()) // 450_000
+
+      const txReceipt: TransactionReceipt = await txResponse.wait()
+
+      console.log("swap() TX receipt:")
+      console.dir(txReceipt)
+      console.log("swap(): Effective gas price: ", txReceipt.effectiveGasPrice.toString())
+
       // TODO: Fails with UNPREDICTABLE_GAS_LIMIT. Execute this using the same approach as the other methods, ie:
       //   await this.owner.sendTransaction(txRequest)
-      await this.swapPoolContract.swap(this.owner.address, // Recipient
-        zeroForOne,
-        amountSpecified,
-        sqrtPriceLimitX96,
-        data
-      )
+      // Construct the calldata from these parameters.
+      // await this.swapPoolContract.swap(recipient,
+      //   zeroForOne,
+      //   amountSpecified,
+      //   sqrtPriceLimitX96,
+      //   data
+      // )
     }
   
     async addLiquidity() {
@@ -394,7 +439,7 @@ export class DRO {
   
       const nonce = await this.owner.getTransactionCount("latest")
   
-      // Sending WETH, not ETH, no value is zero here. WETH amount is in the call data.
+      // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
       const txRequest = {
         from: this.owner.address,
         to: CONFIG.addrPositionManager,
@@ -424,6 +469,7 @@ export class DRO {
       //   If not can we run geth locally and test with tracing on?
       //   Are we running out of gas? Is Kovan unrealistic for gas cost?
       //   Would this actually work on Mainnet?
+      //   Can we decode the calldata using an ethers Interface and check it?
 
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the token ID.
     }
