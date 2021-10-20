@@ -75,7 +75,7 @@ export function useConfig() {
 
             // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
             // specify here. Typical range: 30 - 200 gwei.
-            gasPrice: ethers.utils.parseUnits("100", "gwei"),
+            gasPrice: ethers.utils.parseUnits("100", "gwei"), // Sensible: 100
         },
 
         // The rest of these contracts are deployed at the same address on all chains.
@@ -85,8 +85,10 @@ export function useConfig() {
 
         addrQuoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
 
+        addrSwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+
         // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
-        gasLimit: ethers.utils.hexlify(450_000),
+        gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
     }
     
     return c
