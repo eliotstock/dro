@@ -6,10 +6,9 @@ import moment from 'moment'
 
 // TODO
 // ----
+// (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Remove an existing liquidity position (but fail because no position yet)
-// (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
-// (P2) Execute a swap for a known amount of ETH (half our account balance, less some savings for execution)
 // (P2) Execute a swap for a known amount of USDC (half our account balance)
 // (P2) Keep track of how much ETH to keep on hand for gas and swap costs
 // (P3) Build the URL of the position, based on the serial number, and log it
@@ -26,6 +25,7 @@ import moment from 'moment'
 // (P1) Timestamps in logging
 // (P2) Execute everything on every new block by subscribing to "block""
 // (P2) Mint a new liquidity position (but fail because no balances in account) centred on the current price, providing half ETH and half USDC
+// (P2) Execute a swap for a known amount of WETH (half our account balance, less some savings for execution)
 // (P3) Understand whether executing on every block is going to spend the free quota at Infura
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
 // (P3) Have this script execute transactions using the local account, using an Ethers.js Signer
