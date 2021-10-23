@@ -1,5 +1,5 @@
 import { config } from 'dotenv'
-import { useConfig } from './config'
+import { useConfig, ChainConfig } from './config'
 import { EthUsdcWallet } from './wallet'
 import { DRO } from './dro'
 import moment from 'moment'
@@ -35,10 +35,11 @@ import moment from 'moment'
 config()
 
 // Static config that doesn't belong in the .env file.
-const CONFIG = useConfig()
+const CHAIN_CONFIG: ChainConfig = useConfig()
 
-// To switch to another chain, this line should be all we need to change.
-const CHAIN_CONFIG = CONFIG.ethereumKovan
+// To switch to another chain, only the .env file needs to change.
+// const CHAIN: string = process.env.CHAIN || 'ethereumMainnet'
+// const CHAIN_CONFIG = CONFIG[CHAIN]
 
 // Single, global instance of the DRO class.
 let dro: DRO
@@ -92,6 +93,8 @@ async function onBlock(...args: Array<any>) {
 }
 
 async function main() {
+  console.log(`Using ${CHAIN_CONFIG.name}`)
+
   // From the Uniswap v3 whitepaper:
   //   "Ticks are all 1.0001 to an integer power, which means each tick is .01% away from the next
   //    tick."

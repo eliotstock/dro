@@ -9,7 +9,7 @@ import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/arti
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import moment from 'moment'
 import { Immutables, State, getPoolImmutables, getPoolState } from './uniswap'
-import { useConfig } from './config'
+import { useConfig, ChainConfig } from './config'
 import { EthUsdcWallet } from './wallet'
 import invariant from 'tiny-invariant'
 import { TickMath } from '@uniswap/v3-sdk/'
@@ -18,7 +18,7 @@ import { TickMath } from '@uniswap/v3-sdk/'
 config()
 
 // Static config that doesn't belong in the .env file.
-const CONFIG = useConfig()
+const CHAIN_CONFIG: ChainConfig = useConfig()
 
 // On all transactions, set the deadline to 3 minutes from now
 const DEADLINE_SECONDS = 180
@@ -58,13 +58,13 @@ export class DRO {
         this.rangeWidthTicks = _rangeWidthTicks
 
         this.quoterContract = new ethers.Contract(
-            CONFIG.addrQuoter,
+            CHAIN_CONFIG.addrQuoter,
             QuoterABI,
             this.provider
         )
           
         this.positionManagerContract = new ethers.Contract(
-            CONFIG.addrPositionManager,
+            CHAIN_CONFIG.addrPositionManager,
             NonfungiblePositionManagerABI,
             this.provider
         )
@@ -104,22 +104,6 @@ export class DRO {
         const price = tickToPrice(this.weth, this.usdc, tick).toFixed(2)
         console.log("Swap price:", price)
       })
-
-      // Example of extracting the price from a historical transaction log.
-      // console.log("Parsing log")
-      // const rangeOrderPoolInterface = new ethers.utils.Interface(
-      //   IUniswapV3PoolABI
-      // )
-      // const logsTopics = ["0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67",
-      //   "0x000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564",
-      //   "0x000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564"]
-      // const logsData = "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffff8dcd9a2000000000000000000000000000000000000000000000000007c58508723800000000000000000000000000000000000000042f6fac2e8d93171810499824dd6000000000000000000000000000000000000000000000000000139d797d3bfe0000000000000000000000000000000000000000000000000000000000002f9b4"
-      // const parsedLog = rangeOrderPoolInterface.parseLog({topics: logsTopics, data: logsData})
-      // console.dir(parsedLog)
-      // const tick = parsedLog.args["tick"]
-      // console.log("Tick: ", tick)
-      // const price = tickToPrice(this.weth, this.usdc, tick).toFixed(2)
-      // console.log("Price: ", price)
 
       // TODO: Put back once nonce error debugged.
       // await this.owner.approveAll()
@@ -261,10 +245,10 @@ export class DRO {
   
       const tx = {
         from: this.owner.address,
-        to: CONFIG.addrPositionManager,
+        to: CHAIN_CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
-        gasLimit: CONFIG.gasLimit,
+        gasLimit: CHAIN_CONFIG.gasLimit,
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
@@ -339,10 +323,10 @@ export class DRO {
       // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
       const txRequest = {
         from: this.owner.address,
-        to: CONFIG.addrSwapRouter,
+        to: CHAIN_CONFIG.addrSwapRouter,
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
-        gasLimit: CONFIG.gasLimit,
+        gasLimit: CHAIN_CONFIG.gasLimit,
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
@@ -405,7 +389,7 @@ export class DRO {
         to: this.chainConfig.addrPoolSwaps,
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
-        gasLimit: CONFIG.gasLimit,
+        gasLimit: CHAIN_CONFIG.gasLimit,
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
@@ -483,11 +467,11 @@ export class DRO {
       // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
       const txRequest = {
         from: this.owner.address,
-        to: CONFIG.addrPositionManager,
+        to: CHAIN_CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
         // value: amountEth,
         nonce: nonce,
-        gasLimit: CONFIG.gasLimit,
+        gasLimit: CHAIN_CONFIG.gasLimit,
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
