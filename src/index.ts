@@ -118,6 +118,16 @@ async function main() {
 
   wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
 
+  // TODO: Use a command line switch to invoke this. Don't expect to figure out whether it needs to be done heuristically.
+  // if (CHAIN_CONFIG.isTestnet) {
+  //   console.log("No USDC contract address. Update the config after dpeloying a test USDC contract.")
+
+  //   console.log(`Private key for Hardhat .env file: ${wallet.privateKey}`)
+
+  //   process.exitCode = 1
+  //   process.exit()
+  // }
+
   try {
     dro = new DRO(wallet, CHAIN_CONFIG, rangeWidthTicks)
 
@@ -132,4 +142,7 @@ async function main() {
   CHAIN_CONFIG.provider().on('block', onBlock)
 }
   
-main().catch(console.error)
+main().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

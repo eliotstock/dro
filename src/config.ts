@@ -84,8 +84,8 @@ const ETHEREUM_KOVAN: ChainConfig = {
         return new ethers.providers.JsonRpcProvider(this.endpoint)
     },
 
-    // I have 1K of this USDC on Kovan in a work account.
-    addrTokenUsdc: "0xe22da380ee6b445bb8273c81944adeb6e8450422",
+    // This is our own USDC test contract. The deployer is the DRO account and has all the supply.
+    addrTokenUsdc: "0x6aD91931622d2b60B95561BfE17646469bB6E670",
 
     addrTokenWeth: "0xd0A1E359811322d97991E03f863a0C30C2cF029C",
 
