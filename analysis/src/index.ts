@@ -269,14 +269,12 @@ function gasCost(): number {
     return GAS_COST
 }
 
-function rerangingInterval(previousTimestamp: string, currentTimestamp: string): number {
+export function rerangingInterval(previousTimestamp: string, currentTimestamp: string): number {
     const previous = moment(previousTimestamp, TIMESTAMP_FORMAT)
     const current = moment(currentTimestamp, TIMESTAMP_FORMAT)
-    const interval = moment.duration(current.diff(previous))
 
-    // console.log(`  Time since last re-ranging: ${interval.minutes()} mins`)
-
-    return interval.years()
+    // Do NOT round to the nearest integer here, by passing true.
+    return current.diff(previous, 'years', true)
 }
 
 async function main() {
@@ -342,7 +340,7 @@ async function main() {
                 positionValue -= gas
 
                 if (positionValue > 0) {
-                    console.log(`  Position: +${unclaimedFees.toFixed(4)} -${fee.toFixed(2)} -${gas} = USDC ${positionValue.toFixed(2)}`)
+                    console.log(`  Position: +${unclaimedFees.toFixed(6)} -${fee.toFixed(2)} -${gas} = USDC ${positionValue.toFixed(2)}`)
                 }
             }
 
