@@ -32,7 +32,7 @@ const SWAP_POOL_FEE = 0.05 / 100
 const GAS_COST = 92.20
 
 // Start out with this in the position and see how we get on.
-const INITIAL_POSTION_VALUE_USDC = 1_000_000
+const INITIAL_POSTION_VALUE_USDC = 100_000
 
 const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
 
@@ -253,7 +253,7 @@ function rerange() {
 
     logLine += ` to ${minPriceUsdc} <-> ${maxPriceUsdc}`
 
-    console.log(logLine)
+    // console.log(logLine)
 }
 
 function outOfRange(): boolean {
@@ -327,7 +327,9 @@ async function main() {
                 // We'll claim some fees at the time of removing liquidity.
                 const yearsInRange = rerangingInterval(blockTimestamp, e.blockTimestamp.value)
 
-                const unclaimedFees = expectedGrossYield / 100 * yearsInRange
+                const unclaimedFees = expectedGrossYield / 100 * yearsInRange * positionValue
+
+                // console.log(`  Expect gross yield of ${expectedGrossYield}% APY for ${yearsInRange} years is ${unclaimedFees.toFixed(6)}`)
 
                 positionValue += unclaimedFees
 
@@ -339,9 +341,9 @@ async function main() {
                 positionValue -= fee
                 positionValue -= gas
 
-                if (positionValue > 0) {
-                    console.log(`  Position: +${unclaimedFees.toFixed(6)} -${fee.toFixed(2)} -${gas} = USDC ${positionValue.toFixed(2)}`)
-                }
+                // if (positionValue > 0) {
+                //     console.log(`  Position: +${unclaimedFees.toFixed(6)} -${fee.toFixed(2)} -${gas} = USDC ${positionValue.toFixed(2)}`)
+                // }
             }
 
             blockTimestamp = e.blockTimestamp.value
