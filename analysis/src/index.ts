@@ -196,13 +196,14 @@ function getTimeRange() {
 }
 
 function rerange() {
-    let logLine = `  #${rerangeCounter} ${blockTimestamp} Re-ranging `
+    let logLine = `  #${rerangeCounter} ${blockTimestamp} Price of USDC ${priceUsdc.toFixed(2)} re-ranges `
 
+    // Down in tick terms is up in USDC terms and vice versa.
     if (tick < minTick) {
-        logLine += `down`
+        logLine += `up  `
     }
     else if (tick > maxTick) {
-        logLine += `up`
+        logLine += `down`
     }
 
     minTick = Math.round(tick - (rangeWidthTicks / 2))
@@ -217,7 +218,7 @@ function rerange() {
 
     rerangeCounter++
 
-    logLine += ` at USDC ${priceUsdc.toFixed(2)} to ${minPriceUsdc} <-> ${maxPriceUsdc}`
+    logLine += ` to ${minPriceUsdc} <-> ${maxPriceUsdc}`
 
     console.log(logLine)
 }
@@ -245,14 +246,17 @@ async function main() {
         // Start out with a range centered on the price of the first block in our data.
         const firstSwapEvent = swapEvents[0]
         tick = firstSwapEvent.tick
+        priceUsdc = firstSwapEvent.priceUsdc || 0
         rerange()
         rerangeCounter = 0
     
         swapEvents.forEach(e => {
-            // if (e.blockTimestamp.value == blockTimestamp) {
-            //     // Disregard all but the first swap event in a given block.
-            //     return
-            // }
+            if (e.blockTimestamp.value == blockTimestamp) {
+                // Disregard all but the first swap event in a given block. We will never re-range
+                // more than once per block because it takes us a whole block to re-range.
+                // The last swap in the block would be just as good - doesn't matter much.
+                return
+            }
     
             tick = e.tick
             priceUsdc = e.priceUsdc || 0
