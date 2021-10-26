@@ -4,7 +4,7 @@ We need to execute tests on testnets that are as similar in behaviour as possibl
 
 Create an `.env` file with the following values:
 
-1. `PRIVATE_KEY` from the DRO account
+1. `PRIVATE_KEY` from the DRO account used in the parent project
 1. `KOVAN_URL` for Infura
 
 Then deploy our test USDC contract with
