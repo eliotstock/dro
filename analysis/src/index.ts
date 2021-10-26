@@ -5,6 +5,8 @@ import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/i
 import { tickToPrice, nearestUsableTick } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
 import { BigQuery, BigQueryTimestamp }  from '@google-cloud/bigquery'
+import moment from 'moment'
+import fs from 'fs'
 
 const CHAIN_ID = 1
 
@@ -21,6 +23,20 @@ const TOKEN_WETH = new Token(CHAIN_ID, ADDR_TOKEN_WETH, 18, "WETH", "Wrapped Eth
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
 const POOL_TICK_SPACING = 60
+
+// The fee in the pool in which we execute our swaps is 0.05%.
+const SWAP_POOL_FEE = 0.05 / 100
+
+// This constant gas cost is a mean taken from 7 sets of the three transactions (remove liquidity,
+// swap, add liquidity) when manually executing re-ranging.
+const GAS_COST = 92.20
+
+// Start out with this in the position and see how we get on.
+const INITIAL_POSTION_VALUE_USDC = 1_000_000
+
+const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
+
+const SWAP_EVENTS_FILE = './swap_events.json'
 
 // Read our .env file
 config()
@@ -43,7 +59,7 @@ class SwapEvent {
 
 // Single, global array of SwapEvents. As of 2021-10, this is about 750K events at less than 1kB
 // per event, so easy enough to store in RAM on an everyday laptop.
-const swapEvents: SwapEvent[] = []
+let swapEvents: SwapEvent[] = []
 
 // Current tick/price and range around it.
 let tick: number
@@ -76,12 +92,25 @@ let blockTimestamp: string
 // Forget about using a range width of 60 bps. When we re-range, we want a new range that's
 // centered on the current price. This is impossible when the range width is the smallest possible
 // width - we can't set a min tick 30 bps lower than the current price.
-const rangeWidthsTicks = [120, 180, 240, 300, 360]
+const expectedGrossYields = new Map<number, number>()
+//                      bps  percent
+//                      ---  -------
+expectedGrossYields.set(120, 1_280)
+expectedGrossYields.set(180, 980)
+expectedGrossYields.set(240, 710)
+expectedGrossYields.set(300, 500)
+expectedGrossYields.set(360, 320)
+expectedGrossYields.set(540, 209)
+expectedGrossYields.set(720, 160)
+expectedGrossYields.set(900, 126)
+
 let rangeWidthTicks: number
 
 let rerangeCounter: number
 
 let timeRangeSeconds: number
+
+let positionValue: number
 
 // Query Google's public dataset for Ethereum mainnet transactions.
 async function runQuery() {
@@ -129,7 +158,7 @@ async function runQuery() {
     console.log("Querying...")
     const [rows] = await bigqueryClient.query(options)
 
-    // The result is ~750K rows, starting on 2021-05-05 when Uniswap v3 went live. Good.
+    // The result is ~800K rows, starting on 2021-05-05 when Uniswap v3 went live. Good.
     // This is about 500MB to download each time we run (at 700K or so per row).
     console.log(`  Row count: ${rows.length}`)
 
@@ -158,6 +187,10 @@ async function runQuery() {
     // Don't stop the stopwatch until we've iterated over the data.
     const stopwatchMillis = (Date.now() - stopwatchStart)
     console.log(`... done in ${Math.round(stopwatchMillis / 1_000)}s`)
+
+    // Write the events to disk as a cache. We need a tight feedback loop when developing.
+    const json = JSON.stringify(swapEvents)
+    fs.writeFileSync(SWAP_EVENTS_FILE, json)
 }
 
 function rowToSwapEvent(row: any): SwapEvent {
@@ -227,8 +260,35 @@ function outOfRange(): boolean {
     return tick > maxTick || tick < minTick
 }
 
+// Only half the value in our account needs to be swapped to the other asset when we re-range.
+function swapFee(amount: number): number {
+    return SWAP_POOL_FEE * 0.5 * amount
+}
+
+function gasCost(): number {
+    return GAS_COST
+}
+
+function rerangingInterval(previousTimestamp: string, currentTimestamp: string): number {
+    const previous = moment(previousTimestamp, TIMESTAMP_FORMAT)
+    const current = moment(currentTimestamp, TIMESTAMP_FORMAT)
+    const interval = moment.duration(current.diff(previous))
+
+    // console.log(`  Time since last re-ranging: ${interval.minutes()} mins`)
+
+    return interval.years()
+}
+
 async function main() {
-    await runQuery()
+    if (fs.existsSync(SWAP_EVENTS_FILE)) {
+        console.log(`Using cached query results`)
+
+        const json = fs.readFileSync(SWAP_EVENTS_FILE, 'utf8')
+        swapEvents = JSON.parse(json)
+    }
+    else {
+        await runQuery()
+    }
 
     // We now have a price timeseries, both in terms of ticks and USDC.
 
@@ -237,9 +297,10 @@ async function main() {
     // Determine the time range of our data.
     getTimeRange()
 
-    // Run the analysis once per value in rangeWidthsTicks
-    rangeWidthsTicks.forEach(width => {
-        rangeWidthTicks = width
+    // Run the analysis once per key in expectedGrossYields
+    // for (let [rangeWidth, expectGrossYield] of expectedGrossYields) {
+    expectedGrossYields.forEach((expectedGrossYield: number, rangeWidth: number) => {
+        rangeWidthTicks = rangeWidth
 
         console.log(`  Range width in ticks: ${rangeWidthTicks}`)
     
@@ -249,6 +310,7 @@ async function main() {
         priceUsdc = firstSwapEvent.priceUsdc || 0
         rerange()
         rerangeCounter = 0
+        positionValue = INITIAL_POSTION_VALUE_USDC
     
         swapEvents.forEach(e => {
             if (e.blockTimestamp.value == blockTimestamp) {
@@ -260,18 +322,40 @@ async function main() {
     
             tick = e.tick
             priceUsdc = e.priceUsdc || 0
-            blockTimestamp = e.blockTimestamp.value
     
             if (outOfRange()) {
                 rerange()
+
+                // We'll claim some fees at the time of removing liquidity.
+                const yearsInRange = rerangingInterval(blockTimestamp, e.blockTimestamp.value)
+
+                const unclaimedFees = expectedGrossYield / 100 * yearsInRange
+
+                positionValue += unclaimedFees
+
+                // But we'll also incur the cost of the swap and the gas for the set of re-ranging
+                // transactions (remove liquidity, swap, add liquidity)
+                const fee = swapFee(positionValue)
+                const gas = gasCost()
+
+                positionValue -= fee
+                positionValue -= gas
+
+                if (positionValue > 0) {
+                    console.log(`  Position: +${unclaimedFees.toFixed(4)} -${fee.toFixed(2)} -${gas} = USDC ${positionValue.toFixed(2)}`)
+                }
             }
+
+            blockTimestamp = e.blockTimestamp.value
         })
     
         console.log(`  Re-ranged ${rerangeCounter} times in ${secondsToDays(timeRangeSeconds)} days`)
     
         // Note that forEach() above is blocking.
         const meanTimeToReranging = timeRangeSeconds / rerangeCounter
-        console.log(`  Mean time to re-ranging: ${meanTimeToReranging / 60} mins`)
+        const humanized = moment.duration(meanTimeToReranging, 'seconds').humanize()
+        console.log(`  Mean time to re-ranging: ${humanized}`)
+        console.log(`  Closing position value: USDC ${positionValue.toFixed(2)}`)
     })
 }
 
