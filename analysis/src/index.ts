@@ -78,21 +78,11 @@ let blockTimestamp: string
 // Note that .01% is one basis point ("bip"), so every tick is a single bip change in price.
 // But the tick spacing in our pool is 60, so our range width must be a multiple of that.
 //
-// Percent   bps (ticks)   Mean time to re-ranging
-// -------   -----------   ------------
-//    1.2%           120
-//    1.8%           180
-//    2.4%           240
-//    3.0%           300
-//    3.6%           360
-//    4.2%           420
-//    4.8%           480   
-//    5.4%           540
-//    6.0%           600
 // Forget about using a range width of 60 bps. When we re-range, we want a new range that's
 // centered on the current price. This is impossible when the range width is the smallest possible
 // width - we can't set a min tick 30 bps lower than the current price.
 const expectedGrossYields = new Map<number, number>()
+
 //                      bps  percent
 //                      ---  -------
 expectedGrossYields.set(120, 1_280)
@@ -277,6 +267,25 @@ export function rerangingInterval(previousTimestamp: string, currentTimestamp: s
     return current.diff(previous, 'years', true)
 }
 
+export function apy(startTimestamp: string, endTimestamp: string, startingBalance: number,
+    endingBalance: number): number {
+    const start = moment(startTimestamp, TIMESTAMP_FORMAT)
+    const end = moment(endTimestamp, TIMESTAMP_FORMAT)
+
+    // Do NOT round to the nearest integer here, by passing true.
+    const intervalYears = end.diff(start, 'years', true)
+
+    const absoluteReturn = endingBalance - startingBalance
+    const relativeReturn = absoluteReturn / startingBalance
+
+    const anualisedReturn = relativeReturn / intervalYears
+
+//     console.log(`  From ${startingBalance.toFixed(0)} to ${endingBalance.toFixed(0)}\
+// in ${intervalYears.toFixed(2)} is ${(anualisedReturn * 100).toFixed(0)}%`)
+
+    return anualisedReturn
+}
+
 async function main() {
     if (fs.existsSync(SWAP_EVENTS_FILE)) {
         console.log(`Using cached query results`)
@@ -356,6 +365,12 @@ async function main() {
         const humanized = moment.duration(meanTimeToReranging, 'seconds').humanize()
         console.log(`  Mean time to re-ranging: ${humanized}`)
         console.log(`  Closing position value: USDC ${positionValue.toFixed(2)}`)
+
+        const lastSwapEvent = swapEvents[swapEvents.length - 1]
+        const expectedApy = apy(firstSwapEvent.blockTimestamp.value, lastSwapEvent.blockTimestamp.value,
+            INITIAL_POSTION_VALUE_USDC, positionValue)
+        console.log(`  Expected net APY: ${(expectedApy * 100).toFixed(0)}%`)
+        console.log('')
     })
 }
 
