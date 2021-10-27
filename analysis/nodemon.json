@@ -2,5 +2,5 @@
     "watch": ["src"],
     "ext": ".ts,.js",
     "ignore": [],
-    "exec": "rm ./logs.txt && ts-node ./src/index.ts > ./logs.txt"
+    "exec": "mkdir -p ./out && rm -f ./out/logs.txt && ts-node ./src/index.ts > ./out/logs.txt"
 }

@@ -5,6 +5,8 @@ import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/i
 import { tickToPrice, nearestUsableTick } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
 import { BigQuery, BigQueryTimestamp }  from '@google-cloud/bigquery'
+import stringify from 'csv-stringify/lib/sync'
+import parse from 'csv-parse/lib/sync'
 import moment from 'moment'
 import fs from 'fs'
 
@@ -36,7 +38,9 @@ const INITIAL_POSTION_VALUE_USDC = 100_000
 
 const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
 
-const SWAP_EVENTS_FILE = './swap_events.json'
+const OUT_DIR = './out'
+const SWAP_EVENTS_FILE = OUT_DIR + '/swap_events.json'
+const SWAP_EVENTS_CSV = OUT_DIR + '/swap_events.csv'
 
 // Read our .env file
 config()
@@ -44,12 +48,12 @@ config()
 // An event emitted by the Uniswap v3 pool contract. See:
 //   https://github.com/Uniswap/v3-core/blob/v1.0.0/contracts/UniswapV3Pool.sol#L786
 class SwapEvent {
-    blockTimestamp: BigQueryTimestamp
+    blockTimestamp: string
     tick: number
     priceUsdc?: number
 
     constructor(
-        _blockTimestamp: BigQueryTimestamp,
+        _blockTimestamp: string,
         _tick: number
     ) {
         this.blockTimestamp = _blockTimestamp
@@ -120,7 +124,7 @@ async function runQuery() {
     // on the environment too.
     process.env.GOOGLE_APPLICATION_CREDENTIALS = config.keyPath
 
-    const bigqueryClient = new BigQuery(config)
+    const bigQueryClient = new BigQuery(config)
 
     // First, query the logs of a single transaction that we know was a swap in the ETH/USDC 0.05%
     // fee pool, because it was our own swap.
@@ -146,7 +150,7 @@ async function runQuery() {
 
     const stopwatchStart = Date.now()
     console.log("Querying...")
-    const [rows] = await bigqueryClient.query(options)
+    const [rows] = await bigQueryClient.query(options)
 
     // The result is ~800K rows, starting on 2021-05-05 when Uniswap v3 went live. Good.
     // This is about 500MB to download each time we run (at 700K or so per row).
@@ -181,6 +185,9 @@ async function runQuery() {
     // Write the events to disk as a cache. We need a tight feedback loop when developing.
     const json = JSON.stringify(swapEvents)
     fs.writeFileSync(SWAP_EVENTS_FILE, json)
+
+    const csv = stringify(swapEvents, {header: true})
+    fs.writeFileSync(SWAP_EVENTS_CSV, csv)
 }
 
 function rowToSwapEvent(row: any): SwapEvent {
@@ -192,7 +199,7 @@ function rowToSwapEvent(row: any): SwapEvent {
 
     const parsedLog = INTERFACE_POOL.parseLog({topics: logsTopics, data: logsData})
 
-    let e: SwapEvent = new SwapEvent(row['block_timestamp'], parsedLog.args['tick'])
+    let e: SwapEvent = new SwapEvent(row['block_timestamp']['value'], parsedLog.args['tick'])
 
     const price: string = tickToPrice(TOKEN_WETH, TOKEN_USDC, e.tick).toFixed(2)
     e.priceUsdc = parseFloat(price)
@@ -208,8 +215,8 @@ function getTimeRange() {
     const firstSwapEvent = swapEvents[0]
     const lastSwapEvent = swapEvents[swapEvents.length - 1]
 
-    const firstSwapDate = new Date(firstSwapEvent.blockTimestamp.value)
-    const lastSwapDate = new Date(lastSwapEvent.blockTimestamp.value)
+    const firstSwapDate = new Date(firstSwapEvent.blockTimestamp)
+    const lastSwapDate = new Date(lastSwapEvent.blockTimestamp)
 
     timeRangeSeconds = lastSwapDate.valueOf() / 1000 - firstSwapDate.valueOf() / 1000
 
@@ -287,6 +294,10 @@ export function apy(startTimestamp: string, endTimestamp: string, startingBalanc
 }
 
 async function main() {
+    if (!fs.existsSync(OUT_DIR)) {
+        fs.mkdirSync(OUT_DIR)
+    }
+
     if (fs.existsSync(SWAP_EVENTS_FILE)) {
         console.log(`Using cached query results`)
 
@@ -320,7 +331,7 @@ async function main() {
         positionValue = INITIAL_POSTION_VALUE_USDC
     
         swapEvents.forEach(e => {
-            if (e.blockTimestamp.value == blockTimestamp) {
+            if (e.blockTimestamp == blockTimestamp) {
                 // Disregard all but the first swap event in a given block. We will never re-range
                 // more than once per block because it takes us a whole block to re-range.
                 // The last swap in the block would be just as good - doesn't matter much.
@@ -334,7 +345,7 @@ async function main() {
                 rerange()
 
                 // We'll claim some fees at the time of removing liquidity.
-                const yearsInRange = rerangingInterval(blockTimestamp, e.blockTimestamp.value)
+                const yearsInRange = rerangingInterval(blockTimestamp, e.blockTimestamp)
 
                 const unclaimedFees = expectedGrossYield / 100 * yearsInRange * positionValue
 
@@ -355,7 +366,7 @@ async function main() {
                 // }
             }
 
-            blockTimestamp = e.blockTimestamp.value
+            blockTimestamp = e.blockTimestamp
         })
     
         console.log(`  Re-ranged ${rerangeCounter} times in ${secondsToDays(timeRangeSeconds)} days`)
@@ -367,7 +378,7 @@ async function main() {
         console.log(`  Closing position value: USDC ${positionValue.toFixed(2)}`)
 
         const lastSwapEvent = swapEvents[swapEvents.length - 1]
-        const expectedApy = apy(firstSwapEvent.blockTimestamp.value, lastSwapEvent.blockTimestamp.value,
+        const expectedApy = apy(firstSwapEvent.blockTimestamp, lastSwapEvent.blockTimestamp,
             INITIAL_POSTION_VALUE_USDC, positionValue)
         console.log(`  Expected net APY: ${(expectedApy * 100).toFixed(0)}%`)
         console.log('')

@@ -30,5 +30,4 @@ yarn-debug.log*
 yarn-error.log*
 
 # Output
-logs.txt
-swap_events.json
+/out
