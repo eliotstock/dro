@@ -54,7 +54,19 @@ Goals: low power, no fan, secure, simple.
 1. Plug the ethernet cable in and reboot: `sudo reboot`
 1. `ifconfig` and note down the IPv4 address. Now you can set your ssh alias.
 1. Update packages and get some stuff
-    1. `sudo apt-get update`
-    1. `sudo apt-get upgrade`
-    1. `sudo apt-get install net-tools emacs git`
-1. TODO: `fail2ban` steps: https://techguides.yt/guides/secure-linux-server/#5_Install_and_setup_fail2ban
+    1. `sudo apt update`
+    1. `sudo apt upgrade`
+    1. `sudo apt install net-tools emacs git`
+1. Ban any IP address that has multiple failed login attempts using `fail2ban`
+    1. `sudo apt install fail2ban`
+    1. `sudo cp /etc/fail2ban/fail2ban.conf /etc/fail2ban/fail2ban.local`
+    1. `sudo nano /etc/fail2ban/fail2ban.local` and add:
+        1. `[sshd]`
+        1. `enabled = true`
+        1. `port = [port]`
+        1. `filter = sshd`
+        1. `logpath = /var/log/auth.log`
+        1. `maxretry = 3`
+        1. `bantime = -1`
+    1. `sudo service fail2ban restart`
+    1. Check for any banned IPs later with `sudo fail2ban-client status sshd`
