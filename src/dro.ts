@@ -99,18 +99,6 @@ export class DRO {
       // console.log("WETH: ", this.poolImmutables.token1)
       // console.log("Fee: ", this.poolImmutables.fee)
 
-      // Event emitted here:
-      //   https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol#L786
-      // and defined here:
-      //   https://github.com/Uniswap/v3-core/blob/main/contracts/interfaces/pool/IUniswapV3PoolEvents.sol#L72
-      // TODO: Move this out to a swap-monitor.ts source and have it triggered by a command line arg.
-      this.rangeOrderPoolContract.on('Swap', (sender, recipient, amount0, amount1, sqrtPriceX96, liquidity, tick) => {
-        if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
-
-        const price = tickToPrice(this.weth, this.usdc, tick).toFixed(2)
-        console.log("Swap price:", price)
-      })
-
       // TODO: Put back once nonce error debugged.
       // await this.owner.approveAll()
     }

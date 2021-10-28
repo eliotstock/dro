@@ -2,6 +2,7 @@ import { config } from 'dotenv'
 import { useConfig, ChainConfig } from './config'
 import { EthUsdcWallet } from './wallet'
 import { DRO } from './dro'
+import { monitor } from './swap-monitor'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
 
@@ -103,12 +104,23 @@ async function onBlock(...args: Array<any>) {
 async function main() {
   // Process command line args using yargs.
   const argv = yargs(process.argv.slice(2)).options({
-    n: { type: 'boolean', default: false }
+    n: { type: 'boolean', default: false },
+    monitor: { type: 'boolean', default: false }
   }).parseSync()
 
+  // Invoke with `ts-node ./src/index.ts --n`
   if (argv.n) {
     noops = true
     console.log(`Running in no-op mode. No transactions will be executed.`)
+  }
+
+  // Invoke with `ts-node ./src/index.ts --monitor`
+  if (argv.monitor) {
+    console.log(`Monitoring swaps in the pool`)
+
+    monitor(CHAIN_CONFIG)
+
+    return
   }
 
   console.log(`Using ${CHAIN_CONFIG.name}`)
