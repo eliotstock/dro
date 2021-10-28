@@ -43,6 +43,7 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 // const CHAIN_CONFIG = CONFIG[CHAIN]
 
 // Single, global instance of the DRO class.
+// let dros: DRO[]
 let dro: DRO
 
 // Single, global Ethers.js wallet subclass instance (account).
@@ -59,41 +60,13 @@ let noops: boolean = false
 async function onBlock(...args: Array<any>) {
   await dro.updatePoolState()
 
-  // Log the timestamp and block number first
-  let logThisBlock = false
-  let logLine = moment().format("MM-DD-HH:mm:ss")
-  logLine += " #" + args
-  
-  // Only log the price when it changes.
+  // Log the timestamp and block number first. Only log the price when it changes.
   if (dro.priceUsdc != price) {
-    logLine += " " + dro.priceUsdc + " USDC."
-    logThisBlock = true
+    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${dro.priceUsdc} USDC`)
   }
   price = dro.priceUsdc
 
-  // Are we now out of range?
-  if (dro.outOfRange()) {
-    // Remove all of our liquidity now and burn the NFT for our position.
-    await dro.removeLiquidity()
-
-    // Take note of what assets we now hold
-    wallet.logBalances()
-
-    // Find our new range around the current price.
-    dro.updateRange()
-
-    // Swap half our assets to the other asset so that we have equal value of assets.
-    await dro.swap()
-
-    // Add all our WETH and USDC to a new liquidity position.
-    // TODO: Put back once swaps working
-    // await dro.addLiquidity()
-  }
-  else {
-    logLine += " In range."
-  }
-
-  if (logThisBlock) console.log(logLine)
+  dro.onBlock(wallet)
 }
 
 async function main() {
@@ -103,7 +76,7 @@ async function main() {
 
   if (argv.n) {
     noops = true
-    console.log(`Running in noop mode. No transactions will be executed.`)
+    console.log(`Running in no-op mode. No transactions will be executed.`)
   }
 
   console.log(`Using ${CHAIN_CONFIG.name}`)

@@ -165,7 +165,7 @@ export class DRO {
       const minUsdc = tickToPrice(this.weth, this.usdc, this.maxTick).toFixed(2)
       const maxUsdc = tickToPrice(this.weth, this.usdc, this.minTick).toFixed(2)
   
-      console.log("New range: " + minUsdc + " USDC - " + maxUsdc + " USDC.")
+      console.log(`[${this.rangeWidthTicks}] New range: ${minUsdc} USDC - ${maxUsdc} USDC.`)
     }
   
     // Checking unclaimed fees is a nice-to-have for the logs but essential if we want to actually
@@ -209,7 +209,7 @@ export class DRO {
         this.unclaimedFeesUsdc = results.amount0
         this.unclaimedFeesWeth = results.amount1
   
-        console.log("Unclaimed fees: " + this.unclaimedFeesUsdc + " USDC, " + this.unclaimedFeesWeth + " WETH")
+        console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${this.unclaimedFeesUsdc} USDC, ${this.unclaimedFeesWeth} WETH`)
       })
     }
   
@@ -294,7 +294,7 @@ export class DRO {
       )
   
       // Swapping 1_000_000_000_000_000_000 WETH (18 zeroes) will get us 19_642_577_913_338_823 USDC (19B USDC)
-      console.log("Swapping " + weth + " WETH will get us " + quotedUsdcOut.toString() + " USDC")
+      console.log(`[${this.rangeWidthTicks}] Swapping ${weth} WETH will get us ${quotedUsdcOut.toString()} USDC`)
   
       // The pool depends on the pool state so we need to reconstruct it every time the state changes.
       const poolEthUsdcForSwaps = new Pool(
@@ -464,6 +464,8 @@ export class DRO {
         recipient: this.owner.address,
         createPool: false
       }
+
+      if (this.noops) return
   
       // addCallParameters() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
@@ -484,8 +486,6 @@ export class DRO {
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
-
-      if (this.noops) return
   
       // Send the transaction to the provider.
       const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
@@ -510,5 +510,25 @@ export class DRO {
       //   Can we decode the calldata using an ethers Interface and check it?
 
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the token ID.
+    }
+
+    async onBlock(wallet: EthUsdcWallet) {
+      // Are we now out of range?
+      if (this.outOfRange()) {
+        // Remove all of our liquidity now and burn the NFT for our position.
+        await this.removeLiquidity()
+
+        // Take note of what assets we now hold
+        wallet.logBalances()
+
+        // Find our new range around the current price.
+        this.updateRange()
+
+        // Swap half our assets to the other asset so that we have equal value of assets.
+        await this.swap()
+
+        // Add all our WETH and USDC to a new liquidity position.
+        await this.addLiquidity()
+      }
     }
   }
