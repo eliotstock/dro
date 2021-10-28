@@ -15,12 +15,21 @@ export async function monitor(chainConfig: any) {
         chainConfig.provider()
     )
 
-    const usdc = new Token(chainConfig.chainId, (await poolContract.token0()), 6, "USDC", "USD Coin")
+    const usdcAddress = await poolContract.token0()
 
-    const weth = new Token(chainConfig.chainId, (await poolContract.token0()), 18, "WETH", "Wrapped Ether")
+    const wethAddress = await poolContract.token1()
+
+    // console.log(`USDC: ${usdcAddress}, WETH: ${wethAddress}`)
+
+    const usdc = new Token(chainConfig.chainId, usdcAddress, 6, "USDC", "USD Coin")
+
+    const weth = new Token(chainConfig.chainId, wethAddress, 18, "WETH", "Wrapped Ether")
 
     poolContract.on('Swap', (sender, recipient, amount0, amount1, sqrtPriceX96, liquidity, tick) => {
+        // ticktoPrice() implementation:
+        //   https://github.com/Uniswap/v3-sdk/blob/main/src/utils/priceTickConversions.ts#L14
         const price: string = tickToPrice(weth, usdc, tick).toFixed(2)
+
         const timestamp = moment()
         console.log(`${timestamp.toLocaleString()} ${price}`)
     })
