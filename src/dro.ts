@@ -86,6 +86,8 @@ export class DRO {
     }
 
     async init() {
+      console.log(`[${this.rangeWidthTicks}] init`)
+
       // Get the range order pool's immutables once only.
       this.poolImmutables = await getPoolImmutables(this.rangeOrderPoolContract)
 
@@ -101,6 +103,7 @@ export class DRO {
       //   https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol#L786
       // and defined here:
       //   https://github.com/Uniswap/v3-core/blob/main/contracts/interfaces/pool/IUniswapV3PoolEvents.sol#L72
+      // TODO: Move this out to a swap-monitor.ts source and have it triggered by a command line arg.
       this.rangeOrderPoolContract.on('Swap', (sender, recipient, amount0, amount1, sqrtPriceX96, liquidity, tick) => {
         if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
@@ -195,8 +198,6 @@ export class DRO {
       // }
   
       // const { calldata, value } = NonfungiblePositionManager.collectCallParameters(collectOptions)
-
-      if (this.noops) return
   
       this.positionManagerContract.callStatic.collect({
         tokenId: tokenIdHexString,
@@ -257,8 +258,6 @@ export class DRO {
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
-
-      if (this.noops) return
   
       // TODO: Switch to Kovan, fund the account with USDC and WETH and test.
       // w.sendTransaction(tx).then((transaction) => {
@@ -282,8 +281,6 @@ export class DRO {
 
       // Assume we're swapping our entire WETH balance for USDC for now.
       const weth = await this.owner.weth()
-
-      if (this.noops) return
   
       const quotedUsdcOut = await this.quoterContract.callStatic.quoteExactInputSingle(
         this.poolImmutables.token1, // Token in: WETH
@@ -464,8 +461,6 @@ export class DRO {
         recipient: this.owner.address,
         createPool: false
       }
-
-      if (this.noops) return
   
       // addCallParameters() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
@@ -513,6 +508,15 @@ export class DRO {
     }
 
     async onBlock(wallet: EthUsdcWallet) {
+      // When in no-op mode, don't execute any transactions but do re-range when necessary.
+      if (this.noops) {
+        if (this.outOfRange()) {
+          this.updateRange()
+        }
+
+        return
+      }
+
       // Are we now out of range?
       if (this.outOfRange()) {
         // Remove all of our liquidity now and burn the NFT for our position.

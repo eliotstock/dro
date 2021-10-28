@@ -50,21 +50,20 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 // But the tick spacing in our pool is 60, so our range width must be a multiple of that.
 // Forget about using a range width of 60 bps. When we re-range, we want a new range that's
 // centered on the current price. This is impossible when the range width is the smallest
-// possible width - we can't set a min tick 30 bps lower than the current price.
+// possible width - we can't set a min tick 30 bps lower than the current price. The same applies
+// to range widths that are multiples of 60 bps but not 120 bps - they cannot be centered on the 
+// current price. Therefore, choose ranges widths that are multiples of 120 bps.
 //
 // Percent   bps (ticks)   Observations
 // -------   -----------   ------------
 //    1.2%           120   NFW. Re-ranging 7 times in 8 hours.
-//    1.8%           180   Re-ranged 3 times in 11 hours in a non-volatile market.
 //    2.4%           240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
-//    3.0%           300   Re-ranged 5 times in 16 hours on a 6% daily bar.
 //    3.6%           360   Re-ranged 7 times in 34 hours on a 8% daily bar.
-//    4.2%           420   Re-ranged 3 times in 39 hours on a 6% move.
 //    4.8%           480   Testing now.
-//    5.4%           540
-//    6.0%           600
-// const rangeWidths: number[] = [120, 180, 240, 300, 360, 420, 480, 540, 600, 720, 900]
-const rangeWidths: number[] = [480, 540, 600]
+//    6.0%           600   Testing now.
+//    7.2%           720   Testing now.
+// const rangeWidths: number[] = [120, 240, 360, 480, 600, 720]
+const rangeWidths: number[] = [360, 480, 600, 720]
 
 // Single, global instance of the DRO class.
 let dros: DRO[] = []
@@ -102,6 +101,7 @@ async function onBlock(...args: Array<any>) {
 }
 
 async function main() {
+  // Process command line args using yargs.
   const argv = yargs(process.argv.slice(2)).options({
     n: { type: 'boolean', default: false }
   }).parseSync()
@@ -147,6 +147,7 @@ async function main() {
 }
   
 main().catch((error) => {
+  // TODO: Catch HTTP timeout errors and continue. Losing the network should not kill the process.
   console.error(error)
   process.exitCode = 1
 })
