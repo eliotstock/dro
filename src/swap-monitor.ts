@@ -2,6 +2,7 @@ import { ethers } from 'ethers'
 import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
 import { tickToPrice } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
+import moment from 'moment'
 
 // Event emitted here:
 //   https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol#L786
@@ -20,6 +21,7 @@ export async function monitor(chainConfig: any) {
 
     poolContract.on('Swap', (sender, recipient, amount0, amount1, sqrtPriceX96, liquidity, tick) => {
         const price: string = tickToPrice(weth, usdc, tick).toFixed(2)
-        console.log(price)
+        const timestamp = moment()
+        console.log(`${timestamp.toLocaleString()} ${price}`)
     })
 }
