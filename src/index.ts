@@ -42,9 +42,32 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 // const CHAIN: string = process.env.CHAIN || 'ethereumMainnet'
 // const CHAIN_CONFIG = CONFIG[CHAIN]
 
+// Candidate values for the range width in bps.
+// From the Uniswap v3 whitepaper:
+//   "Ticks are all 1.0001 to an integer power, which means each tick is .01% away from the next
+//    tick."
+// Note that .01% is one basis point ("bip"), so every tick is a single bip change in price.
+// But the tick spacing in our pool is 60, so our range width must be a multiple of that.
+// Forget about using a range width of 60 bps. When we re-range, we want a new range that's
+// centered on the current price. This is impossible when the range width is the smallest
+// possible width - we can't set a min tick 30 bps lower than the current price.
+//
+// Percent   bps (ticks)   Observations
+// -------   -----------   ------------
+//    1.2%           120   NFW. Re-ranging 7 times in 8 hours.
+//    1.8%           180   Re-ranged 3 times in 11 hours in a non-volatile market.
+//    2.4%           240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
+//    3.0%           300   Re-ranged 5 times in 16 hours on a 6% daily bar.
+//    3.6%           360   Re-ranged 7 times in 34 hours on a 8% daily bar.
+//    4.2%           420   Re-ranged 3 times in 39 hours on a 6% move.
+//    4.8%           480   Testing now.
+//    5.4%           540
+//    6.0%           600
+// const rangeWidths: number[] = [120, 180, 240, 300, 360, 420, 480, 540, 600, 720, 900]
+const rangeWidths: number[] = [480, 540, 600]
+
 // Single, global instance of the DRO class.
-// let dros: DRO[]
-let dro: DRO
+let dros: DRO[] = []
 
 // Single, global Ethers.js wallet subclass instance (account).
 let wallet: EthUsdcWallet
@@ -58,15 +81,24 @@ let noops: boolean = false
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
-  await dro.updatePoolState()
+  // Pass the onBlock() call through to each DRO instance, which will figure out whether it needs
+  // to re-range and execute transactions if so.
+  let first = true
 
-  // Log the timestamp and block number first. Only log the price when it changes.
-  if (dro.priceUsdc != price) {
-    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${dro.priceUsdc} USDC`)
+  for (const dro of dros) {
+    await dro.updatePoolState()
+
+    // Log the timestamp and block number first. Only log the price when it changes.
+    // We need a DRO instance in order to figure out the current price, but any one of them will do.
+    if (first && dro.priceUsdc != price) {
+      console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${dro.priceUsdc} USDC`)
+
+      first = false
+    }
+    price = dro.priceUsdc
+
+    await dro.onBlock(wallet)
   }
-  price = dro.priceUsdc
-
-  dro.onBlock(wallet)
 }
 
 async function main() {
@@ -81,28 +113,8 @@ async function main() {
 
   console.log(`Using ${CHAIN_CONFIG.name}`)
 
-  // From the Uniswap v3 whitepaper:
-  //   "Ticks are all 1.0001 to an integer power, which means each tick is .01% away from the next
-  //    tick."
-  // Note that .01% is one basis point ("bip"), so every tick is a single bip change in price.
-  // But the tick spacing in our pool is 60, so our range width must be a multiple of that.
-  // Forget about using a range width of 60 bps. When we re-range, we want a new range that's
-  // centered on the current price. This is impossible when the range width is the smallest
-  // possible width - we can't set a min tick 30 bps lower than the current price.
-  //
-  // Percent   bps (ticks)   Observations
-  // -------   -----------   ------------
-  //    1.2%           120   NFW. Re-ranging 7 times in 8 hours.
-  //    1.8%           180   Re-ranged 3 times in 11 hours in a non-volatile market.
-  //    2.4%           240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
-  //    3.0%           300   Re-ranged 5 times in 16 hours on a 6% daily bar.
-  //    3.6%           360   Re-ranged 7 times in 34 hours on a 8% daily bar.
-  //    4.2%           420   Re-ranged 3 times in 39 hours on a 6% move.
-  //    4.8%           480   Testing now.
-  //    5.4%           540
-  //    6.0%           600
-  const rangeWidthTicks = 480
-  console.log("Range width in ticks: " + rangeWidthTicks)
+  // const rangeWidthTicks = 480
+  // console.log("Range width in ticks: " + rangeWidthTicks)
 
   wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
 
@@ -117,9 +129,13 @@ async function main() {
   // }
 
   try {
-    dro = new DRO(wallet, CHAIN_CONFIG, rangeWidthTicks, noops)
+    for (const width of rangeWidths) {
+      const dro: DRO = new DRO(wallet, CHAIN_CONFIG, width, noops)
 
-    await dro.init()
+      await dro.init()
+
+      dros.push(dro)
+    }
   }
   catch(e) {
     // Probably network error thrown by getPoolImmutables().
