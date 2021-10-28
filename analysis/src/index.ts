@@ -2,9 +2,10 @@ import { config } from 'dotenv'
 import { resolve } from 'path'
 import { ethers } from 'ethers'
 import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
-import { tickToPrice, nearestUsableTick } from '@uniswap/v3-sdk'
+import { tickToPrice, nearestUsableTick, TickMath } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
-import { BigQuery, BigQueryTimestamp }  from '@google-cloud/bigquery'
+import { BigQuery }  from '@google-cloud/bigquery'
+import invariant from 'tiny-invariant'
 import stringify from 'csv-stringify/lib/sync'
 import parse from 'csv-parse/lib/sync'
 import moment from 'moment'
@@ -39,7 +40,6 @@ const INITIAL_POSTION_VALUE_USDC = 100_000
 const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
 
 const OUT_DIR = './out'
-const SWAP_EVENTS_FILE = OUT_DIR + '/swap_events.json'
 const SWAP_EVENTS_CSV = OUT_DIR + '/swap_events.csv'
 
 // Read our .env file
@@ -183,9 +183,6 @@ async function runQuery() {
     console.log(`... done in ${Math.round(stopwatchMillis / 1_000)}s`)
 
     // Write the events to disk as a cache. We need a tight feedback loop when developing.
-    const json = JSON.stringify(swapEvents)
-    fs.writeFileSync(SWAP_EVENTS_FILE, json)
-
     const csv = stringify(swapEvents, {header: true})
     fs.writeFileSync(SWAP_EVENTS_CSV, csv)
 }
@@ -219,14 +216,10 @@ function getTimeRange() {
     const lastSwapDate = new Date(lastSwapEvent.blockTimestamp)
 
     timeRangeSeconds = lastSwapDate.valueOf() / 1000 - firstSwapDate.valueOf() / 1000
-
-//     console.log(`  Data range: ${firstSwapDate.toLocaleString()} \
-// to ${lastSwapDate.toLocaleString()} \
-// is ${timeRangeSeconds}s (${secondsToDays(timeRangeSeconds)} days)`)
 }
 
 function rerange() {
-    let logLine = `  #${rerangeCounter} ${blockTimestamp} Price of USDC ${priceUsdc.toFixed(2)} re-ranges `
+    let logLine = `  #${rerangeCounter} ${blockTimestamp} Price of USDC ${priceUsdc} re-ranges `
 
     // Down in tick terms is up in USDC terms and vice versa.
     if (tick < minTick) {
@@ -236,10 +229,14 @@ function rerange() {
         logLine += `down`
     }
 
+    // Check that the tick value won't cause nearestUsableTick() to fail below.
+
     minTick = Math.round(tick - (rangeWidthTicks / 2))
+    invariant(minTick >= TickMath.MIN_TICK && minTick <= TickMath.MAX_TICK, `TICK_BOUND: minTick: ${minTick}, TickMath.MIN_TICK: ${TickMath.MIN_TICK}`)
     minTick = nearestUsableTick(minTick, POOL_TICK_SPACING)
 
     maxTick = Math.round(tick + (rangeWidthTicks / 2))
+    invariant(maxTick >= TickMath.MIN_TICK && maxTick <= TickMath.MAX_TICK, `TICK_BOUND: maxTick: ${maxTick}, TickMath.MAX_TICK: ${TickMath.MAX_TICK}`)
     maxTick = nearestUsableTick(maxTick, POOL_TICK_SPACING)
 
     // The minimum USDC price corresponds to the maximum tick and vice versa.
@@ -250,7 +247,7 @@ function rerange() {
 
     logLine += ` to ${minPriceUsdc} <-> ${maxPriceUsdc}`
 
-    // console.log(logLine)
+    console.log(logLine)
 }
 
 function outOfRange(): boolean {
@@ -287,9 +284,6 @@ export function apy(startTimestamp: string, endTimestamp: string, startingBalanc
 
     const anualisedReturn = relativeReturn / intervalYears
 
-//     console.log(`  From ${startingBalance.toFixed(0)} to ${endingBalance.toFixed(0)}\
-// in ${intervalYears.toFixed(2)} is ${(anualisedReturn * 100).toFixed(0)}%`)
-
     return anualisedReturn
 }
 
@@ -298,11 +292,11 @@ async function main() {
         fs.mkdirSync(OUT_DIR)
     }
 
-    if (fs.existsSync(SWAP_EVENTS_FILE)) {
+    if (fs.existsSync(SWAP_EVENTS_CSV)) {
         console.log(`Using cached query results`)
 
-        const json = fs.readFileSync(SWAP_EVENTS_FILE, 'utf8')
-        swapEvents = JSON.parse(json)
+        const csv = fs.readFileSync(SWAP_EVENTS_CSV, 'utf8')
+        swapEvents = parse(csv, {columns: true, cast: true})
     }
     else {
         await runQuery()
