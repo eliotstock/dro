@@ -3,6 +3,7 @@ import { useConfig, ChainConfig } from './config'
 import { EthUsdcWallet } from './wallet'
 import { DRO } from './dro'
 import moment from 'moment'
+import yargs from 'yargs/yargs'
 
 // TODO
 // ----
@@ -50,6 +51,9 @@ let wallet: EthUsdcWallet
 // Single, global USDC price in the range order pool.
 let price: string
 
+// When invoked with the -n command line arg, don't execute any transactions.
+let noops: boolean = false
+
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
@@ -93,6 +97,15 @@ async function onBlock(...args: Array<any>) {
 }
 
 async function main() {
+  const argv = yargs(process.argv.slice(2)).options({
+    n: { type: 'boolean', default: false }
+  }).parseSync()
+
+  if (argv.n) {
+    noops = true
+    console.log(`Running in noop mode. No transactions will be executed.`)
+  }
+
   console.log(`Using ${CHAIN_CONFIG.name}`)
 
   // From the Uniswap v3 whitepaper:
@@ -100,20 +113,22 @@ async function main() {
   //    tick."
   // Note that .01% is one basis point ("bip"), so every tick is a single bip change in price.
   // But the tick spacing in our pool is 60, so our range width must be a multiple of that.
+  // Forget about using a range width of 60 bps. When we re-range, we want a new range that's
+  // centered on the current price. This is impossible when the range width is the smallest
+  // possible width - we can't set a min tick 30 bps lower than the current price.
   //
   // Percent   bps (ticks)   Observations
   // -------   -----------   ------------
-  //    0.6%            60   NFW. Re-ranging 8 times during a 4% hourly bar.
   //    1.2%           120   NFW. Re-ranging 7 times in 8 hours.
   //    1.8%           180   Re-ranged 3 times in 11 hours in a non-volatile market.
   //    2.4%           240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
   //    3.0%           300   Re-ranged 5 times in 16 hours on a 6% daily bar.
   //    3.6%           360   Re-ranged 7 times in 34 hours on a 8% daily bar.
   //    4.2%           420   Re-ranged 3 times in 39 hours on a 6% move.
-  //    4.8%           480   Testing now. 
+  //    4.8%           480   Testing now.
   //    5.4%           540
   //    6.0%           600
-  const rangeWidthTicks = 0.048 / 0.0001
+  const rangeWidthTicks = 480
   console.log("Range width in ticks: " + rangeWidthTicks)
 
   wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
@@ -129,7 +144,7 @@ async function main() {
   // }
 
   try {
-    dro = new DRO(wallet, CHAIN_CONFIG, rangeWidthTicks)
+    dro = new DRO(wallet, CHAIN_CONFIG, rangeWidthTicks, noops)
 
     await dro.init()
   }

@@ -31,6 +31,7 @@ export class DRO {
     readonly chainConfig: any
     readonly quoterContract: ethers.Contract
     readonly positionManagerContract: ethers.Contract
+    readonly noops: boolean
     poolImmutables?: Immutables
     usdc?: Token
     weth?: Token
@@ -51,11 +52,13 @@ export class DRO {
     constructor(
         _owner: EthUsdcWallet,
         _chainConfig: any,
-        _rangeWidthTicks: number) {
+        _rangeWidthTicks: number,
+        _noops: boolean) {
         this.owner = _owner
         this.provider = _chainConfig.provider()
         this.chainConfig = _chainConfig
         this.rangeWidthTicks = _rangeWidthTicks
+        this.noops = _noops
 
         this.quoterContract = new ethers.Contract(
             CHAIN_CONFIG.addrQuoter,
@@ -192,6 +195,8 @@ export class DRO {
       // }
   
       // const { calldata, value } = NonfungiblePositionManager.collectCallParameters(collectOptions)
+
+      if (this.noops) return
   
       this.positionManagerContract.callStatic.collect({
         tokenId: tokenIdHexString,
@@ -252,6 +257,8 @@ export class DRO {
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
+
+      if (this.noops) return
   
       // TODO: Switch to Kovan, fund the account with USDC and WETH and test.
       // w.sendTransaction(tx).then((transaction) => {
@@ -275,6 +282,8 @@ export class DRO {
 
       // Assume we're swapping our entire WETH balance for USDC for now.
       const weth = await this.owner.weth()
+
+      if (this.noops) return
   
       const quotedUsdcOut = await this.quoterContract.callStatic.quoteExactInputSingle(
         this.poolImmutables.token1, // Token in: WETH
@@ -475,6 +484,8 @@ export class DRO {
         gasPrice: this.chainConfig.gasPrice,
         data: calldata
       }
+
+      if (this.noops) return
   
       // Send the transaction to the provider.
       const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
