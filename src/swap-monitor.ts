@@ -4,6 +4,8 @@ import { tickToPrice } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
 import moment from 'moment'
 
+const TIMESTAMP_FORMAT = 'YYYY-MM-DD HH:mm:ss'
+
 // Event emitted here:
 //   https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol#L786
 // and defined here:
@@ -31,6 +33,6 @@ export async function monitor(chainConfig: any) {
         const price: string = tickToPrice(weth, usdc, tick).toFixed(2)
 
         const timestamp = moment()
-        console.log(`${timestamp.toLocaleString()} ${price}`)
+        console.log(`${timestamp.format(TIMESTAMP_FORMAT)} ${price}`)
     })
 }
