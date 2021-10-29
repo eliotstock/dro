@@ -117,8 +117,14 @@ async function main() {
   // Invoke with `ts-node ./src/index.ts --monitor`
   if (argv.monitor) {
     console.log(`Monitoring swaps in the pool`)
-
-    monitor(CHAIN_CONFIG)
+    
+    try {
+      monitor(CHAIN_CONFIG)
+    }
+    catch(e) {
+      // Probably network error
+      console.error(e)
+    }
 
     return
   }
