@@ -8,10 +8,9 @@ import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens
 import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import moment from 'moment'
-import { Immutables, State, getPoolImmutables, getPoolState } from './uniswap'
+import { Immutables, getPoolImmutables } from './uniswap'
 import { useConfig, ChainConfig } from './config'
 import { EthUsdcWallet } from './wallet'
-import invariant from 'tiny-invariant'
 import { TickMath } from '@uniswap/v3-sdk/'
 
 // Read our .env file
@@ -35,15 +34,14 @@ export class DRO {
     poolImmutables?: Immutables
     usdc?: Token
     weth?: Token
+    tick?: number
     priceUsdc: string = "unknown"
     minTick: number = 0
     maxTick: number = 0
     rangeWidthTicks = 0
     rangeOrderPoolContract: ethers.Contract
-    rangeOrderPoolState?: State
     rangeOrderPool?: Pool
     swapPoolContract: ethers.Contract
-    swapPoolState?: State
     position?: Position
     tokenId?: BigintIsh
     unclaimedFeesUsdc?: BigintIsh
@@ -103,49 +101,56 @@ export class DRO {
       // await this.owner.approveAll()
     }
 
-    async updatePoolState() {
+    async updateTick() {
         if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
-        this.rangeOrderPoolState = await getPoolState(this.rangeOrderPoolContract)
+        // this.rangeOrderPoolState = await getPoolState(this.rangeOrderPoolContract)
 
-        // The pool depends on the pool state so we need to reconstruct it every time the state changes.
-        this.rangeOrderPool = new Pool(
-          this.usdc,
-          this.weth,
-          this.poolImmutables.fee,
-          this.rangeOrderPoolState.sqrtPriceX96.toString(),
-          this.rangeOrderPoolState.liquidity.toString(),
-          this.rangeOrderPoolState.tick
-        )
+        // // The pool depends on the pool state so we need to reconstruct it every time the state changes.
+        // this.rangeOrderPool = new Pool(
+        //   this.usdc,
+        //   this.weth,
+        //   this.poolImmutables.fee,
+        //   this.rangeOrderPoolState.sqrtPriceX96.toString(),
+        //   this.rangeOrderPoolState.liquidity.toString(),
+        //   this.rangeOrderPoolState.tick
+        // )
 
-        // Check that the tick value won't cause nearestUsableTick() to fail later. Testnets might have strange prices.
-        invariant(this.rangeOrderPoolState.tick >= TickMath.MIN_TICK && this.rangeOrderPoolState.tick <= TickMath.MAX_TICK, 'TICK_BOUND')
+        // // Check that the tick value won't cause nearestUsableTick() to fail later. Testnets might have strange prices.
+        // invariant(this.rangeOrderPoolState.tick >= TickMath.MIN_TICK && this.rangeOrderPoolState.tick <= TickMath.MAX_TICK, 'TICK_BOUND')
 
-        // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
-        this.priceUsdc = this.rangeOrderPool.token1Price.toFixed(2)
+        // // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
+        // this.priceUsdc = this.rangeOrderPool.token1Price.toFixed(2)
 
-        this.swapPoolState = await getPoolState(this.swapPoolContract)
+        // TODO: Remove the need for all the above and reduce the onBlock() work to the below.
+        const slot = await this.rangeOrderPoolContract.slot0()
+
+        this.tick = slot[1]
+
+        if (this.tick) {
+          this.priceUsdc = tickToPrice(this.weth, this.usdc, this.tick).toFixed(2)
+        }
     }
   
     outOfRange() {
-        return this.rangeOrderPoolState && (
-            this.rangeOrderPoolState.tick < this.minTick ||
-            this.rangeOrderPoolState.tick > this.maxTick)
+        return this.tick && (this.tick < this.minTick || this.tick > this.maxTick)
     }
   
     // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
     // returned here can be quite different to rangeWidthTicks.
     updateRange() {
-      if (this.rangeOrderPoolState == undefined) throw "Not updatePoolState()ed"
+      if (this.tick == undefined) throw "No tick yet."
 
       if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
-      this.minTick = Math.round(this.rangeOrderPoolState.tick - (this.rangeWidthTicks / 2))
+      this.minTick = Math.round(this.tick - (this.rangeWidthTicks / 2))
+
       // Don't go under MIN_TICK, which can happen on testnets.
       this.minTick = Math.max(this.minTick, TickMath.MIN_TICK)
       this.minTick = nearestUsableTick(this.minTick, this.poolImmutables.tickSpacing)
   
-      this.maxTick = Math.round(this.rangeOrderPoolState.tick + (this.rangeWidthTicks / 2))
+      this.maxTick = Math.round(this.tick + (this.rangeWidthTicks / 2))
+
       // Don't go over MAX_TICK, which can happen on testnets.
       this.maxTick = Math.min(this.maxTick, TickMath.MAX_TICK)
       this.maxTick = nearestUsableTick(this.maxTick, this.poolImmutables.tickSpacing)
@@ -262,8 +267,6 @@ export class DRO {
 
       if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
-      if (this.swapPoolState == undefined) throw "No swap pool state"
-
       const swapPoolFee = await this.swapPoolContract.fee()
       console.log("swapPoolFee: ", swapPoolFee)
 
@@ -281,14 +284,17 @@ export class DRO {
       // Swapping 1_000_000_000_000_000_000 WETH (18 zeroes) will get us 19_642_577_913_338_823 USDC (19B USDC)
       console.log(`[${this.rangeWidthTicks}] Swapping ${weth} WETH will get us ${quotedUsdcOut.toString()} USDC`)
   
-      // The pool depends on the pool state so we need to reconstruct it every time the state changes.
+      // The pool depends on the pool liquidity and slot 0 so we need to reconstruct it every time.
+      const liquidity = await this.swapPoolContract.liquidity()
+      const slot = await this.swapPoolContract.slot0()
+
       const poolEthUsdcForSwaps = new Pool(
         this.usdc,
         this.weth,
         swapPoolFee, // 0.05%
-        this.swapPoolState.sqrtPriceX96.toString(),
-        this.swapPoolState.liquidity.toString(),
-        this.swapPoolState.tick
+        slot[0].toString(),
+        liquidity.toString(),
+        slot[1]
       )
   
       // The order of the tokens here is significant. Input first.
@@ -419,7 +425,7 @@ export class DRO {
     async addLiquidity() {
       if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
-      if (this.rangeOrderPoolState == undefined || this.rangeOrderPool == undefined) throw "Not updatePoolState()ed"
+      if (this.tick == undefined || this.rangeOrderPool == undefined) throw "Not ready"
 
       if (this.position || this.tokenId)
         throw "Can't add liquidity. Already in a position. Remove liquidity and swap first."

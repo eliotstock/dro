@@ -86,7 +86,9 @@ async function onBlock(...args: Array<any>) {
   let first = true
 
   for (const dro of dros) {
-    await dro.updatePoolState()
+    // TODO: This generates an Infura API call once per dro instance. Every DRO has the same tick.
+    // Extract the two pools out somewhere and make one API call here.
+    await dro.updateTick()
 
     // Log the timestamp and block number first. Only log the price when it changes.
     // We need a DRO instance in order to figure out the current price, but any one of them will do.
