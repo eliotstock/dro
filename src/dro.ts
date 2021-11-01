@@ -1,16 +1,14 @@
 import { config } from 'dotenv'
 import { BigNumber } from '@ethersproject/bignumber'
 import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SwapOptions, SwapRouter, tickToPrice, Trade } from "@uniswap/v3-sdk"
-import { Token, CurrencyAmount, Percent, BigintIsh, TradeType } from "@uniswap/sdk-core"
+import { CurrencyAmount, Percent, BigintIsh, TradeType } from "@uniswap/sdk-core"
+import { TickMath } from '@uniswap/v3-sdk/'
 import { ethers } from 'ethers'
 import { TransactionResponse, TransactionReceipt } from "@ethersproject/abstract-provider";
-import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
-import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
-import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
-import { EthUsdcWallet } from './wallet'
-import { TickMath } from '@uniswap/v3-sdk/'
+import { wallet } from './wallet'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing } from './uniswap'
 
 // Read our .env file
 config()
@@ -24,128 +22,62 @@ const DEADLINE_SECONDS = 180
 const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
 
 export class DRO {
-    readonly owner: EthUsdcWallet
-    readonly provider: ethers.providers.Provider
-    readonly chainConfig: any
-    readonly quoterContract: ethers.Contract
-    readonly positionManagerContract: ethers.Contract
+    readonly rangeWidthTicks: number
     readonly noops: boolean
-    // poolImmutables?: Immutables
-    usdc?: Token
-    weth?: Token
-    tick?: number
-    priceUsdc: string = "unknown"
+
     minTick: number = 0
     maxTick: number = 0
-    rangeWidthTicks = 0
-    rangeOrderPoolContract: ethers.Contract
-    rangeOrderPool?: Pool
-    rangeOrderPoolToken0?: string
-    rangeOrderPoolToken1?: string
-    rangeOrderPoolTickSpacing?: number
-    swapPoolContract: ethers.Contract
     position?: Position
     tokenId?: BigintIsh
     unclaimedFeesUsdc?: BigintIsh
     unclaimedFeesWeth?: BigintIsh
   
     constructor(
-        _owner: EthUsdcWallet,
-        _chainConfig: any,
         _rangeWidthTicks: number,
         _noops: boolean) {
-        this.owner = _owner
-        this.provider = _chainConfig.provider()
-        this.chainConfig = _chainConfig
         this.rangeWidthTicks = _rangeWidthTicks
         this.noops = _noops
 
-        this.quoterContract = new ethers.Contract(
-            CHAIN_CONFIG.addrQuoter,
-            QuoterABI,
-            this.provider
-        )
-          
-        this.positionManagerContract = new ethers.Contract(
-            CHAIN_CONFIG.addrPositionManager,
-            NonfungiblePositionManagerABI,
-            this.provider
-        )
-
-        this.rangeOrderPoolContract = new ethers.Contract(
-            this.chainConfig.addrPoolRangeOrder,
-            IUniswapV3PoolABI,
-            this.provider
-        )
-
-        this.swapPoolContract = new ethers.Contract(
-            this.chainConfig.addrPoolSwaps,
-            IUniswapV3PoolABI,
-            this.provider
-        )
-    }
-
-    async init() {
-      console.log(`[${this.rangeWidthTicks}] init`)
-
-      // Get the range order pool's immutables once only.
-      this.rangeOrderPoolToken0 = await this.rangeOrderPoolContract.token0()
-      this.rangeOrderPoolToken1 = await this.rangeOrderPoolContract.token1()
-
-      if (this.rangeOrderPoolToken0 === undefined || this.rangeOrderPoolToken1 === undefined) {
-        throw "No token addresses"
-      }
-
-      this.usdc = new Token(this.chainConfig.chainId, this.rangeOrderPoolToken0, 6, "USDC", "USD Coin")
-
-      this.weth = new Token(this.chainConfig.chainId, this.rangeOrderPoolToken1, 18, "WETH", "Wrapped Ether")
-
-      this.rangeOrderPoolTickSpacing = await this.rangeOrderPoolContract.tickSpacing()
-
-      // TODO: Put back once nonce error debugged.
-      // await this.owner.approveAll()
-    }
-
-    async updateTick() {
-        if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
-
-        const slot = await this.rangeOrderPoolContract.slot0()
-
-        this.tick = slot[1]
-
-        if (this.tick) {
-          this.priceUsdc = tickToPrice(this.weth, this.usdc, this.tick).toFixed(2)
-        }
+        console.log(`[${this.rangeWidthTicks}] init`)
     }
   
     outOfRange() {
-        return this.tick && (this.tick < this.minTick || this.tick > this.maxTick)
+        return rangeOrderPoolTick &&
+          (rangeOrderPoolTick < this.minTick || rangeOrderPoolTick > this.maxTick)
     }
   
     // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
     // returned here can be quite different to rangeWidthTicks.
     updateRange() {
-      if (this.tick == undefined) throw "No tick yet."
+      if (rangeOrderPoolTick == undefined) throw "No tick yet."
 
-      if (this.rangeOrderPoolTickSpacing == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+      // console.log(`updateRange() Width: ${this.rangeWidthTicks}, rangeOrderPoolTick: ${rangeOrderPoolTick}`)
 
-      this.minTick = Math.round(this.tick - (this.rangeWidthTicks / 2))
+      this.minTick = Math.round(rangeOrderPoolTick - (this.rangeWidthTicks / 2))
+
+      // console.log(`updateRange() minTick: ${this.minTick}`)
 
       // Don't go under MIN_TICK, which can happen on testnets.
       this.minTick = Math.max(this.minTick, TickMath.MIN_TICK)
-      this.minTick = nearestUsableTick(this.minTick, this.rangeOrderPoolTickSpacing)
+      this.minTick = nearestUsableTick(this.minTick, rangeOrderPoolTickSpacing)
+
+      // console.log(`updateRange() minTick usable: ${this.minTick}`)
   
-      this.maxTick = Math.round(this.tick + (this.rangeWidthTicks / 2))
+      this.maxTick = Math.round(rangeOrderPoolTick + (this.rangeWidthTicks / 2))
+
+      // console.log(`updateRange() maxTick: ${this.maxTick}`)
 
       // Don't go over MAX_TICK, which can happen on testnets.
       this.maxTick = Math.min(this.maxTick, TickMath.MAX_TICK)
-      this.maxTick = nearestUsableTick(this.maxTick, this.rangeOrderPoolTickSpacing)
+      this.maxTick = nearestUsableTick(this.maxTick, rangeOrderPoolTickSpacing)
+
+      // console.log(`updateRange() maxTick usable: ${this.maxTick}`)
   
       // tickToPrice() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
       // Note that minimum USDC value per ETH corresponds to the maximum tick value and vice versa.
-      const minUsdc = tickToPrice(this.weth, this.usdc, this.maxTick).toFixed(2)
-      const maxUsdc = tickToPrice(this.weth, this.usdc, this.minTick).toFixed(2)
+      const minUsdc = tickToPrice(wethToken, usdcToken, this.maxTick).toFixed(2)
+      const maxUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
   
       console.log(`[${this.rangeWidthTicks}] New range: ${minUsdc} USDC - ${maxUsdc} USDC.`)
     }
@@ -178,13 +110,13 @@ export class DRO {
   
       // const { calldata, value } = NonfungiblePositionManager.collectCallParameters(collectOptions)
   
-      this.positionManagerContract.callStatic.collect({
+      positionManagerContract.callStatic.collect({
         tokenId: tokenIdHexString,
-        recipient: this.owner.address,
+        recipient: wallet.address,
         amount0Max: MAX_UINT128,
         amount1Max: MAX_UINT128,
       },
-      { from: this.owner.address })
+      { from: wallet.address })
       .then((results) => {
         this.unclaimedFeesUsdc = results.amount0
         this.unclaimedFeesWeth = results.amount1
@@ -198,43 +130,41 @@ export class DRO {
         console.error("Can't remove liquidity. Not in a position yet.")
         return
       }
-
-      if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
   
       // If we're only ever collecting fees in WETH and USDC, then the expectedCurrencyOwed0 and
       // expectedCurrencyOwed1 can be zero (CurrencyAmount.fromRawAmount(this.usdc, 0). But if we
       // ever want fees in ETH, which we may do to cover gas costs, then we need to get these
       // using a callStatic on collect() ahead of time.
-      const expectedCurrencyOwed0 = CurrencyAmount.fromRawAmount(this.usdc, this.unclaimedFeesUsdc ?? 0)
-      const expectedCurrencyOwed1 = CurrencyAmount.fromRawAmount(this.weth, this.unclaimedFeesWeth ?? 0)
+      const expectedCurrencyOwed0 = CurrencyAmount.fromRawAmount(usdcToken, this.unclaimedFeesUsdc ?? 0)
+      const expectedCurrencyOwed1 = CurrencyAmount.fromRawAmount(wethToken, this.unclaimedFeesWeth ?? 0)
   
       const collectOptions: CollectOptions = {
         tokenId: this.tokenId,
         expectedCurrencyOwed0: expectedCurrencyOwed0,
         expectedCurrencyOwed1: expectedCurrencyOwed1,
-        recipient: this.owner.address
+        recipient: wallet.address
       }
   
       const removeLiquidityOptions: RemoveLiquidityOptions = {
         tokenId: this.tokenId,
         liquidityPercentage: new Percent(1), // 100%
-        slippageTolerance: this.chainConfig.slippageTolerance,
+        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
         deadline: moment().unix() + DEADLINE_SECONDS,
         collectOptions: collectOptions
       }
   
       const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position, removeLiquidityOptions)
   
-      const nonce = await this.owner.getTransactionCount("latest")
+      const nonce = await wallet.getTransactionCount("latest")
       console.log("nonce: ", nonce)
   
       const tx = {
-        from: this.owner.address,
+        from: wallet.address,
         to: CHAIN_CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: this.chainConfig.gasPrice,
+        gasPrice: CHAIN_CONFIG.gasPrice,
         data: calldata
       }
   
@@ -251,17 +181,15 @@ export class DRO {
         return
       }
 
-      if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
-
-      const swapPoolFee = await this.swapPoolContract.fee()
+      const swapPoolFee = await swapPoolContract.fee()
       console.log("swapPoolFee: ", swapPoolFee)
 
       // Assume we're swapping our entire WETH balance for USDC for now.
-      const weth = await this.owner.weth()
+      const weth = await wallet.weth()
   
-      const quotedUsdcOut = await this.quoterContract.callStatic.quoteExactInputSingle(
-        this.rangeOrderPoolToken1, // Token in: WETH
-        this.rangeOrderPoolToken0, // Token out: USDC
+      const quotedUsdcOut = await quoterContract.callStatic.quoteExactInputSingle(
+        CHAIN_CONFIG.addrTokenWeth, // Token in
+        CHAIN_CONFIG.addrTokenUsdc, // Token out
         swapPoolFee, // 0.05%
         weth, // Amount in, WETH (18 decimals), BigNumber
         0 // sqrtPriceLimitX96
@@ -271,12 +199,12 @@ export class DRO {
       console.log(`[${this.rangeWidthTicks}] Swapping ${weth} WETH will get us ${quotedUsdcOut.toString()} USDC`)
   
       // The pool depends on the pool liquidity and slot 0 so we need to reconstruct it every time.
-      const liquidity = await this.swapPoolContract.liquidity()
-      const slot = await this.swapPoolContract.slot0()
+      const liquidity = await swapPoolContract.liquidity()
+      const slot = await swapPoolContract.slot0()
 
       const poolEthUsdcForSwaps = new Pool(
-        this.usdc,
-        this.weth,
+        usdcToken,
+        wethToken,
         swapPoolFee, // 0.05%
         slot[0].toString(),
         liquidity.toString(),
@@ -284,36 +212,36 @@ export class DRO {
       )
   
       // The order of the tokens here is significant. Input first.
-      const swapRoute = new Route([poolEthUsdcForSwaps], this.weth, this.usdc)
+      const swapRoute = new Route([poolEthUsdcForSwaps], wethToken, usdcToken)
 
       const trade = await Trade.createUncheckedTrade({
         route: swapRoute,
-        inputAmount: CurrencyAmount.fromRawAmount(this.weth, weth.toString()),
-        outputAmount: CurrencyAmount.fromRawAmount(this.usdc, quotedUsdcOut.toString()),
+        inputAmount: CurrencyAmount.fromRawAmount(wethToken, weth.toString()),
+        outputAmount: CurrencyAmount.fromRawAmount(usdcToken, quotedUsdcOut.toString()),
         tradeType: TradeType.EXACT_INPUT,
       });
       console.log("Trade:")
       console.dir(trade)
 
       const options: SwapOptions = {
-        slippageTolerance: this.chainConfig.slippageTolerance,
-        recipient: this.owner.address,
+        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+        recipient: wallet.address,
         deadline: moment().unix() + DEADLINE_SECONDS
       }
 
       const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
       console.log("calldata: ", calldata)
 
-      const nonce = await this.owner.getTransactionCount("latest")
+      const nonce = await wallet.getTransactionCount("latest")
   
       // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
       const txRequest = {
-        from: this.owner.address,
+        from: wallet.address,
         to: CHAIN_CONFIG.addrSwapRouter,
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: this.chainConfig.gasPrice,
+        gasPrice: CHAIN_CONFIG.gasPrice,
         data: calldata
       }
 
@@ -324,7 +252,7 @@ export class DRO {
       //   loop more causing need for more gas
       //   if it's your pool fix the balance in the pool
       //   right now there is a lot of the USDC and very little weth
-      const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
+      const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
 
       console.log("swap() TX response: ", txResponse)
       // console.log("swap() Max fee per gas: ", txResponse.maxFeePerGas?.toString())
@@ -341,9 +269,9 @@ export class DRO {
       // router.
       // See: https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol#L596
       // We may need to calculate the sqrtPriceLimitX96 based on the unchecked trade object.
-      this.swapPoolContract = this.swapPoolContract.connect(this.owner)
+      this.swapPoolContract = this.swapPoolContract.connect(wallet)
 
-      const recipient = this.owner.address
+      const recipient = wallet.address
 
       // The direction of the swap, true for token0 to token1, false for token1 to token0
       const zeroForOne = true
@@ -367,11 +295,11 @@ export class DRO {
 
       console.log("calldata: ", calldata)
   
-      const nonce = await this.owner.getTransactionCount("latest")
+      const nonce = await wallet.getTransactionCount("latest")
   
       // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
       const txRequest = {
-        from: this.owner.address,
+        from: wallet.address,
         to: this.chainConfig.addrPoolSwaps,
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
@@ -384,7 +312,7 @@ export class DRO {
       // TODO: Fix:
       //   reason: 'transaction failed',
       //   code: 'CALL_EXCEPTION',
-      const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
+      const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
 
       console.log("swap() TX response: ", txResponse)
       console.log("swap() Max fee per gas: ", txResponse.maxFeePerGas?.toString())
@@ -397,7 +325,7 @@ export class DRO {
       console.log("swap(): Effective gas price: ", txReceipt.effectiveGasPrice.toString())
 
       // TODO: Fails with UNPREDICTABLE_GAS_LIMIT. Execute this using the same approach as the other methods, ie:
-      //   await this.owner.sendTransaction(txRequest)
+      //   await wallet.sendTransaction(txRequest)
       // Construct the calldata from these parameters.
       // await this.swapPoolContract.swap(recipient,
       //   zeroForOne,
@@ -409,23 +337,32 @@ export class DRO {
     }
   
     async addLiquidity() {
-      if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
-
-      if (this.tick == undefined || this.rangeOrderPool == undefined) throw "Not ready"
-
       if (this.position || this.tokenId)
         throw "Can't add liquidity. Already in a position. Remove liquidity and swap first."
   
       // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
-      const amountUsdc = (await this.owner.usdc()).toString()
-      const amountWeth = (await this.owner.weth()).toString()
-      const amountEth = (await this.owner.getBalance()).toString()
+      const amountUsdc = (await wallet.usdc()).toString()
+      const amountWeth = (await wallet.weth()).toString()
+      const amountEth = (await wallet.getBalance()).toString()
 
       console.log("addLiquidity(): Amounts available: ", amountUsdc, " USDC", amountWeth, " WETH", amountEth, " ETH")
+
+      const slot = await rangeOrderPoolContract.slot0()
+      const liquidity = await rangeOrderPoolContract.liquidity()
+
+      // A position instance requires a Pool instance.
+      const rangeOrderPool = new Pool(
+        usdcToken,
+        wethToken,
+        slot[5], // Fee: 0.30%
+        slot[0].toString(), // SqrtRatioX96
+        liquidity.toString(), // Liquidity
+        slot[1] // Tick
+      )
   
       // We don't know L, the liquidity, but we do know how much WETH and how much USDC we'd like to add.
       const position = Position.fromAmounts({
-        pool: this.rangeOrderPool,
+        pool: rangeOrderPool,
         tickLower: this.minTick,
         tickUpper: this.maxTick,
         amount0: amountUsdc,
@@ -436,9 +373,9 @@ export class DRO {
       console.log("addLiquidity(): Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
   
       const mintOptions: MintOptions = {
-        slippageTolerance: this.chainConfig.slippageTolerance,
+        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
         deadline: moment().unix() + DEADLINE_SECONDS,
-        recipient: this.owner.address,
+        recipient: wallet.address,
         createPool: false
       }
   
@@ -448,22 +385,22 @@ export class DRO {
   
       console.log("calldata: ", calldata)
   
-      const nonce = await this.owner.getTransactionCount("latest")
+      const nonce = await wallet.getTransactionCount("latest")
   
       // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
       const txRequest = {
-        from: this.owner.address,
+        from: wallet.address,
         to: CHAIN_CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
         // value: amountEth,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: this.chainConfig.gasPrice,
+        gasPrice: CHAIN_CONFIG.gasPrice,
         data: calldata
       }
   
       // Send the transaction to the provider.
-      const txResponse: TransactionResponse = await this.owner.sendTransaction(txRequest)
+      const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
 
       console.log("addLiquidity() TX response: ", txResponse)
       console.log("addLiquidity() Max fee per gas: ", txResponse.maxFeePerGas?.toString()) // 100_000_000_000 wei or 100 gwei
@@ -487,7 +424,7 @@ export class DRO {
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the token ID.
     }
 
-    async onBlock(wallet: EthUsdcWallet) {
+    async onBlock() {
       // When in no-op mode, don't execute any transactions but do re-range when necessary.
       if (this.noops) {
         if (this.outOfRange()) {

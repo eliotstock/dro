@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import { useConfig, ChainConfig } from './config'
-import { EthUsdcWallet } from './wallet'
+import { wallet } from './wallet'
+import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
 import moment from 'moment'
@@ -37,11 +38,8 @@ import yargs from 'yargs/yargs'
 config()
 
 // Static config that doesn't belong in the .env file.
-const CHAIN_CONFIG: ChainConfig = useConfig()
-
 // To switch to another chain, only the .env file needs to change.
-// const CHAIN: string = process.env.CHAIN || 'ethereumMainnet'
-// const CHAIN_CONFIG = CONFIG[CHAIN]
+const CHAIN_CONFIG: ChainConfig = useConfig()
 
 // Candidate values for the range width in bps.
 // From the Uniswap v3 whitepaper:
@@ -66,11 +64,8 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 // const rangeWidths: number[] = [120, 240, 360, 480, 600, 720]
 const rangeWidths: number[] = [360, 480, 600, 720]
 
-// Single, global instance of the DRO class.
+// Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []
-
-// Single, global Ethers.js wallet subclass instance (account).
-let wallet: EthUsdcWallet
 
 // Single, global USDC price in the range order pool.
 let price: string
@@ -81,47 +76,41 @@ let noops: boolean = false
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
+  // This is a single Infura API call to get the price in the range order pool.
+  await updateTick()
+
+  // Log the timestamp and block number first. Only log the price when it changes.
+  if (rangeOrderPoolPriceUsdc != price) {
+    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${rangeOrderPoolPriceUsdc} USDC`)
+  }
+
+  price = rangeOrderPoolPriceUsdc
+
   // Pass the onBlock() call through to each DRO instance, which will figure out whether it needs
   // to re-range and execute transactions if so.
-  let first = true
-
   for (const dro of dros) {
-    // TODO: This generates an Infura API call once per dro instance. Every DRO has the same tick.
-    // Extract the two pools out somewhere and make one API call here.
-    await dro.updateTick()
-
-    // Log the timestamp and block number first. Only log the price when it changes.
-    // We need a DRO instance in order to figure out the current price, but any one of them will do.
-    if (first && dro.priceUsdc != price) {
-      console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${dro.priceUsdc} USDC`)
-
-      first = false
-    }
-    price = dro.priceUsdc
-
-    await dro.onBlock(wallet)
+    await dro.onBlock()
   }
 }
 
 async function main() {
   console.log(`Using ${CHAIN_CONFIG.name}`)
 
-  wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
-
-  // Process command line args using yargs.
+  // Process command line args using yargs. Pass these to `ts-node ./src/index.ts`
   const argv = yargs(process.argv.slice(2)).options({
     n: { type: 'boolean', default: false },
     monitor: { type: 'boolean', default: false },
+    approve: { type: 'boolean', default: false },
     privateKey: { type: 'boolean', default: false }
   }).parseSync()
 
-  // Invoke with `ts-node ./src/index.ts --n`
+  // `--n` means no-op.
   if (argv.n) {
     noops = true
     console.log(`Running in no-op mode. No transactions will be executed.`)
   }
 
-  // Invoke with `ts-node ./src/index.ts --monitor`
+  // `--monitor` means just log the prices in the pool.
   if (argv.monitor) {
     console.log(`Monitoring swaps in the pool`)
     
@@ -136,18 +125,25 @@ async function main() {
     return
   }
 
+  // `--private-key` means just log the private key for the account.
   if (argv.privateKey) {
     console.log(`Private key for Hardhat .env file: ${wallet.privateKey}`)
 
     return
   }
 
+  // `--approve` means approve spending of USDC and WETH up to MaxInt.
+  if (argv.approve) {
+    console.log(`Approving spending of USDC and WETH`)
+
+    await wallet.approveAll()
+
+    return
+  }
+
   try {
     for (const width of rangeWidths) {
-      const dro: DRO = new DRO(wallet, CHAIN_CONFIG, width, noops)
-
-      await dro.init()
-
+      const dro: DRO = new DRO(width, noops)
       dros.push(dro)
     }
   }

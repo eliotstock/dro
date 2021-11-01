@@ -1,11 +1,19 @@
+import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { Provider } from "@ethersproject/abstract-provider";
 import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer";
 import { SigningKey } from "@ethersproject/signing-key";
 import { BigNumber } from '@ethersproject/bignumber'
 import { abi as ERC20ABI } from './abi/erc20.json'
+import { useConfig, ChainConfig } from './config'
 
-export class EthUsdcWallet extends ethers.Wallet {
+// Read our .env file
+config()
+
+// Static config that doesn't belong in the .env file.
+const CHAIN_CONFIG: ChainConfig = useConfig()
+
+class EthUsdcWallet extends ethers.Wallet {
 
     usdcContract: ethers.Contract
     wethContract: ethers.Contract
@@ -97,3 +105,5 @@ export class EthUsdcWallet extends ethers.Wallet {
         await this.wethContract.approve(this.address, ethers.constants.MaxUint256)
     }
 }
+
+export const wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
