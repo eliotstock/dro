@@ -102,10 +102,15 @@ async function onBlock(...args: Array<any>) {
 }
 
 async function main() {
+  console.log(`Using ${CHAIN_CONFIG.name}`)
+
+  wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
+
   // Process command line args using yargs.
   const argv = yargs(process.argv.slice(2)).options({
     n: { type: 'boolean', default: false },
-    monitor: { type: 'boolean', default: false }
+    monitor: { type: 'boolean', default: false },
+    privateKey: { type: 'boolean', default: false }
   }).parseSync()
 
   // Invoke with `ts-node ./src/index.ts --n`
@@ -129,22 +134,11 @@ async function main() {
     return
   }
 
-  console.log(`Using ${CHAIN_CONFIG.name}`)
+  if (argv.privateKey) {
+    console.log(`Private key for Hardhat .env file: ${wallet.privateKey}`)
 
-  // const rangeWidthTicks = 480
-  // console.log("Range width in ticks: " + rangeWidthTicks)
-
-  wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
-
-  // TODO: Use a command line switch to invoke this. Don't expect to figure out whether it needs to be done heuristically.
-  // if (CHAIN_CONFIG.isTestnet) {
-  //   console.log("No USDC contract address. Update the config after dpeloying a test USDC contract.")
-
-  //   console.log(`Private key for Hardhat .env file: ${wallet.privateKey}`)
-
-  //   process.exitCode = 1
-  //   process.exit()
-  // }
+    return
+  }
 
   try {
     for (const width of rangeWidths) {
