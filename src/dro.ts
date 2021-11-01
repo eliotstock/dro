@@ -51,27 +51,17 @@ export class DRO {
     updateRange() {
       if (rangeOrderPoolTick == undefined) throw "No tick yet."
 
-      // console.log(`updateRange() Width: ${this.rangeWidthTicks}, rangeOrderPoolTick: ${rangeOrderPoolTick}`)
-
       this.minTick = Math.round(rangeOrderPoolTick - (this.rangeWidthTicks / 2))
-
-      // console.log(`updateRange() minTick: ${this.minTick}`)
 
       // Don't go under MIN_TICK, which can happen on testnets.
       this.minTick = Math.max(this.minTick, TickMath.MIN_TICK)
       this.minTick = nearestUsableTick(this.minTick, rangeOrderPoolTickSpacing)
-
-      // console.log(`updateRange() minTick usable: ${this.minTick}`)
   
       this.maxTick = Math.round(rangeOrderPoolTick + (this.rangeWidthTicks / 2))
-
-      // console.log(`updateRange() maxTick: ${this.maxTick}`)
 
       // Don't go over MAX_TICK, which can happen on testnets.
       this.maxTick = Math.min(this.maxTick, TickMath.MAX_TICK)
       this.maxTick = nearestUsableTick(this.maxTick, rangeOrderPoolTickSpacing)
-
-      // console.log(`updateRange() maxTick usable: ${this.maxTick}`)
   
       // tickToPrice() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
