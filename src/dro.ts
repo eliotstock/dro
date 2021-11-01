@@ -8,7 +8,6 @@ import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens
 import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
 import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
 import moment from 'moment'
-import { Immutables, getPoolImmutables } from './uniswap'
 import { useConfig, ChainConfig } from './config'
 import { EthUsdcWallet } from './wallet'
 import { TickMath } from '@uniswap/v3-sdk/'
@@ -31,7 +30,7 @@ export class DRO {
     readonly quoterContract: ethers.Contract
     readonly positionManagerContract: ethers.Contract
     readonly noops: boolean
-    poolImmutables?: Immutables
+    // poolImmutables?: Immutables
     usdc?: Token
     weth?: Token
     tick?: number
@@ -41,6 +40,9 @@ export class DRO {
     rangeWidthTicks = 0
     rangeOrderPoolContract: ethers.Contract
     rangeOrderPool?: Pool
+    rangeOrderPoolToken0?: string
+    rangeOrderPoolToken1?: string
+    rangeOrderPoolTickSpacing?: number
     swapPoolContract: ethers.Contract
     position?: Position
     tokenId?: BigintIsh
@@ -87,42 +89,26 @@ export class DRO {
       console.log(`[${this.rangeWidthTicks}] init`)
 
       // Get the range order pool's immutables once only.
-      this.poolImmutables = await getPoolImmutables(this.rangeOrderPoolContract)
+      this.rangeOrderPoolToken0 = await this.rangeOrderPoolContract.token0()
+      this.rangeOrderPoolToken1 = await this.rangeOrderPoolContract.token1()
 
-      this.usdc = new Token(this.chainConfig.chainId, this.poolImmutables.token0, 6, "USDC", "USD Coin")
+      if (this.rangeOrderPoolToken0 === undefined || this.rangeOrderPoolToken1 === undefined) {
+        throw "No token addresses"
+      }
 
-      this.weth = new Token(this.chainConfig.chainId, this.poolImmutables.token1, 18, "WETH", "Wrapped Ether")
+      this.usdc = new Token(this.chainConfig.chainId, this.rangeOrderPoolToken0, 6, "USDC", "USD Coin")
 
-      // console.log("USDC: ", this.poolImmutables.token0)
-      // console.log("WETH: ", this.poolImmutables.token1)
-      // console.log("Fee: ", this.poolImmutables.fee)
+      this.weth = new Token(this.chainConfig.chainId, this.rangeOrderPoolToken1, 18, "WETH", "Wrapped Ether")
+
+      this.rangeOrderPoolTickSpacing = await this.rangeOrderPoolContract.tickSpacing()
 
       // TODO: Put back once nonce error debugged.
       // await this.owner.approveAll()
     }
 
     async updateTick() {
-        if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+        if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
-        // this.rangeOrderPoolState = await getPoolState(this.rangeOrderPoolContract)
-
-        // // The pool depends on the pool state so we need to reconstruct it every time the state changes.
-        // this.rangeOrderPool = new Pool(
-        //   this.usdc,
-        //   this.weth,
-        //   this.poolImmutables.fee,
-        //   this.rangeOrderPoolState.sqrtPriceX96.toString(),
-        //   this.rangeOrderPoolState.liquidity.toString(),
-        //   this.rangeOrderPoolState.tick
-        // )
-
-        // // Check that the tick value won't cause nearestUsableTick() to fail later. Testnets might have strange prices.
-        // invariant(this.rangeOrderPoolState.tick >= TickMath.MIN_TICK && this.rangeOrderPoolState.tick <= TickMath.MAX_TICK, 'TICK_BOUND')
-
-        // // toFixed() implementation: https://github.com/Uniswap/sdk-core/blob/main/src/entities/fractions/price.ts
-        // this.priceUsdc = this.rangeOrderPool.token1Price.toFixed(2)
-
-        // TODO: Remove the need for all the above and reduce the onBlock() work to the below.
         const slot = await this.rangeOrderPoolContract.slot0()
 
         this.tick = slot[1]
@@ -141,19 +127,19 @@ export class DRO {
     updateRange() {
       if (this.tick == undefined) throw "No tick yet."
 
-      if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+      if (this.rangeOrderPoolTickSpacing == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
       this.minTick = Math.round(this.tick - (this.rangeWidthTicks / 2))
 
       // Don't go under MIN_TICK, which can happen on testnets.
       this.minTick = Math.max(this.minTick, TickMath.MIN_TICK)
-      this.minTick = nearestUsableTick(this.minTick, this.poolImmutables.tickSpacing)
+      this.minTick = nearestUsableTick(this.minTick, this.rangeOrderPoolTickSpacing)
   
       this.maxTick = Math.round(this.tick + (this.rangeWidthTicks / 2))
 
       // Don't go over MAX_TICK, which can happen on testnets.
       this.maxTick = Math.min(this.maxTick, TickMath.MAX_TICK)
-      this.maxTick = nearestUsableTick(this.maxTick, this.poolImmutables.tickSpacing)
+      this.maxTick = nearestUsableTick(this.maxTick, this.rangeOrderPoolTickSpacing)
   
       // tickToPrice() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
@@ -213,7 +199,7 @@ export class DRO {
         return
       }
 
-      if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+      if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
   
       // If we're only ever collecting fees in WETH and USDC, then the expectedCurrencyOwed0 and
       // expectedCurrencyOwed1 can be zero (CurrencyAmount.fromRawAmount(this.usdc, 0). But if we
@@ -265,7 +251,7 @@ export class DRO {
         return
       }
 
-      if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+      if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
       const swapPoolFee = await this.swapPoolContract.fee()
       console.log("swapPoolFee: ", swapPoolFee)
@@ -274,8 +260,8 @@ export class DRO {
       const weth = await this.owner.weth()
   
       const quotedUsdcOut = await this.quoterContract.callStatic.quoteExactInputSingle(
-        this.poolImmutables.token1, // Token in: WETH
-        this.poolImmutables.token0, // Token out: USDC
+        this.rangeOrderPoolToken1, // Token in: WETH
+        this.rangeOrderPoolToken0, // Token out: USDC
         swapPoolFee, // 0.05%
         weth, // Amount in, WETH (18 decimals), BigNumber
         0 // sqrtPriceLimitX96
@@ -423,7 +409,7 @@ export class DRO {
     }
   
     async addLiquidity() {
-      if (this.poolImmutables == undefined || this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
+      if (this.usdc == undefined || this.weth == undefined) throw "Not init()ed"
 
       if (this.tick == undefined || this.rangeOrderPool == undefined) throw "Not ready"
 
