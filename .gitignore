@@ -1,10 +1,15 @@
 build
 node_modules
-src/**.js
 coverage
 *.log
 yarn.lock
 .env
+
+# Source are all Typescript. No JS, thank you.
+**/**.js
+
+# Source maps for debugging
+**/*.js.map
 
 # Output
 /out

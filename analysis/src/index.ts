@@ -61,7 +61,7 @@ class SwapEvent {
     }
 }
 
-// Single, global array of SwapEvents. As of 2021-10, this is about 750K events at less than 1kB
+// Single, global array of SwapEvents. As of 2021-11, this is about 800K events at less than 1kB
 // per event, so easy enough to store in RAM on an everyday laptop.
 let swapEvents: SwapEvent[] = []
 
@@ -90,13 +90,9 @@ const expectedGrossYields = new Map<number, number>()
 //                      bps  percent
 //                      ---  -------
 expectedGrossYields.set(120, 1_280)
-expectedGrossYields.set(180, 980)
 expectedGrossYields.set(240, 710)
-expectedGrossYields.set(300, 500)
 expectedGrossYields.set(360, 320)
-expectedGrossYields.set(540, 209)
 expectedGrossYields.set(720, 160)
-expectedGrossYields.set(900, 126)
 
 let rangeWidthTicks: number
 
@@ -310,7 +306,6 @@ async function main() {
     getTimeRange()
 
     // Run the analysis once per key in expectedGrossYields
-    // for (let [rangeWidth, expectGrossYield] of expectedGrossYields) {
     expectedGrossYields.forEach((expectedGrossYield: number, rangeWidth: number) => {
         rangeWidthTicks = rangeWidth
 

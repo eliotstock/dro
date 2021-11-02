@@ -90,3 +90,7 @@ Goals: low power, no fan, secure, simple.
         1. `sudo apt update`
     1. `sudo apt source sqlite`
     1. Follow on above.
+1. Edit the bootloader to switch the display to portrait mode.
+    1. Test this works first: `sudo echo 3 | sudo tee /sys/class/graphics/fbcon/rotate_all`
+    1. `sudo apt install rpi-eeprom`
+    1. TODO: Bootloader might not be configurable for this. Consider a sysvinit script or similar.
