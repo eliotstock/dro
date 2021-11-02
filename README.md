@@ -82,4 +82,11 @@ Goals: low power, no fan, secure, simple.
     1. Copy the `curl` script from https://github.com/nvm-sh/nvm and execute it.
     1. Exit and restart the terminal to get `nvm` onto the path.
     1. `cd` to this repo and `nvm use` then `nvm install [version]`
+    1. `sudo apt install make gcc g++ python sqlite dpkg-dev`
+    1. Edit your apt sources list (in the .d directory) to add the source servers.
+        1. `sudo cp /etc/apt/sources.list /etc/apt/sources.list.d/foo.list`
+        1. `sudo nano /etc/apt/sources.list.d/foo.list`
+        1. Uncomment all the sources lines and save
+        1. `sudo apt update`
+    1. `sudo apt source sqlite`
     1. Follow on above.
