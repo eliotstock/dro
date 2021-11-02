@@ -4,6 +4,7 @@ import { wallet } from './wallet'
 import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
+import { init, dumpToCsv } from './db'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
 
@@ -101,7 +102,8 @@ async function main() {
     n: { type: 'boolean', default: false },
     monitor: { type: 'boolean', default: false },
     approve: { type: 'boolean', default: false },
-    privateKey: { type: 'boolean', default: false }
+    privateKey: { type: 'boolean', default: false },
+    dbDump: { type: 'boolean', default: false }
   }).parseSync()
 
   // `--n` means no-op.
@@ -137,6 +139,18 @@ async function main() {
     console.log(`Approving spending of USDC and WETH`)
 
     await wallet.approveAll()
+
+    return
+  }
+
+  // Create our database if it doesn't already exist.
+  init()
+
+  // `--db-dump` means dump our database contents to the console.
+  if (argv.dbDump) {
+    console.log(`Database:`)
+
+    await dumpToCsv()
 
     return
   }

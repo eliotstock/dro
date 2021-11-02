@@ -2,5 +2,5 @@
     "watch": ["src","./.env"],
     "ext": "*",
     "ignore": [],
-    "exec": "ts-node ./src/index.ts"
+    "exec": "mkdir -p ./out && ts-node ./src/index.ts"
 }

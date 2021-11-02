@@ -8,6 +8,7 @@ import { TransactionResponse, TransactionReceipt } from "@ethersproject/abstract
 import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet } from './wallet'
+import { insertRerangeEvent } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing } from './uniswap'
 
 // Read our .env file
@@ -51,6 +52,10 @@ export class DRO {
     updateRange() {
       if (rangeOrderPoolTick == undefined) throw "No tick yet."
 
+      const noRangeYet: boolean = (this.minTick == 0)
+
+      const direction: string = rangeOrderPoolTick < this.minTick ? 'down' : 'up'
+
       this.minTick = Math.round(rangeOrderPoolTick - (this.rangeWidthTicks / 2))
 
       // Don't go under MIN_TICK, which can happen on testnets.
@@ -68,6 +73,12 @@ export class DRO {
       // Note that minimum USDC value per ETH corresponds to the maximum tick value and vice versa.
       const minUsdc = tickToPrice(wethToken, usdcToken, this.maxTick).toFixed(2)
       const maxUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
+
+      // Insert a row in the database for analytics, except when we're just starting up and there's
+      // no range yet.
+      if (!noRangeYet) {
+        insertRerangeEvent(this.rangeWidthTicks, moment().toISOString(), direction)
+      }
   
       console.log(`[${this.rangeWidthTicks}] New range: ${minUsdc} USDC - ${maxUsdc} USDC.`)
     }

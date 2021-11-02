@@ -5,3 +5,6 @@ coverage
 *.log
 yarn.lock
 .env
+
+# Output
+/out
