@@ -1,5 +1,6 @@
 import sqlite3 from 'sqlite3'
 import { Database, open } from 'sqlite'
+import moment from 'moment'
 import { existsSync } from 'fs'
 
 const OUT_DIR = './out'
@@ -13,6 +14,9 @@ async function openDb () {
 
     return db
 }
+
+const sum = (numbers: number[]) => numbers.reduce((total, aNumber) => total + aNumber, 0)
+const mean = (numbers: number[]) => sum(numbers) / numbers.length
 
 // Create the database if it doesn't already exist.
 export async function init() {
@@ -49,4 +53,38 @@ export async function dumpToCsv() {
     
         console.log(`${row.width}, ${row.datetime}, ${row.direction}`)
       })
+}
+
+export async function meanTimeToReranging(width: number): Promise<string> {
+    const db: Database = await openDb()
+
+    let previousRerange: string
+    const timesToRerangingMillis: number[] = []
+
+    const rowsCount = await db.each('SELECT datetime FROM rerange_event WHERE width = ? ORDER BY datetime', width, (err, row) => {
+        if (err) {
+          throw err
+        }
+
+        if (previousRerange) {
+            const a = moment(previousRerange)
+            const b = moment(row.datetime)
+            const timeToRerangingMillis = b.diff(a)
+            const humanized = moment.duration(timeToRerangingMillis, 'milliseconds').humanize()
+
+            console.log(`Time to reranging: ${humanized}`)
+
+            timesToRerangingMillis.push(timeToRerangingMillis)
+        }
+
+        previousRerange = row.datetime
+    })
+
+    if (rowsCount == 0) return 'No re-ranges'
+
+    console.log(`Mean taken from ${rowsCount} values`)
+
+    const m = mean(timesToRerangingMillis)
+
+    return moment.duration(m, 'milliseconds').humanize()
 }

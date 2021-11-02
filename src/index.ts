@@ -4,7 +4,7 @@ import { wallet } from './wallet'
 import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
-import { init, dumpToCsv } from './db'
+import { init, dumpToCsv, meanTimeToReranging } from './db'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
 
@@ -62,8 +62,8 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 //    4.8%           480   Testing now.
 //    6.0%           600   Testing now.
 //    7.2%           720   Testing now.
-// const rangeWidths: number[] = [120, 240, 360, 480, 600, 720]
-const rangeWidths: number[] = [360, 480, 600, 720]
+const rangeWidths: number[] = [120, 240, 360]
+// const rangeWidths: number[] = [360, 480, 600, 720]
 
 // Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []
@@ -103,7 +103,8 @@ async function main() {
     monitor: { type: 'boolean', default: false },
     approve: { type: 'boolean', default: false },
     privateKey: { type: 'boolean', default: false },
-    dbDump: { type: 'boolean', default: false }
+    dbDump: { type: 'boolean', default: false },
+    mtr: { type: 'boolean', default: false }
   }).parseSync()
 
   // `--n` means no-op.
@@ -151,6 +152,18 @@ async function main() {
     console.log(`Database:`)
 
     await dumpToCsv()
+
+    return
+  }
+
+  // `--mtr` means show our mean time to re-ranging for some range widths.
+  if (argv.mtr) {
+
+    for (const width of rangeWidths) {
+      const mtr = await meanTimeToReranging(width)
+  
+      console.log(`Mean time to re-ranging for range width ${width}: ${mtr}`)
+    }
 
     return
   }
