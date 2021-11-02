@@ -38,7 +38,7 @@ export async function insertRerangeEvent(width: number, datetimeUtc: string, dir
     const result = await db.run('INSERT INTO rerange_event (width, datetime, direction) \
 VALUES (?, ?, ?)', width, datetimeUtc, direction)
 
-    console.log(`Row ID: ${result}.rowID`)
+    // console.log(`Row ID: ${result}.rowID`)
 }
 
 export async function dumpToCsv() {

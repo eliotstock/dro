@@ -74,13 +74,16 @@ export class DRO {
       const minUsdc = tickToPrice(wethToken, usdcToken, this.maxTick).toFixed(2)
       const maxUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
 
-      // Insert a row in the database for analytics, except when we're just starting up and there's
-      // no range yet.
-      if (!noRangeYet) {
-        insertRerangeEvent(this.rangeWidthTicks, moment().toISOString(), direction)
+      if (noRangeYet) {
+        console.log(`[${this.rangeWidthTicks}] Initial range: ${minUsdc} USDC - ${maxUsdc} USDC.`)
       }
-  
-      console.log(`[${this.rangeWidthTicks}] New range: ${minUsdc} USDC - ${maxUsdc} USDC.`)
+      else {
+        // Insert a row in the database for analytics, except when we're just starting up and there's
+        // no range yet.
+        insertRerangeEvent(this.rangeWidthTicks, moment().toISOString(), direction)
+
+        console.log(`[${this.rangeWidthTicks}] New range: ${minUsdc} USDC - ${maxUsdc} USDC.`)
+      }
     }
   
     // Checking unclaimed fees is a nice-to-have for the logs but essential if we want to actually
