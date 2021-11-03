@@ -5,13 +5,27 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "dro",
             "type": "node",
+            "program": "${workspaceFolder}/dro/src/index.ts",
             "request": "launch",
-            "name": "Launch Program",
             "skipFiles": [
                 "<node_internals>/**"
             ],
+            "preLaunchTask": "tsc: build - dro/tsconfig.json",
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "cwd": "${workspaceFolder}/dro"
+        },
+        {
+            "name": "analysis",
+            "type": "node",
             "program": "${workspaceFolder}/analysis/src/index.ts",
+            "request": "launch",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
             "preLaunchTask": "tsc: build - analysis/tsconfig.json",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"

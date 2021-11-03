@@ -370,6 +370,10 @@ export class DRO {
 
       console.log("addLiquidity(): Amounts available: ", amountUsdc, " USDC", amountWeth, " WETH", amountEth, " ETH")
 
+      // TODO: On testnet, when we need to create the pool with our own USDC contract, using the
+      // rangeOrderPoolContract won't work since that's pointing at an existing pool. The Uniswap
+      // SDK docs do not cover creating a pool from scratch.
+
       const slot = await rangeOrderPoolContract.slot0()
       const liquidity = await rangeOrderPoolContract.liquidity()
 
@@ -394,12 +398,15 @@ export class DRO {
       })
   
       console.log("addLiquidity(): Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
+
+      // On testnets, we expect to have to create the pool with the addition of our own liquidity.
+      const createPool: boolean = CHAIN_CONFIG.isTestnet
   
       const mintOptions: MintOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
         deadline: moment().unix() + DEADLINE_SECONDS,
         recipient: wallet.address,
-        createPool: false
+        createPool: createPool
       }
   
       // addCallParameters() implementation:
@@ -469,7 +476,8 @@ export class DRO {
         this.updateRange()
 
         // Swap half our assets to the other asset so that we have equal value of assets.
-        await this.swap()
+        // TODO: Put back once pool created on Kovan.
+        // await this.swap()
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()

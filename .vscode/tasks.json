@@ -9,6 +9,15 @@
 			],
 			"group": "build",
 			"label": "tsc: build - analysis/tsconfig.json"
+		},
+		{
+			"type": "typescript",
+			"tsconfig": "dro/tsconfig.json",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build",
+			"label": "tsc: build - dro/tsconfig.json"
 		}
 	]
 }
