@@ -12,10 +12,11 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/analysis/src/index.ts",
-            "preLaunchTask": "tsc: build - tsconfig.json",
+            "preLaunchTask": "tsc: build - analysis/tsconfig.json",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
-            ]
+            ],
+            "cwd": "${workspaceFolder}/analysis"
         }
     ]
 }

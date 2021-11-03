@@ -90,9 +90,9 @@ const expectedGrossYields = new Map<number, number>()
 //                      bps  percent
 //                      ---  -------
 expectedGrossYields.set(120, 1_280)
-expectedGrossYields.set(240, 710)
-expectedGrossYields.set(360, 320)
-expectedGrossYields.set(720, 160)
+// expectedGrossYields.set(240, 710)
+// expectedGrossYields.set(360, 320)
+// expectedGrossYields.set(720, 160)
 
 let rangeWidthTicks: number
 
@@ -259,7 +259,7 @@ function gasCost(): number {
     return GAS_COST
 }
 
-export function rerangingInterval(previousTimestamp: string, currentTimestamp: string): number {
+export function intervalYears(previousTimestamp: string, currentTimestamp: string): number {
     const previous = moment(previousTimestamp, TIMESTAMP_FORMAT)
     const current = moment(currentTimestamp, TIMESTAMP_FORMAT)
 
@@ -308,8 +308,6 @@ async function main() {
     // Run the analysis once per key in expectedGrossYields
     expectedGrossYields.forEach((expectedGrossYield: number, rangeWidth: number) => {
         rangeWidthTicks = rangeWidth
-
-        console.log(`  Range width in ticks: ${rangeWidthTicks}`)
     
         // Start out with a range centered on the price of the first block in our data.
         const firstSwapEvent = swapEvents[0]
@@ -334,7 +332,7 @@ async function main() {
                 rerange()
 
                 // We'll claim some fees at the time of removing liquidity.
-                const yearsInRange = rerangingInterval(blockTimestamp, e.blockTimestamp)
+                const yearsInRange = intervalYears(blockTimestamp, e.blockTimestamp)
 
                 const unclaimedFees = expectedGrossYield / 100 * yearsInRange * positionValue
 
@@ -358,7 +356,7 @@ async function main() {
             blockTimestamp = e.blockTimestamp
         })
     
-        console.log(`  Re-ranged ${rerangeCounter} times in ${secondsToDays(timeRangeSeconds)} days`)
+        console.log(`  Range width ${rangeWidthTicks} re-ranged ${rerangeCounter} times in ${secondsToDays(timeRangeSeconds)} days`)
     
         // Note that forEach() above is blocking.
         const meanTimeToReranging = timeRangeSeconds / rerangeCounter
