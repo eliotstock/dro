@@ -197,12 +197,8 @@ function rowToSwapEvent(row: any): SwapEvent {
     return e
 }
 
-function secondsToDays(secs: number): number {
-    return Math.round(secs / 60 / 60 / 24)
-}
-
 function rerange() {
-    let logLine = `  #${rerangeCounter} ${blockTimestamp} Price of USDC ${priceUsdc} re-ranges `
+    let logLine = `  #${rerangeCounter} ${blockTimestamp} Price ${priceUsdc} re-ranges `
 
     // Down in tick terms is up in USDC terms and vice versa.
     if (tick < minTick) {

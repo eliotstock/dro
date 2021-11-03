@@ -32,6 +32,7 @@ export class DRO {
     tokenId?: BigintIsh
     unclaimedFeesUsdc?: BigintIsh
     unclaimedFeesWeth?: BigintIsh
+    lastRerangeTimestamp?: string
   
     constructor(
         _rangeWidthTicks: number,
@@ -50,11 +51,22 @@ export class DRO {
     // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
     // returned here can be quite different to rangeWidthTicks.
     updateRange() {
-      if (rangeOrderPoolTick == undefined) throw "No tick yet."
+      if (rangeOrderPoolTick == undefined) throw 'No tick yet.'
 
       const noRangeYet: boolean = (this.minTick == 0)
 
       const direction: string = rangeOrderPoolTick < this.minTick ? 'down' : 'up'
+
+      let timeInRange: string = 'an unknown period'
+
+      if (this.lastRerangeTimestamp) {
+        const a = moment(this.lastRerangeTimestamp)
+        const b = moment() // Now
+        const timeToRerangingMillis = b.diff(a)
+        timeInRange = moment.duration(timeToRerangingMillis, 'milliseconds').humanize()
+
+        this.lastRerangeTimestamp = moment().toISOString()
+      }
 
       this.minTick = Math.round(rangeOrderPoolTick - (this.rangeWidthTicks / 2))
 
@@ -75,14 +87,14 @@ export class DRO {
       const maxUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
 
       if (noRangeYet) {
-        console.log(`[${this.rangeWidthTicks}] Initial range: ${minUsdc} USDC - ${maxUsdc} USDC.`)
+        console.log(`[${this.rangeWidthTicks}] Initial range: ${minUsdc} <-> ${maxUsdc}`)
       }
       else {
         // Insert a row in the database for analytics, except when we're just starting up and there's
         // no range yet.
         insertRerangeEvent(this.rangeWidthTicks, moment().toISOString(), direction)
 
-        console.log(`[${this.rangeWidthTicks}] New range: ${minUsdc} USDC - ${maxUsdc} USDC.`)
+        console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRange} to ${minUsdc} <-> ${maxUsdc}`)
       }
     }
   
