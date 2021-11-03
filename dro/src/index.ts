@@ -10,14 +10,16 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
-// (P1) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
+// (P1) Get the 'add liquidity' tx working
+// (P1) Get the 'remove liquidity' tx working
+// (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
+// (P1) Get the swap tx working, when re-ranging up (in: USDC, out: WETH)
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
-// (P2) Remove an existing liquidity position (but fail because no position yet)
-// (P2) Execute a swap for a known amount of USDC (half our account balance)
-// (P2) Keep track of how much ETH to keep on hand for gas and swap costs
+// (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
+// (P2) Know the current price of gas
+// (P2) Don't re-range when the current price of gas is over a constant threshold
+// (P3) Keep track of how much ETH to keep on hand for gas and swap costs
 // (P3) Build the URL of the position, based on the serial number, and log it
-// (P3) Know the current price of gas
-// (P3) Don't re-range when the current price of gas is over a constant threshold
 
 // Done
 // ----
