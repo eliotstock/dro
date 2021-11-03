@@ -90,15 +90,12 @@ const expectedGrossYields = new Map<number, number>()
 //                      bps  percent
 //                      ---  -------
 expectedGrossYields.set(120, 1_280)
-// expectedGrossYields.set(240, 710)
-// expectedGrossYields.set(360, 320)
-// expectedGrossYields.set(720, 160)
+expectedGrossYields.set(240, 710)
+expectedGrossYields.set(360, 320)
 
 let rangeWidthTicks: number
 
 let rerangeCounter: number
-
-let timeRangeSeconds: number
 
 let positionValue: number
 
@@ -204,16 +201,6 @@ function secondsToDays(secs: number): number {
     return Math.round(secs / 60 / 60 / 24)
 }
 
-function getTimeRange() {
-    const firstSwapEvent = swapEvents[0]
-    const lastSwapEvent = swapEvents[swapEvents.length - 1]
-
-    const firstSwapDate = new Date(firstSwapEvent.blockTimestamp)
-    const lastSwapDate = new Date(lastSwapEvent.blockTimestamp)
-
-    timeRangeSeconds = lastSwapDate.valueOf() / 1000 - firstSwapDate.valueOf() / 1000
-}
-
 function rerange() {
     let logLine = `  #${rerangeCounter} ${blockTimestamp} Price of USDC ${priceUsdc} re-ranges `
 
@@ -302,9 +289,6 @@ async function main() {
 
     console.log(`Analysing...`)
 
-    // Determine the time range of our data.
-    getTimeRange()
-
     // Run the analysis once per key in expectedGrossYields
     expectedGrossYields.forEach((expectedGrossYield: number, rangeWidth: number) => {
         rangeWidthTicks = rangeWidth
@@ -355,16 +339,18 @@ async function main() {
 
             blockTimestamp = e.blockTimestamp
         })
+
+        const lastSwapEvent = swapEvents[swapEvents.length - 1]
+        const totalIntervalYears = intervalYears(firstSwapEvent.blockTimestamp, lastSwapEvent.blockTimestamp)
     
-        console.log(`  Range width ${rangeWidthTicks} re-ranged ${rerangeCounter} times in ${secondsToDays(timeRangeSeconds)} days`)
+        console.log(`  Range width ${rangeWidthTicks} re-ranged ${rerangeCounter} times in ${totalIntervalYears} years`)
     
         // Note that forEach() above is blocking.
-        const meanTimeToReranging = timeRangeSeconds / rerangeCounter
-        const humanized = moment.duration(meanTimeToReranging, 'seconds').humanize()
+        const meanTimeToReranging = totalIntervalYears / rerangeCounter
+        const humanized = moment.duration(meanTimeToReranging, 'years').humanize()
         console.log(`  Mean time to re-ranging: ${humanized}`)
         console.log(`  Closing position value: USDC ${positionValue.toFixed(2)}`)
 
-        const lastSwapEvent = swapEvents[swapEvents.length - 1]
         const expectedApy = apy(firstSwapEvent.blockTimestamp, lastSwapEvent.blockTimestamp,
             INITIAL_POSTION_VALUE_USDC, positionValue)
         console.log(`  Expected net APY: ${(expectedApy * 100).toFixed(0)}%`)
