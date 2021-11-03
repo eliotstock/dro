@@ -66,7 +66,8 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 //    7.2%           720   ?
 //    8.4%           840   ?
 //    9.6%           960   ?
-const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960]
+// const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960]
+const rangeWidths: number[] = [120]
 
 // Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []
@@ -178,7 +179,7 @@ async function main() {
     }
   }
   catch(e) {
-    // Probably network error thrown by getPoolImmutables().
+    // Probably network error thrown by a Uniswap tx call.
     console.error(e)
   }
 

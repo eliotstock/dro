@@ -198,11 +198,18 @@ export class DRO {
       }
 
       const swapPoolFee = await swapPoolContract.fee()
-      console.log("swapPoolFee: ", swapPoolFee)
+      // console.log("swapPoolFee: ", swapPoolFee)
 
       // Assume we're swapping our entire WETH balance for USDC for now.
       const weth = await wallet.weth()
+
+      // console.log(`[${this.rangeWidthTicks}] WETH address: ${CHAIN_CONFIG.addrTokenWeth}`)
+      // console.log(`[${this.rangeWidthTicks}] USDC address: ${CHAIN_CONFIG.addrTokenUsdc}`)
+
+      console.log(`[${this.rangeWidthTicks}] Swapping ${weth} WETH will get us...`)
   
+      // This will revert with code -32015 on testnets if there is no pool for the token addresses
+      // passed in. Create a pool first.
       const quotedUsdcOut = await quoterContract.callStatic.quoteExactInputSingle(
         CHAIN_CONFIG.addrTokenWeth, // Token in
         CHAIN_CONFIG.addrTokenUsdc, // Token out
@@ -212,7 +219,7 @@ export class DRO {
       )
   
       // Swapping 1_000_000_000_000_000_000 WETH (18 zeroes) will get us 19_642_577_913_338_823 USDC (19B USDC)
-      console.log(`[${this.rangeWidthTicks}] Swapping ${weth} WETH will get us ${quotedUsdcOut.toString()} USDC`)
+      console.log(`[${this.rangeWidthTicks}] ...${quotedUsdcOut.toString()} USDC`)
   
       // The pool depends on the pool liquidity and slot 0 so we need to reconstruct it every time.
       const liquidity = await swapPoolContract.liquidity()
@@ -456,7 +463,7 @@ export class DRO {
         await this.removeLiquidity()
 
         // Take note of what assets we now hold
-        wallet.logBalances()
+        await wallet.logBalances()
 
         // Find our new range around the current price.
         this.updateRange()

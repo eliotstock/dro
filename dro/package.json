@@ -4,8 +4,8 @@
   "description": "Dynamic range order",
   "main": "build/main/index.js",
   "scripts": {
-    "nodemon": "nodemon",
-    "start": "ts-node ./src/index.ts",
+    "dev": "nodemon",
+    "prod": "ts-node ./src/index.ts",
     "n": "ts-node ./src/index.ts --n"
   },
   "author": "",
