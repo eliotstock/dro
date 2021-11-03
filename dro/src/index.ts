@@ -54,16 +54,17 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 // to range widths that are multiples of 60 bps but not 120 bps - they cannot be centered on the 
 // current price. Therefore, choose ranges widths that are multiples of 120 bps.
 //
-// Percent   bps (ticks)   Observations
+// Percent   bps (ticks)   Mean time to re-ranging, from forward testing
 // -------   -----------   ------------
-//    1.2%           120   NFW. Re-ranging 7 times in 8 hours.
-//    2.4%           240   Re-ranged 5 times in 8 hours on a 5% daily bar. 
-//    3.6%           360   Re-ranged 7 times in 34 hours on a 8% daily bar.
-//    4.8%           480   Testing now.
-//    6.0%           600   Testing now.
-//    7.2%           720   Testing now.
-const rangeWidths: number[] = [120, 240, 360]
-// const rangeWidths: number[] = [360, 480, 600, 720]
+//    1.2%           120   2 hours
+//    2.4%           240   4 hours
+//    3.6%           360   8 hours
+//    4.8%           480   ?
+//    6.0%           600   ?
+//    7.2%           720   ?
+//    8.4%           840   ?
+//    9.6%           960   ?
+const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960]
 
 // Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []
