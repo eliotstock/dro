@@ -34,5 +34,7 @@ export async function monitor(chainConfig: any) {
 
         const timestamp = moment()
         console.log(`${timestamp.format(TIMESTAMP_FORMAT)} ${price}`)
+
+        console.log(`sqrtPriceX96: ${sqrtPriceX96}, liquidity: ${liquidity}, tick: ${tick}`)
     })
 }

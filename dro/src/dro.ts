@@ -3,24 +3,18 @@ import { BigNumber } from '@ethersproject/bignumber'
 import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SwapOptions, SwapRouter, tickToPrice, Trade } from "@uniswap/v3-sdk"
 import { CurrencyAmount, Percent, BigintIsh, TradeType } from "@uniswap/sdk-core"
 import { TickMath } from '@uniswap/v3-sdk/'
-import { ethers } from 'ethers'
-import { TransactionResponse, TransactionReceipt } from "@ethersproject/abstract-provider";
+import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet } from './wallet'
 import { insertRerangeEvent } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 
 // Read our .env file
 config()
 
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
-
-// On all transactions, set the deadline to 3 minutes from now
-const DEADLINE_SECONDS = 180
-
-const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
 
 export class DRO {
     readonly rangeWidthTicks: number
@@ -364,11 +358,12 @@ export class DRO {
         throw "Can't add liquidity. Already in a position. Remove liquidity and swap first."
   
       // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
-      const amountUsdc = (await wallet.usdc()).toString()
-      const amountWeth = (await wallet.weth()).toString()
-      const amountEth = (await wallet.getBalance()).toString()
+      const availableUsdc = (await wallet.usdc()).toString()
+      const availableWeth = (await wallet.weth()).toString()
+      const availableEth = (await wallet.getBalance()).toString()
 
-      console.log("addLiquidity(): Amounts available: ", amountUsdc, " USDC", amountWeth, " WETH", amountEth, " ETH")
+      console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH, \
+${availableEth} ETH`)
 
       // TODO: On testnet, when we need to create the pool with our own USDC contract, using the
       // rangeOrderPoolContract won't work since that's pointing at an existing pool. The Uniswap
@@ -392,28 +387,26 @@ export class DRO {
         pool: rangeOrderPool,
         tickLower: this.minTick,
         tickUpper: this.maxTick,
-        amount0: amountUsdc,
-        amount1: amountWeth,
+        amount0: availableUsdc,
+        amount1: availableWeth,
         useFullPrecision: true
       })
   
-      console.log("addLiquidity(): Amounts desired: ", position.mintAmounts.amount0.toString(), "USDC", position.mintAmounts.amount1.toString(), "WETH")
-
-      // On testnets, we expect to have to create the pool with the addition of our own liquidity.
-      const createPool: boolean = CHAIN_CONFIG.isTestnet
+      console.log(`addLiquidity() Amounts desired: ${position.mintAmounts.amount0.toString()} USDC \
+${position.mintAmounts.amount1.toString()} WETH`)
   
       const mintOptions: MintOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
         deadline: moment().unix() + DEADLINE_SECONDS,
         recipient: wallet.address,
-        createPool: createPool
+        createPool: false
       }
   
       // addCallParameters() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
       const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
   
-      console.log("calldata: ", calldata)
+      console.log(`addLiquidity() calldata: ${calldata}`)
   
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -432,19 +425,19 @@ export class DRO {
       // Send the transaction to the provider.
       const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
 
-      console.log("addLiquidity() TX response: ", txResponse)
-      console.log("addLiquidity() Max fee per gas: ", txResponse.maxFeePerGas?.toString()) // 100_000_000_000 wei or 100 gwei
-      console.log("addLiquidity() Gas limit: ", txResponse.gasLimit?.toString()) // 450_000
+      console.log(`addLiquidity() TX response: ${txResponse}`)
+      console.log(`addLiquidity() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
+      console.log(`addLiquidity() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
 
       const txReceipt: TransactionReceipt = await txResponse.wait()
 
-      console.log("addLiquidity() TX receipt:")
+      console.log(`addLiquidity() TX receipt:`)
       console.dir(txReceipt)
-      console.log("addLiquidity(): Effective gas price: ", txReceipt.effectiveGasPrice.toString())
+      console.log(`addLiquidity(): Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
   
       // TODO: This is failing. No position is created.
       //   When on a testnet, don't use anyone else's pool. Create one ourselves, even if it means
-      //     using a newly deploy contract for USDC.
+      //     using a newly deployed contract for USDC.
       //   Can we turn on tracing? Does Infura support it?
       //   If not can we run geth locally and test with tracing on?
       //   Are we running out of gas? Is Kovan unrealistic for gas cost?

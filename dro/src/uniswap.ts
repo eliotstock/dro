@@ -1,11 +1,14 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
-import { abi as IUniswapV3PoolABI } from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json"
-import { abi as QuoterABI } from "@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json"
-import { abi as NonfungiblePositionManagerABI } from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"
-import { tickToPrice } from "@uniswap/v3-sdk"
+import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
+import { abi as QuoterABI } from '@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'
+import { abi as NonfungiblePositionManagerABI } from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
+import { tickToPrice, Pool, Position, MintOptions, NonfungiblePositionManager } from '@uniswap/v3-sdk'
+import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
 import { Token } from '@uniswap/sdk-core'
+import { wallet } from './wallet'
+import moment from 'moment'
 
 // Read our .env file
 config()
@@ -15,6 +18,11 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 
 export let rangeOrderPoolTick: number
 export let rangeOrderPoolPriceUsdc: string
+
+// On all transactions, set the deadline to 3 minutes from now
+export const DEADLINE_SECONDS = 180
+
+export const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
 
 // This is what `await rangeOrderPoolContract.tickSpacing()` would return, but we want to avoid
 // the await.
@@ -64,4 +72,105 @@ export async function updateTick() {
     if (rangeOrderPoolTick) {
         rangeOrderPoolPriceUsdc = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick).toFixed(2)
     }
+}
+
+export async function createPoolOnTestnet() {
+    if (!CHAIN_CONFIG.isTestnet) {
+        throw 'Not on a testnet'
+    }
+
+    // 0.30%
+    const fee: number = 3000
+
+    // Run `ts-node src/index.ts --monitor` to get some suitable starting values for these from the
+    // existing pool on mainnet.
+    // These were at a USDC price of 4,604.00.
+    const sqrtRatioX96: string = '1167653694127320251748170330430894' // Expects BigintIsh
+    const liquidity: string = '17794964695224007502' // Expects BigintIsh
+    const tickCurrent: number = 191973
+
+    const newPool = new Pool(
+        usdcToken,
+        wethToken,
+        fee,
+        sqrtRatioX96,
+        liquidity,
+        tickCurrent
+    )
+
+    // Observed on a manually created position, therefore valid.
+    const minTick: number = 191580
+    const maxTick: number = 195840
+
+    const availableUsdc = (await wallet.usdc()).toString()
+    const availableWeth = (await wallet.weth()).toString()
+    const availableEth = (await wallet.getBalance()).toString()
+    console.log(`createPoolOnTestnet(): Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH, \
+${availableEth} ETH`)
+
+    // Eyeball these and make sure they're within our available amounts logged above.
+    // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
+
+    // 500 USDC, 6 decimals
+    const amountUsdc = '500000000'
+
+    // ~0.1 WETH, 18 decimals. Works for the above price of 4,604.00 USDC.
+    const amountWeth = '10860121633000000'
+
+    // TODO: Get some more Kovan ETH for gas.
+    //   Error: Insufficient funds. The account you tried to send transaction from does not have enough funds.
+    //   Required 45_000_000_000_000_000 (0.045 ETH)
+    //   and got: 22_440_525_093_280_227 (0.022 ETH)
+    // Amounts available:
+    //            22440525093280227 ETH
+    //  1000000000 USDC, 1000000000000000000 WETH
+
+    const position = Position.fromAmounts({
+        pool: newPool,
+        tickLower: minTick,
+        tickUpper: maxTick,
+        amount0: amountUsdc,
+        amount1: amountWeth,
+        useFullPrecision: true
+    })
+
+    const mintOptions: MintOptions = {
+        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+        deadline: moment().unix() + DEADLINE_SECONDS,
+        recipient: wallet.address,
+        createPool: true
+    }
+
+    // addCallParameters() implementation:
+    //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
+    const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
+  
+    console.log(`createPoolOnTestnet() calldata: ${calldata}`)
+  
+    const nonce = await wallet.getTransactionCount("latest")
+  
+    // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
+    const txRequest = {
+        from: wallet.address,
+        to: CHAIN_CONFIG.addrPositionManager,
+        value: VALUE_ZERO_ETHER,
+        // value: amountEth,
+        nonce: nonce,
+        gasLimit: CHAIN_CONFIG.gasLimit,
+        gasPrice: CHAIN_CONFIG.gasPrice,
+        data: calldata
+    }
+
+    // Send the transaction to the provider.
+    const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+
+    console.log(`addLiquidity() TX response: ${txResponse}`)
+    console.log(`addLiquidity() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
+    console.log(`addLiquidity() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
+
+    const txReceipt: TransactionReceipt = await txResponse.wait()
+
+    console.log(`addLiquidity() TX receipt:`)
+    console.dir(txReceipt)
+    console.log(`addLiquidity(): Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
 }

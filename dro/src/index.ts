@@ -5,6 +5,7 @@ import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
 import { init, dumpToCsv, meanTimeToReranging } from './db'
+import { createPoolOnTestnet } from './uniswap'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
 
@@ -108,7 +109,8 @@ async function main() {
     approve: { type: 'boolean', default: false },
     privateKey: { type: 'boolean', default: false },
     dbDump: { type: 'boolean', default: false },
-    mtr: { type: 'boolean', default: false }
+    mtr: { type: 'boolean', default: false },
+    testnetCreatePool: { type: 'boolean', default: false }
   }).parseSync()
 
   // `--n` means no-op.
@@ -144,6 +146,15 @@ async function main() {
     console.log(`Approving spending of USDC and WETH`)
 
     await wallet.approveAll()
+
+    return
+  }
+
+  // `--testnet-create-pool` means create a new Uniswap v3 pool with our own USDC token.
+  if (argv.testnetCreatePool) {
+    console.log(`Creating pool on testnet`)
+
+    await createPoolOnTestnet()
 
     return
   }
