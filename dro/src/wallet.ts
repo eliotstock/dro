@@ -1,10 +1,12 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
+import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { Provider } from "@ethersproject/abstract-provider";
 import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer";
 import { SigningKey } from "@ethersproject/signing-key";
 import { BigNumber } from '@ethersproject/bignumber'
 import { abi as ERC20ABI } from './abi/erc20.json'
+import { abi as WETHABI } from './abi/weth.json'
 import { useConfig, ChainConfig } from './config'
 
 // Read our .env file
@@ -50,7 +52,7 @@ class EthUsdcWallet extends ethers.Wallet {
 
         const wethContract = new ethers.Contract(
             chainConfig.addrTokenWeth,
-            ERC20ABI,
+            WETHABI,
             chainConfig.provider()
         )
 
@@ -103,6 +105,30 @@ class EthUsdcWallet extends ethers.Wallet {
 
         console.log("Approving spending of max WETH")
         await this.wethContract.approve(address, ethers.constants.MaxUint256)
+    }
+
+    async wrapEth(ethAmount: string) {
+        console.log(`Wrapping ${ethAmount} ETH to WETH`)
+
+        const nonce = await this.getTransactionCount("latest")
+
+        const txRequest = {
+            from: this.address,
+            to: this.wethContract.address,
+            value: ethers.utils.parseEther(ethAmount),
+            nonce: nonce,
+            gasLimit: CHAIN_CONFIG.gasLimit,
+            gasPrice: CHAIN_CONFIG.gasPrice,
+        }
+
+        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+
+        console.log("swap() TX response: ", txResponse)
+
+        const txReceipt: TransactionReceipt = await txResponse.wait()
+
+        console.log("swap() TX receipt:")
+        console.dir(txReceipt)
     }
 }
 

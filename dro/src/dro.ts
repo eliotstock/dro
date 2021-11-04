@@ -412,7 +412,6 @@ ${position.mintAmounts.amount1.toString()} WETH`)
         from: wallet.address,
         to: CHAIN_CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
-        // value: amountEth,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
         gasPrice: CHAIN_CONFIG.gasPrice,
@@ -431,6 +430,20 @@ ${position.mintAmounts.amount1.toString()} WETH`)
       console.log(`addLiquidity() TX receipt:`)
       console.dir(txReceipt)
       console.log(`addLiquidity(): Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
+
+      // Log index 5 has some topics. Topic index 3 on it is the Token ID for the position.
+      try {
+        const logs = txReceipt.logs
+        const log = logs[5]
+        const topics = log.topics
+        const topic = topics[3]
+        this.tokenId = topic
+
+        console.log(`Token ID: ${this.tokenId}`)
+      }
+      catch (error) {
+        console.log(error)
+      }
 
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the
       // token ID. Or get it from the logs. See this tx from createPoolOnTestnet() on Kovan:

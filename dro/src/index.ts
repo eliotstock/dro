@@ -11,7 +11,8 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
-// (P1) Get the 'add liquidity' tx working
+// (P1) Mint some USDC for the deployer (DRO) account
+// (P1) Get the 'add liquidity' tx working, including capturing the Token ID
 // (P1) Get the 'remove liquidity' tx working
 // (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
 // (P1) Get the swap tx working, when re-ranging up (in: USDC, out: WETH)
@@ -24,6 +25,7 @@ import yargs from 'yargs/yargs'
 
 // Done
 // ----
+// (P1) Get hold of some WETH for the DRO account
 // (P1) Know what our current balance of ETH, WETH and USDC is, right after removing liquidity
 // (P1) Fix the range width arithmetic
 // (P1) Show the new range min and max in terms of USDC rather than ticks
@@ -111,7 +113,8 @@ async function main() {
     privateKey: { type: 'boolean', default: false },
     dbDump: { type: 'boolean', default: false },
     mtr: { type: 'boolean', default: false },
-    testnetCreatePool: { type: 'boolean', default: false }
+    testnetCreatePool: { type: 'boolean', default: false },
+    wrapEth: { type: 'boolean', default: false },
   }).parseSync()
 
   // `--n` means no-op.
@@ -166,6 +169,13 @@ async function main() {
     await wallet.approveAll(CHAIN_CONFIG.addrPositionManager)
 
     await createPoolOnTestnet()
+
+    return
+  }
+
+  // `--wrap-eth` means wrap some ETH to WETH.
+  if (argv.wrapEth) {
+    await wallet.wrapEth('1.0')
 
     return
   }

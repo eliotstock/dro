@@ -178,7 +178,7 @@ export async function createPoolOnTestnet() {
     console.dir(txReceipt)
     console.log(`createPoolOnTestnet() Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
 
-    // If we get a revert with `Fail with error: 'STF'` here, STF is `safe transfe from` and this
+    // If we get a revert with `Fail with error: 'STF'` here, STF is `safe transfer from` and this
     // is thrown by:
     //   https://github.com/Uniswap/v3-periphery/blob/9ca9575d09b0b8d985cc4d9a0f689f7a4470ecb7/contracts/libraries/TransferHelper.sol#L21
     // We need to approve the position manager contract to spend the tokens.
