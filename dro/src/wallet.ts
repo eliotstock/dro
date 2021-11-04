@@ -78,7 +78,7 @@ class EthUsdcWallet extends ethers.Wallet {
     }
 
     async logBalances() {
-        let [usdcBalance, wethBalance, ethBalance] =
+        const [usdcBalance, wethBalance, ethBalance] =
             await Promise.all([
                 this.usdc(),
                 this.weth(),
