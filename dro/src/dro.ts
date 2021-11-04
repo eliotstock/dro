@@ -49,7 +49,8 @@ export class DRO {
 
       const noRangeYet: boolean = (this.minTick == 0)
 
-      const direction: string = rangeOrderPoolTick < this.minTick ? 'down' : 'up'
+      // A lower tick value means a higher price in USDC.
+      const direction: string = rangeOrderPoolTick < this.minTick ? 'up' : 'down'
 
       let timeInRange: string = 'an unknown period'
 
@@ -58,9 +59,9 @@ export class DRO {
         const b = moment() // Now
         const timeToRerangingMillis = b.diff(a)
         timeInRange = moment.duration(timeToRerangingMillis, 'milliseconds').humanize()
-
-        this.lastRerangeTimestamp = moment().toISOString()
       }
+
+      this.lastRerangeTimestamp = moment().toISOString()
 
       this.minTick = Math.round(rangeOrderPoolTick - (this.rangeWidthTicks / 2))
 
