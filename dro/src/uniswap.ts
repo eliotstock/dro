@@ -102,13 +102,16 @@ export async function createPoolOnTestnet() {
     const minTick: number = 191580
     const maxTick: number = 195840
 
-    const availableUsdc = (await wallet.usdc()).toString()
-    const availableWeth = (await wallet.weth()).toString()
-    const availableEth = (await wallet.getBalance()).toString()
-    console.log(`createPoolOnTestnet(): Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH, \
-${availableEth} ETH`)
+    await wallet.logBalances()
 
-    // Eyeball these and make sure they're within our available amounts logged above.
+//     const availableUsdc = (await wallet.usdc()).toString()
+//     const availableWeth = (await wallet.weth()).toString()
+//     const availableEth = (await wallet.getBalance()).toString()
+//     console.log(`createPoolOnTestnet(): Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH, \
+// ${availableEth} ETH`)
+
+    // Eyeball these and make sure they're within our available amounts logged above and that we
+    // have enough for gas.
     // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
 
     // 500 USDC, 6 decimals
@@ -143,9 +146,8 @@ ${availableEth} ETH`)
 
     // addCallParameters() implementation:
     //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
+    // Don't bother logging the calldata. It'll be on the txResponse instance below.
     const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
-  
-    console.log(`createPoolOnTestnet() calldata: ${calldata}`)
   
     const nonce = await wallet.getTransactionCount("latest")
   
@@ -164,13 +166,23 @@ ${availableEth} ETH`)
     // Send the transaction to the provider.
     const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
 
-    console.log(`addLiquidity() TX response: ${txResponse}`)
-    console.log(`addLiquidity() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
-    console.log(`addLiquidity() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
+    console.log(`createPoolOnTestnet() TX response:`)
+    console.dir(txResponse)
+
+    console.log(`createPoolOnTestnet() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
+    console.log(`createPoolOnTestnet() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
 
     const txReceipt: TransactionReceipt = await txResponse.wait()
 
-    console.log(`addLiquidity() TX receipt:`)
+    console.log(`createPoolOnTestnet() TX receipt:`)
     console.dir(txReceipt)
-    console.log(`addLiquidity(): Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
+    console.log(`createPoolOnTestnet() Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
+
+    // If we get a revert with `Fail with error: 'STF'` here, STF is `safe transfe from` and this
+    // is thrown by:
+    //   https://github.com/Uniswap/v3-periphery/blob/9ca9575d09b0b8d985cc4d9a0f689f7a4470ecb7/contracts/libraries/TransferHelper.sol#L21
+    // We need to approve the position manager contract to spend the tokens.
+
+    // Otherwise, check etherscan for the logs from this tx. There should be a pool address in
+    // there. Put that in the config for this testnet.
 }

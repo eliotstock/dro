@@ -360,10 +360,6 @@ export class DRO {
       // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
       const availableUsdc = (await wallet.usdc()).toString()
       const availableWeth = (await wallet.weth()).toString()
-      const availableEth = (await wallet.getBalance()).toString()
-
-      console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH, \
-${availableEth} ETH`)
 
       // TODO: On testnet, when we need to create the pool with our own USDC contract, using the
       // rangeOrderPoolContract won't work since that's pointing at an existing pool. The Uniswap
@@ -434,17 +430,14 @@ ${position.mintAmounts.amount1.toString()} WETH`)
       console.log(`addLiquidity() TX receipt:`)
       console.dir(txReceipt)
       console.log(`addLiquidity(): Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
-  
-      // TODO: This is failing. No position is created.
-      //   When on a testnet, don't use anyone else's pool. Create one ourselves, even if it means
-      //     using a newly deployed contract for USDC.
-      //   Can we turn on tracing? Does Infura support it?
-      //   If not can we run geth locally and test with tracing on?
-      //   Are we running out of gas? Is Kovan unrealistic for gas cost?
-      //   Would this actually work on Mainnet?
-      //   Can we decode the calldata using an ethers Interface and check it?
 
-      // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the token ID.
+      // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the
+      // token ID. Or get it from the logs. See this tx from createPoolOnTestnet() on Kovan:
+      //   https://kovan.etherscan.io/tx/0xfdf5704a01bcd90bec183ed091856c4845fe2bb12129c6bb474942ec75fbc4a7#eventlog
+      // Which created this pool:
+      //   https://kovan.etherscan.io/address/0x36f114d17fdcf3df2a96b4ad317345ac62a6a6f7
+      // And minted us this NFT with TokenID 8187:
+      //   https://kovan.etherscan.io/token/0xc36442b4a4522e871399cd717abdd847ab11fe88?a=8187
     }
 
     async onBlock() {
@@ -471,6 +464,9 @@ ${position.mintAmounts.amount1.toString()} WETH`)
         // Swap half our assets to the other asset so that we have equal value of assets.
         // TODO: Put back once pool created on Kovan.
         // await this.swap()
+
+        // Take note of what assets we now hold after the swap
+        await wallet.logBalances()
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()

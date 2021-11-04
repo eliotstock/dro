@@ -105,6 +105,7 @@ async function main() {
   // Process command line args using yargs. Pass these to `ts-node ./src/index.ts`
   const argv = yargs(process.argv.slice(2)).options({
     n: { type: 'boolean', default: false },
+    balances: { type: 'boolean', default: false },
     monitor: { type: 'boolean', default: false },
     approve: { type: 'boolean', default: false },
     privateKey: { type: 'boolean', default: false },
@@ -117,6 +118,13 @@ async function main() {
   if (argv.n) {
     noops = true
     console.log(`Running in no-op mode. No transactions will be executed.`)
+  }
+
+  // `--balances` means just log our available balances.
+  if (argv.balances) {
+    await wallet.logBalances()
+
+    return
   }
 
   // `--monitor` means just log the prices in the pool.
@@ -145,7 +153,7 @@ async function main() {
   if (argv.approve) {
     console.log(`Approving spending of USDC and WETH`)
 
-    await wallet.approveAll()
+    await wallet.approveAll(wallet.address)
 
     return
   }
@@ -153,6 +161,9 @@ async function main() {
   // `--testnet-create-pool` means create a new Uniswap v3 pool with our own USDC token.
   if (argv.testnetCreatePool) {
     console.log(`Creating pool on testnet`)
+
+    // Approve the position manager contract to spend our tokens.
+    await wallet.approveAll(CHAIN_CONFIG.addrPositionManager)
 
     await createPoolOnTestnet()
 

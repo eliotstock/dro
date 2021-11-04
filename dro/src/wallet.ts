@@ -95,14 +95,14 @@ class EthUsdcWallet extends ethers.Wallet {
         console.log("  ETH ", ethers.utils.formatEther(ethBalance))
     }
 
-    async approveAll() {
+    async approveAll(address: string) {
         // TODO: Add allowance() method to ABI and call it first. That should cost no gas. Only call
         // approve() when we need to.
         console.log("Approving spending of max USDC")
-        await this.usdcContract.approve(this.address, ethers.constants.MaxUint256)
+        await this.usdcContract.approve(address, ethers.constants.MaxUint256)
 
         console.log("Approving spending of max WETH")
-        await this.wethContract.approve(this.address, ethers.constants.MaxUint256)
+        await this.wethContract.approve(address, ethers.constants.MaxUint256)
     }
 }
 

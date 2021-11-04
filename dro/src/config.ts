@@ -89,18 +89,11 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     addrTokenWeth: "0xd0A1E359811322d97991E03f863a0C30C2cF029C",
 
-    // This can be found by querying the factory contract on Kovan in Etherscan:
-    //   https://kovan.etherscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984#readContract
-    // Use the two token addresses above. The pool with a fee of 3000 (for 0.30%),
-    // 0x877BD57CAF5A8620f06E80688070f23f091dF3b1 has no liquidity, adding some is near
-    // impossible from Etherscan and there's no dapp on Kovan.
-    // The 0.05% fee pool has liquidity. Use that instead.
-    // If that fails consider creating a new pool with a different USDC contract:
-    //   https://github.com/Uniswap/v3-core/blob/v1.0.0/contracts/UniswapV3Factory.sol#L35
-    addrPoolRangeOrder: "0xD31910c6aeAEF00F51C9e0f4F5Dca102f94F7cF5",
+    // We created this pool ourselves, using uniswap.ts:createPoolOnTestnet().
+    addrPoolRangeOrder: "0x36f114d17fdcf3df2a96b4ad317345ac62a6a6f7",
 
     // Would normally be different to the range order pool, but is the same on Kovan.
-    addrPoolSwaps: "0xD31910c6aeAEF00F51C9e0f4F5Dca102f94F7cF5",
+    addrPoolSwaps: "0x36f114d17fdcf3df2a96b4ad317345ac62a6a6f7",
 
     slippageTolerance: new Percent(50, 10_000), // 0.005%
 
@@ -114,7 +107,8 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter,
 
-    gasLimit: ETHEREUM_MAINNET.gasLimit
+    // Go crazy high on testnets, where we need to create the pool and also we don't care about cost.
+    gasLimit: ethers.utils.hexlify(10_000_000)
 }
 
 const CHAIN_CONFIGS = {
