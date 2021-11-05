@@ -156,7 +156,13 @@ async function main() {
   if (argv.approve) {
     console.log(`Approving spending of USDC and WETH`)
 
-    await wallet.approveAll(wallet.address)
+    // await wallet.approveAll(wallet.address)
+
+    // Approve the position manager contract to spend our tokens.
+    await wallet.approveAll(CHAIN_CONFIG.addrPositionManager)
+
+    // Approve the swap router to spend our tokens.
+    await wallet.approveAll(CHAIN_CONFIG.addrSwapRouter)
 
     return
   }

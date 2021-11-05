@@ -100,11 +100,17 @@ class EthUsdcWallet extends ethers.Wallet {
     async approveAll(address: string) {
         // TODO: Add allowance() method to ABI and call it first. That should cost no gas. Only call
         // approve() when we need to.
-        console.log("Approving spending of max USDC")
-        await this.usdcContract.approve(address, ethers.constants.MaxUint256)
+        // console.log("Approving spending of max USDC")
+        const txResponseUsdc: TransactionResponse = await this.usdcContract.approve(address, ethers.constants.MaxUint256)
+        // console.dir(txResponseUsdc)
+        const txReceiptUsdc: TransactionReceipt = await txResponseUsdc.wait()
+        // console.dir(txReceiptUsdc)
 
-        console.log("Approving spending of max WETH")
-        await this.wethContract.approve(address, ethers.constants.MaxUint256)
+        // console.log("Approving spending of max WETH")
+        const txResponseWeth: TransactionResponse = await this.wethContract.approve(address, ethers.constants.MaxUint256)
+        // console.dir(txResponseWeth)
+        const txReceiptWeth: TransactionReceipt = await txResponseWeth.wait()
+        // console.dir(txReceiptWeth)
     }
 
     async wrapEth(ethAmount: string) {

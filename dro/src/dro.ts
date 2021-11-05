@@ -195,13 +195,14 @@ export class DRO {
       const swapPoolFee = await swapPoolContract.fee()
       // console.log("swapPoolFee: ", swapPoolFee)
 
-      // Assume we're swapping our entire WETH balance for USDC for now.
-      const weth = await wallet.weth()
+      // Assume we're swapping half our WETH balance for USDC for now.
+      let weth = await wallet.weth()
+      weth = weth.div(2)
 
       // console.log(`[${this.rangeWidthTicks}] WETH address: ${CHAIN_CONFIG.addrTokenWeth}`)
       // console.log(`[${this.rangeWidthTicks}] USDC address: ${CHAIN_CONFIG.addrTokenUsdc}`)
 
-      console.log(`[${this.rangeWidthTicks}] Swapping ${weth} WETH will get us...`)
+      console.log(`[${this.rangeWidthTicks}] Swapping ${weth.toString()} WETH will get us...`)
   
       // This will revert with code -32015 on testnets if there is no pool for the token addresses
       // passed in. Create a pool first.
@@ -272,15 +273,16 @@ export class DRO {
       //   right now there is a lot of the USDC and very little weth
       const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
 
-      console.log("swap() TX response: ", txResponse)
+      console.log(`swap() TX response:`)
+      console.dir(txResponse)
       // console.log("swap() Max fee per gas: ", txResponse.maxFeePerGas?.toString())
       // console.log("swap() Gas limit: ", txResponse.gasLimit?.toString())
 
       const txReceipt: TransactionReceipt = await txResponse.wait()
 
-      console.log("swap() TX receipt:")
+      console.log(`swap() TX receipt:`)
       console.dir(txReceipt)
-      console.log("swap(): Effective gas price: ", txReceipt.effectiveGasPrice.toString())
+      console.log(`swap() Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
 
       /*
       // The other approach here is to execute the swap directly on the pool contract, skipping the
@@ -467,7 +469,7 @@ ${position.mintAmounts.amount1.toString()} WETH`)
       // Are we now out of range?
       if (this.outOfRange()) {
         // Remove all of our liquidity now and burn the NFT for our position.
-        await this.removeLiquidity()
+        // await this.removeLiquidity()
 
         // Take note of what assets we now hold
         await wallet.logBalances()
@@ -476,14 +478,13 @@ ${position.mintAmounts.amount1.toString()} WETH`)
         this.updateRange()
 
         // Swap half our assets to the other asset so that we have equal value of assets.
-        // TODO: Put back once pool created on Kovan.
-        // await this.swap()
+        await this.swap()
 
         // Take note of what assets we now hold after the swap
         await wallet.logBalances()
 
         // Add all our WETH and USDC to a new liquidity position.
-        await this.addLiquidity()
+        // await this.addLiquidity()
       }
     }
   }
