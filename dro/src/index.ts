@@ -11,7 +11,6 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
-// (P1) Swap some WETH to USDC so the DRO account has some on Kovan.
 // (P1) Get the 'add liquidity' tx working, including capturing the Token ID
 // (P1) Get the 'remove liquidity' tx working
 // (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
@@ -25,6 +24,7 @@ import yargs from 'yargs/yargs'
 
 // Done
 // ----
+// (P1) Swap some WETH to USDC so the DRO account has some on Kovan.
 // (P1) Get hold of some WETH for the DRO account
 // (P1) Know what our current balance of ETH, WETH and USDC is, right after removing liquidity
 // (P1) Fix the range width arithmetic

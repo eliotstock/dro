@@ -72,7 +72,7 @@ export async function meanTimeToReranging(width: number): Promise<string> {
             const timeToRerangingMillis = b.diff(a)
             const humanized = moment.duration(timeToRerangingMillis, 'milliseconds').humanize()
 
-            console.log(`Time to reranging: ${humanized}`)
+            // console.log(`Time to reranging: ${humanized}`)
 
             timesToRerangingMillis.push(timeToRerangingMillis)
         }
@@ -82,9 +82,8 @@ export async function meanTimeToReranging(width: number): Promise<string> {
 
     if (rowsCount == 0) return 'No re-ranges'
 
-    console.log(`Mean taken from ${rowsCount} values`)
-
     const m = mean(timesToRerangingMillis)
+    const d = moment.duration(m, 'milliseconds')
 
-    return moment.duration(m, 'milliseconds').humanize()
+    return `${d.humanize()} (${d.minutes().toFixed(2)} minutes, from ${rowsCount} values)`
 }
