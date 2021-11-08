@@ -11,11 +11,9 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
-// (P1) Get the 'add liquidity' tx working, including capturing the Token ID
 // (P1) Get the 'remove liquidity' tx working
 // (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
 // (P1) Get the swap tx working, when re-ranging up (in: USDC, out: WETH)
-// (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P2) Know the current price of gas
 // (P2) Don't re-range when the current price of gas is over a constant threshold
@@ -24,6 +22,7 @@ import yargs from 'yargs/yargs'
 
 // Done
 // ----
+// (P1) Get the 'add liquidity' tx working, including capturing the Token ID
 // (P1) Swap some WETH to USDC so the DRO account has some on Kovan.
 // (P1) Get hold of some WETH for the DRO account
 // (P1) Know what our current balance of ETH, WETH and USDC is, right after removing liquidity
@@ -32,6 +31,7 @@ import yargs from 'yargs/yargs'
 // (P1) Get the current price in the pool synchronously and in terms of the quote currency
 // (P1) Know when we're out of range, indirectly, based on the current price in the pool and the current min/max, which we'll store for now
 // (P1) Timestamps in logging
+// (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Execute everything on every new block by subscribing to "block""
 // (P2) Mint a new liquidity position (but fail because no balances in account) centred on the current price, providing half ETH and half USDC
 // (P2) Execute a swap for a known amount of WETH (half our account balance, less some savings for execution)
@@ -69,8 +69,8 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 //    7.2%           720   ?
 //    8.4%           840   ?
 //    9.6%           960   ?
-const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960]
-// const rangeWidths: number[] = [120]
+// const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960]
+const rangeWidths: number[] = [120]
 
 // Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []
@@ -181,7 +181,7 @@ async function main() {
 
   // `--wrap-eth` means wrap some ETH to WETH.
   if (argv.wrapEth) {
-    await wallet.wrapEth('1.0')
+    await wallet.wrapEth('0.5')
 
     return
   }

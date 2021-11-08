@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 import { BigNumber } from '@ethersproject/bignumber'
-import { CollectOptions, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SwapOptions, SwapRouter, tickToPrice, Trade } from "@uniswap/v3-sdk"
+import { CollectOptions, FeeAmount, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SwapOptions, SwapRouter, Tick, tickToPrice, Trade } from "@uniswap/v3-sdk"
 import { CurrencyAmount, Percent, BigintIsh, TradeType } from "@uniswap/sdk-core"
 import { TickMath } from '@uniswap/v3-sdk/'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
@@ -8,7 +8,8 @@ import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet } from './wallet'
 import { insertRerangeEvent } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, extractTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import invariant from 'tiny-invariant'
 
 // Read our .env file
 config()
@@ -27,6 +28,7 @@ export class DRO {
     unclaimedFeesUsdc?: BigintIsh
     unclaimedFeesWeth?: BigintIsh
     lastRerangeTimestamp?: string
+    locked: boolean = false
   
     constructor(
         _rangeWidthTicks: number,
@@ -167,7 +169,7 @@ export class DRO {
       const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position, removeLiquidityOptions)
   
       const nonce = await wallet.getTransactionCount("latest")
-      console.log("nonce: ", nonce)
+      // console.log("nonce: ", nonce)
   
       const tx = {
         from: wallet.address,
@@ -360,28 +362,65 @@ export class DRO {
       if (this.position || this.tokenId)
         throw "Can't add liquidity. Already in a position. Remove liquidity and swap first."
   
-      // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
+      // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is
+      // easier.
       const availableUsdc = (await wallet.usdc()).toString()
       const availableWeth = (await wallet.weth()).toString()
-
-      // TODO: On testnet, when we need to create the pool with our own USDC contract, using the
-      // rangeOrderPoolContract won't work since that's pointing at an existing pool. The Uniswap
-      // SDK docs do not cover creating a pool from scratch.
 
       const slot = await rangeOrderPoolContract.slot0()
       const liquidity = await rangeOrderPoolContract.liquidity()
 
       // A position instance requires a Pool instance.
-      const rangeOrderPool = new Pool(
-        usdcToken,
-        wethToken,
-        slot[5], // Fee: 0.30%
-        slot[0].toString(), // SqrtRatioX96
-        liquidity.toString(), // Liquidity
-        slot[1] // Tick
-      )
+      let rangeOrderPool: Pool
+
+      // It's difficult to keep a range order pool liquid on testnet, even one we've created
+      // ourselves.
+      if (CHAIN_CONFIG.isTestnet) {
+        // If we don't pass some ticks to the Pool constructor, the pool's tick spacing is
+        // undefined and creating the position instance fails.
+        // const ticks: Tick[] = [
+        //   {
+        //     index: nearestUsableTick(TickMath.MIN_TICK, rangeOrderPoolTickSpacing),
+        //     liquidityNet: liquidity,
+        //     liquidityGross: liquidity
+        //   },
+        //   {
+        //     index: nearestUsableTick(TickMath.MAX_TICK, rangeOrderPoolTickSpacing),
+        //     liquidityNet: BigNumber.from(liquidity).mul(-1).toString(),
+        //     liquidityGross: liquidity
+        //   }
+        // ]
+        // TODO: Actually it's probably just passing FeeAmount.MEDIUM below that fixed this. Remove
+        // the above if so.
+
+        rangeOrderPool = new Pool(
+          usdcToken,
+          wethToken,
+          FeeAmount.MEDIUM, // Fee: 0.30%
+          slot[0].toString(), // SqrtRatioX96
+          liquidity.toString(), // Liquidity
+          slot[1], // Tick
+          // ticks
+        )
+
+        // Rather than require minTick and maxTick to be valid, replace them with valid values on
+        // testnets. These were observed on a manually created position, therefore valid.
+        this.minTick = 191580
+        this.maxTick = 195840
+      }
+      else {
+        rangeOrderPool = new Pool(
+          usdcToken,
+          wethToken,
+          slot[5], // Fee: 0.30%
+          slot[0].toString(), // SqrtRatioX96
+          liquidity.toString(), // Liquidity
+          slot[1] // Tick
+        )
+      }
   
-      // We don't know L, the liquidity, but we do know how much WETH and how much USDC we'd like to add.
+      // We don't know L, the liquidity, but we do know how much WETH and how much USDC we'd like
+      // to add, which is all of it.
       const position = Position.fromAmounts({
         pool: rangeOrderPool,
         tickLower: this.minTick,
@@ -391,8 +430,8 @@ export class DRO {
         useFullPrecision: true
       })
   
-      console.log(`addLiquidity() Amounts desired: ${position.mintAmounts.amount0.toString()} USDC \
-${position.mintAmounts.amount1.toString()} WETH`)
+      // console.log(`addLiquidity() Amounts desired: ${position.mintAmounts.amount0.toString()} USDC \
+      // ${position.mintAmounts.amount1.toString()} WETH`)
   
       const mintOptions: MintOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
@@ -405,7 +444,7 @@ ${position.mintAmounts.amount1.toString()} WETH`)
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
       const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
   
-      console.log(`addLiquidity() calldata: ${calldata}`)
+      // console.log(`addLiquidity() calldata: ${calldata}`)
   
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -424,28 +463,20 @@ ${position.mintAmounts.amount1.toString()} WETH`)
       const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
 
       console.log(`addLiquidity() TX response: ${txResponse}`)
-      console.log(`addLiquidity() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
-      console.log(`addLiquidity() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
+      console.dir(txResponse)
+      // console.log(`addLiquidity() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
+      // console.log(`addLiquidity() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
 
       const txReceipt: TransactionReceipt = await txResponse.wait()
 
       console.log(`addLiquidity() TX receipt:`)
       console.dir(txReceipt)
-      console.log(`addLiquidity(): Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
+      // console.log(`addLiquidity(): Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
 
-      // Log index 5 has some topics. Topic index 3 on it is the Token ID for the position.
-      try {
-        const logs = txReceipt.logs
-        const log = logs[5]
-        const topics = log.topics
-        const topic = topics[3]
-        this.tokenId = topic
+      this.tokenId = extractTokenId(txReceipt)
+      this.position = position
 
-        console.log(`Token ID: ${this.tokenId}`)
-      }
-      catch (error) {
-        console.log(error)
-      }
+      console.log(`TokenID: ${this.tokenId}`)
 
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the
       // token ID. Or get it from the logs. See this tx from createPoolOnTestnet() on Kovan:
@@ -468,8 +499,15 @@ ${position.mintAmounts.amount1.toString()} WETH`)
 
       // Are we now out of range?
       if (this.outOfRange()) {
+        if (this.locked) {
+          console.log(`[${this.rangeWidthTicks}] Skipping block. Already busy re-ranging.`)
+          return
+        }
+
+        this.locked = true
+
         // Remove all of our liquidity now and burn the NFT for our position.
-        // await this.removeLiquidity()
+        await this.removeLiquidity()
 
         // Take note of what assets we now hold
         await wallet.logBalances()
@@ -484,7 +522,9 @@ ${position.mintAmounts.amount1.toString()} WETH`)
         await wallet.logBalances()
 
         // Add all our WETH and USDC to a new liquidity position.
-        // await this.addLiquidity()
+        await this.addLiquidity()
+
+        this.locked = false
       }
     }
   }

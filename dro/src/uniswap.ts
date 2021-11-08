@@ -74,6 +74,24 @@ export async function updateTick() {
     }
 }
 
+const TOPIC_0_INCREASE_LIQUIDITY = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f'
+
+export function extractTokenId(txReceipt: TransactionReceipt): number | undefined {
+    if (!Array.isArray(txReceipt.logs)) throw `Expected a logs array`
+
+    for (const log of txReceipt.logs) {
+        if (log.topics[0] === TOPIC_0_INCREASE_LIQUIDITY && log.topics[1]) {
+            const tokenIdHexString = log.topics[1]
+            const tokenId = ethers.BigNumber.from(tokenIdHexString)
+
+            // This will throw an error if Uniswap ever has more LP positions than Number.MAX_SAFE_INTEGER.
+            return tokenId.toNumber()
+        }
+    }
+
+    return undefined
+}
+
 export async function createPoolOnTestnet() {
     if (!CHAIN_CONFIG.isTestnet) {
         throw 'Not on a testnet'
