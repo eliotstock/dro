@@ -85,5 +85,6 @@ export async function meanTimeToReranging(width: number): Promise<string> {
     const m = mean(timesToRerangingMillis)
     const d = moment.duration(m, 'milliseconds')
 
-    return `${d.humanize()} (${d.minutes()} minutes, from ${rowsCount} values)`
+    // return `${d.humanize()} (${d.minutes()} minutes, from ${rowsCount} values)`
+    return `${m / 1_000 / 60} minutes`
 }
