@@ -92,6 +92,18 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
     return undefined
 }
 
+export async function firstTokenId(): Promise<number | undefined> {
+    const tokenId = await positionManagerContract.tokenOfOwnerByIndex(wallet.address, 0)
+
+    return tokenId
+}
+
+export async function positionByTokenId(tokenId: number): Promise<Position> {
+    const position: Position = await positionManagerContract.positions(tokenId)
+
+    return position
+}
+
 export async function createPoolOnTestnet() {
     if (!CHAIN_CONFIG.isTestnet) {
         throw 'Not on a testnet'

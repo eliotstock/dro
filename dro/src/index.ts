@@ -181,7 +181,9 @@ async function main() {
 
   // `--wrap-eth` means wrap some ETH to WETH.
   if (argv.wrapEth) {
-    await wallet.wrapEth('0.5')
+    // Required 1_250_000_000_000_000_000
+    // Got      1_186_361_607_590_516_298
+    await wallet.wrapEth('0.25')
 
     return
   }
@@ -213,6 +215,7 @@ async function main() {
   try {
     for (const width of rangeWidths) {
       const dro: DRO = new DRO(width, noops)
+      await dro.init()
       dros.push(dro)
     }
   }

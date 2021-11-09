@@ -128,12 +128,11 @@ class EthUsdcWallet extends ethers.Wallet {
         }
 
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-
-        console.log("swap() TX response: ", txResponse)
+        console.log(`TX response`)
+        console.dir(txResponse)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
-
-        console.log("swap() TX receipt:")
+        console.log(`TX receipt`)
         console.dir(txReceipt)
     }
 }

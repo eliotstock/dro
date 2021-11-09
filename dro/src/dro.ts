@@ -8,8 +8,11 @@ import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet } from './wallet'
 import { insertRerangeEvent } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, extractTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, extractTokenId, firstTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import invariant from 'tiny-invariant'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+
+const OUT_DIR = './out'
 
 // Read our .env file
 config()
@@ -29,6 +32,8 @@ export class DRO {
     unclaimedFeesWeth?: BigintIsh
     lastRerangeTimestamp?: string
     locked: boolean = false
+    // positionFilename: string
+    // tokenIdFilename: string
   
     constructor(
         _rangeWidthTicks: number,
@@ -36,7 +41,41 @@ export class DRO {
         this.rangeWidthTicks = _rangeWidthTicks
         this.noops = _noops
 
-        console.log(`[${this.rangeWidthTicks}] init`)
+        /*
+        if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR)
+        this.positionFilename = `${OUT_DIR}/${this.rangeWidthTicks}-position.json`
+        this.tokenIdFilename = `${OUT_DIR}/${this.rangeWidthTicks}-token-id.txt`
+
+        try {
+          const positionJson = readFileSync(this.positionFilename, 'utf8')
+
+          if (positionJson) this.position = JSON.parse(positionJson)
+        }
+        catch (error) {
+          console.error(error)
+        }
+
+        const tokenIdString = readFileSync(this.tokenIdFilename, 'utf8')
+
+        if (tokenIdString) {
+          this.tokenId = tokenIdString
+
+          console.log(`[${this.rangeWidthTicks}] init with existing token ID ${this.tokenId}`)
+        }
+        else {
+          console.log(`[${this.rangeWidthTicks}] init`)
+        }
+        */
+    }
+
+    async init() {
+      const t = await firstTokenId()
+      console.log(`Token ID from position manager contract: ${t}`)
+
+      if (t) {
+        console.log(`Position from position manager contract:`)
+        const p = await positionByTokenId(t)
+      }
     }
   
     outOfRange() {
@@ -169,9 +208,8 @@ export class DRO {
       const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position, removeLiquidityOptions)
   
       const nonce = await wallet.getTransactionCount("latest")
-      // console.log("nonce: ", nonce)
   
-      const tx = {
+      const txRequest = {
         from: wallet.address,
         to: CHAIN_CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
@@ -181,11 +219,13 @@ export class DRO {
         data: calldata
       }
   
-      // TODO: Switch to Kovan, fund the account with USDC and WETH and test.
-      // w.sendTransaction(tx).then((transaction) => {
-      //   console.dir(transaction)
-      //   console.log("Send finished!")
-      // }).catch(console.error)
+      const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+      console.log(`removeLiquidity() TX response:`)
+      console.dir(txResponse)
+
+      const txReceipt: TransactionReceipt = await txResponse.wait()
+      console.log(`removeLiquidity() TX receipt:`)
+      console.dir(txReceipt)
     }
   
     async swap() {
@@ -461,22 +501,24 @@ export class DRO {
   
       // Send the transaction to the provider.
       const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-
-      console.log(`addLiquidity() TX response: ${txResponse}`)
+      console.log(`addLiquidity() TX response:`)
       console.dir(txResponse)
-      // console.log(`addLiquidity() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
-      // console.log(`addLiquidity() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
 
       const txReceipt: TransactionReceipt = await txResponse.wait()
-
       console.log(`addLiquidity() TX receipt:`)
       console.dir(txReceipt)
-      // console.log(`addLiquidity(): Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
 
       this.tokenId = extractTokenId(txReceipt)
       this.position = position
 
-      console.log(`TokenID: ${this.tokenId}`)
+      console.log(`TokenID from logs: ${this.tokenId}`)
+
+      // writeFileSync(this.positionFilename, JSON.stringify(this.position), 'utf8')
+      // writeFileSync(this.positionFilename, `${this.tokenId}`, 'utf8')
+
+      const tokenIdFromPositionManagerContract = firstTokenId()
+
+      console.log(`TokenId from position manager contract: ${tokenIdFromPositionManagerContract}`)
 
       // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the
       // token ID. Or get it from the logs. See this tx from createPoolOnTestnet() on Kovan:
