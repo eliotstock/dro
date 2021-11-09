@@ -10,7 +10,6 @@ import { wallet } from './wallet'
 import { insertRerangeEvent } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, extractTokenId, firstTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import invariant from 'tiny-invariant'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 
 const OUT_DIR = './out'
 
@@ -32,49 +31,38 @@ export class DRO {
     unclaimedFeesWeth?: BigintIsh
     lastRerangeTimestamp?: string
     locked: boolean = false
-    // positionFilename: string
-    // tokenIdFilename: string
   
     constructor(
-        _rangeWidthTicks: number,
-        _noops: boolean) {
-        this.rangeWidthTicks = _rangeWidthTicks
-        this.noops = _noops
-
-        /*
-        if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR)
-        this.positionFilename = `${OUT_DIR}/${this.rangeWidthTicks}-position.json`
-        this.tokenIdFilename = `${OUT_DIR}/${this.rangeWidthTicks}-token-id.txt`
-
-        try {
-          const positionJson = readFileSync(this.positionFilename, 'utf8')
-
-          if (positionJson) this.position = JSON.parse(positionJson)
-        }
-        catch (error) {
-          console.error(error)
-        }
-
-        const tokenIdString = readFileSync(this.tokenIdFilename, 'utf8')
-
-        if (tokenIdString) {
-          this.tokenId = tokenIdString
-
-          console.log(`[${this.rangeWidthTicks}] init with existing token ID ${this.tokenId}`)
-        }
-        else {
-          console.log(`[${this.rangeWidthTicks}] init`)
-        }
-        */
+      _rangeWidthTicks: number,
+      _noops: boolean) {
+      this.rangeWidthTicks = _rangeWidthTicks
+      this.noops = _noops
     }
 
+    // Get the token ID and position instance from the Uniswap v3 position manager contract. We
+    // assume we're only ever in one position concurrently for now.
     async init() {
-      const t = await firstTokenId()
-      console.log(`Token ID from position manager contract: ${t}`)
+      const tokenId = await firstTokenId()
 
-      if (t) {
-        console.log(`Position from position manager contract:`)
-        const p = await positionByTokenId(t)
+      if (tokenId) {
+        this.tokenId = tokenId
+
+        const position: Position = await positionByTokenId(tokenId)
+
+        if (position) {
+          if (position.tickLower != this.minTick || position.tickUpper != this.maxTick) {
+            console.log(`Expected min and max ticks: ${this.minTick}, ${this.maxTick}. \
+Got: ${position.tickLower}, ${position.tickUpper}`)
+            // TODO: Make that a console.error() and return here.
+          }
+
+          this.position = position
+        }
+
+        console.log(`[${this.rangeWidthTicks}] Token ID: ${this.tokenId}`)
+      }
+      else {
+        console.log(`[${this.rangeWidthTicks}] No existing position NFT`)
       }
     }
   
@@ -199,7 +187,7 @@ export class DRO {
   
       const removeLiquidityOptions: RemoveLiquidityOptions = {
         tokenId: this.tokenId,
-        liquidityPercentage: new Percent(1), // 100%
+        liquidityPercentage: new Percent(1),
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
         deadline: moment().unix() + DEADLINE_SECONDS,
         collectOptions: collectOptions
@@ -548,12 +536,20 @@ export class DRO {
 
         this.locked = true
 
+        // Check fees before removing liquidity. Not strictly required if we're never claiming fees
+        // in ETH.
+        // await this.checkUnclaimedFees()
+
+        // Take note of what assets we now hold
+        await wallet.logBalances()
+
         // Remove all of our liquidity now and burn the NFT for our position.
         await this.removeLiquidity()
 
         // Take note of what assets we now hold
         await wallet.logBalances()
 
+        /*
         // Find our new range around the current price.
         this.updateRange()
 
@@ -565,6 +561,7 @@ export class DRO {
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()
+        */
 
         this.locked = false
       }

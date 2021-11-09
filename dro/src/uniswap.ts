@@ -1,9 +1,10 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
+import JSBI from 'jsbi'
 import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
 import { abi as QuoterABI } from '@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'
 import { abi as NonfungiblePositionManagerABI } from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
-import { tickToPrice, Pool, Position, MintOptions, NonfungiblePositionManager } from '@uniswap/v3-sdk'
+import { tickToPrice, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
 import { Token } from '@uniswap/sdk-core'
@@ -101,7 +102,37 @@ export async function firstTokenId(): Promise<number | undefined> {
 export async function positionByTokenId(tokenId: number): Promise<Position> {
     const position: Position = await positionManagerContract.positions(tokenId)
 
-    return position
+    console.log(`Type of position.liquidity: ${typeof(position.liquidity)}`)
+    console.dir(position.liquidity)
+
+    const liquidityJsbi = JSBI.BigInt(position.liquidity)
+
+    console.log(`Type of liquidityJsbi: ${typeof(liquidityJsbi)}`)
+    console.dir(liquidityJsbi)
+
+    // The Pool instance on the position at this point is sorely lacking. Replace it.
+    const slot = await rangeOrderPoolContract.slot0()
+    const liquidity = await rangeOrderPoolContract.liquidity()
+
+    const usablePool = new Pool(
+        usdcToken,
+        wethToken,
+        FeeAmount.MEDIUM, // Fee: 0.30%, TODO: Only force this on testnets.
+        slot[0].toString(), // SqrtRatioX96
+        liquidity.toString(), // Liquidity
+        slot[1] // Tick
+    )
+
+    console.log(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
+
+    const usablePosition = new Position({
+        pool: usablePool,
+        liquidity: liquidityJsbi,
+        tickLower: position.tickLower,
+        tickUpper: position.tickUpper
+    })
+
+    return usablePosition
 }
 
 export async function createPoolOnTestnet() {
