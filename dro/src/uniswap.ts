@@ -94,9 +94,17 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
 }
 
 export async function firstTokenId(): Promise<number | undefined> {
-    const tokenId = await positionManagerContract.tokenOfOwnerByIndex(wallet.address, 0)
+    try {
+        const tokenId = await positionManagerContract.tokenOfOwnerByIndex(wallet.address, 0)
 
-    return tokenId
+        return tokenId
+    }
+    catch (error) {
+        // This will be:
+        //   reason: 'EnumerableSet: index out of bounds',
+        //   code: 'CALL_EXCEPTION'
+        return undefined
+    }
 }
 
 export async function positionByTokenId(tokenId: number): Promise<Position> {
