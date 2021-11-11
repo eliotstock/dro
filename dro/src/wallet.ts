@@ -89,10 +89,10 @@ class EthUsdcWallet extends ethers.Wallet {
 
         // USDC has 6 decimals. We should really get this from the contract but it's another call and
         // our ABI is incomplete.
-        console.log("  USDC ", usdcBalance.div(BigNumber.from(10).pow(6)).toString())
+        console.log("  USDC ", ethers.utils.formatUnits(usdcBalance, 6))
 
         // WETH has 18 decimals.
-        console.log("  WETH ", wethBalance.div(BigNumber.from(10).pow(18)).toString())
+        console.log("  WETH ", ethers.utils.formatEther(wethBalance))
 
         console.log("  ETH ", ethers.utils.formatEther(ethBalance))
     }
