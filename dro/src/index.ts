@@ -11,7 +11,6 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
-// (P1) Get the 'remove liquidity' tx working
 // (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
 // (P1) Get the swap tx working, when re-ranging up (in: USDC, out: WETH)
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
@@ -23,6 +22,7 @@ import yargs from 'yargs/yargs'
 
 // Done
 // ----
+// (P1) Get the 'remove liquidity' tx working
 // (P1) Get the 'add liquidity' tx working, including capturing the Token ID
 // (P1) Swap some WETH to USDC so the DRO account has some on Kovan.
 // (P1) Get hold of some WETH for the DRO account

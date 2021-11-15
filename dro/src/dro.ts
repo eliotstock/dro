@@ -1,14 +1,14 @@
 import { config } from 'dotenv'
 import { BigNumber } from '@ethersproject/bignumber'
 import { CollectOptions, FeeAmount, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SwapOptions, SwapRouter, Tick, tickToPrice, Trade } from "@uniswap/v3-sdk"
-import { CurrencyAmount, Percent, BigintIsh, TradeType } from "@uniswap/sdk-core"
+import { CurrencyAmount, Percent, BigintIsh, TradeType, Currency } from "@uniswap/sdk-core"
 import { TickMath } from '@uniswap/v3-sdk/'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import invariant from 'tiny-invariant'
 
 const OUT_DIR = './out'
@@ -224,37 +224,13 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
     }
   
     async swap() {
-      if (this.position || this.tokenId) {
-        console.error("Refusing to swap. Still in a position. Remove liquidity first.")
-        return
-      }
+      if (this.position || this.tokenId)
+         throw "Refusing to swap. Still in a position. Remove liquidity first."
 
       const swapPoolFee = await swapPoolContract.fee()
-      // console.log("swapPoolFee: ", swapPoolFee)
 
-      // Assume we're swapping half our WETH balance for USDC for now.
-      let weth = await wallet.weth()
-      weth = weth.div(2)
-
-      // console.log(`[${this.rangeWidthTicks}] WETH address: ${CHAIN_CONFIG.addrTokenWeth}`)
-      // console.log(`[${this.rangeWidthTicks}] USDC address: ${CHAIN_CONFIG.addrTokenUsdc}`)
-
-      console.log(`[${this.rangeWidthTicks}] Swapping ${weth.toString()} WETH will get us...`)
-  
-      // This will revert with code -32015 on testnets if there is no pool for the token addresses
-      // passed in. Create a pool first.
-      const quotedUsdcOut = await quoterContract.callStatic.quoteExactInputSingle(
-        CHAIN_CONFIG.addrTokenWeth, // Token in
-        CHAIN_CONFIG.addrTokenUsdc, // Token out
-        swapPoolFee, // 0.05%
-        weth, // Amount in, WETH (18 decimals), BigNumber
-        0 // sqrtPriceLimitX96
-      )
-  
-      // Swapping 1_000_000_000_000_000_000 WETH (18 zeroes) will get us 19_642_577_913_338_823 USDC (19B USDC)
-      console.log(`[${this.rangeWidthTicks}] ...${quotedUsdcOut.toString()} USDC`)
-  
-      // The pool depends on the pool liquidity and slot 0 so we need to reconstruct it every time.
+      // The Pool instance depends on the pool liquidity and slot 0 so we need to reconstruct it
+      // every time.
       const liquidity = await swapPoolContract.liquidity()
       const slot = await swapPoolContract.slot0()
 
@@ -262,21 +238,84 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         usdcToken,
         wethToken,
         swapPoolFee, // 0.05%
-        slot[0].toString(),
+        slot[0].toString(), // sqrtRatioX96
         liquidity.toString(),
-        slot[1]
+        slot[1] // tickCurrent
       )
-  
-      // The order of the tokens here is significant. Input first.
-      const swapRoute = new Route([poolEthUsdcForSwaps], wethToken, usdcToken)
 
-      const trade = await Trade.createUncheckedTrade({
-        route: swapRoute,
-        inputAmount: CurrencyAmount.fromRawAmount(wethToken, weth.toString()),
-        outputAmount: CurrencyAmount.fromRawAmount(usdcToken, quotedUsdcOut.toString()),
-        tradeType: TradeType.EXACT_INPUT,
-      });
-      console.log("Trade:")
+      const usdc = await wallet.usdc()
+      const weth = await wallet.weth()
+
+      const usdcValueOfWethBalance: BigNumber = BigNumber.from(rangeOrderPoolPriceUsdc).mul(weth)
+
+      console.log(`[${this.rangeWidthTicks}] We have ${usdc.toString()} USDC and \
+${usdcValueOfWethBalance.toString()} USDC worth of WETH.`)
+
+      // What is the ratio of the value of our USDC balance to our WETH balance?
+      const ratioUsdcToWeth = usdc.div(usdcValueOfWethBalance)
+
+      let tokenIn
+      let tokenOut
+      let amountIn
+      let swapRoute
+
+      // We should be almost entirely in one asset or the other, because we only removed liquidity
+      // once we were at the edge of our range. we do have some fees just claimed in the other
+      // asset, however.
+      if (ratioUsdcToWeth.gt(1.0)) {
+        console.log(`[${this.rangeWidthTicks}] We're mostly in USDC now. Swapping USDC to WETH.`)
+
+        tokenIn = CHAIN_CONFIG.addrTokenUsdc
+        tokenOut = CHAIN_CONFIG.addrTokenWeth
+        amountIn = usdc
+
+        // The order of the tokens here is significant. Input first.
+        swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
+
+        
+      }
+      else {
+        console.log(`[${this.rangeWidthTicks}] We're mostly in WETH now. Swapping WETH to USDC.`)
+
+        tokenIn = CHAIN_CONFIG.addrTokenWeth
+        tokenOut = CHAIN_CONFIG.addrTokenUsdc
+        amountIn = weth
+
+        swapRoute = new Route([poolEthUsdcForSwaps], wethToken, usdcToken)
+      }
+  
+      // This will revert with code -32015 on testnets if there is no pool for the token addresses
+      // passed in. Create a pool first.
+      const quotedAmountOut = await quoterContract.callStatic.quoteExactInputSingle(
+        tokenIn,
+        tokenOut,
+        swapPoolFee, // 0.05%
+        amountIn,
+        0 // sqrtPriceLimitX96
+      )
+
+      let trade: Trade<Currency, Currency, TradeType>
+
+      if (ratioUsdcToWeth.gt(1.0)) {
+        // Swapping USDC to WETH
+        trade = await Trade.createUncheckedTrade({
+          route: swapRoute,
+          inputAmount: CurrencyAmount.fromRawAmount(wethToken, weth.toString()),
+          outputAmount: CurrencyAmount.fromRawAmount(usdcToken, quotedAmountOut.toString()),
+          tradeType: TradeType.EXACT_INPUT,
+        })
+      }
+      else {
+        // Swapping WETH to USDC
+        trade = await Trade.createUncheckedTrade({
+          route: swapRoute,
+          inputAmount: CurrencyAmount.fromRawAmount(usdcToken, usdc.toString()),
+          outputAmount: CurrencyAmount.fromRawAmount(wethToken, quotedAmountOut.toString()),
+          tradeType: TradeType.EXACT_INPUT,
+        })
+      }
+
+      console.log(`[${this.rangeWidthTicks}] Trade:`)
       console.dir(trade)
 
       const options: SwapOptions = {
@@ -286,7 +325,7 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       }
 
       const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-      console.log("calldata: ", calldata)
+      // console.log("calldata: ", calldata)
 
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -309,88 +348,12 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       //   if it's your pool fix the balance in the pool
       //   right now there is a lot of the USDC and very little weth
       const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-
       console.log(`swap() TX response:`)
       console.dir(txResponse)
-      // console.log("swap() Max fee per gas: ", txResponse.maxFeePerGas?.toString())
-      // console.log("swap() Gas limit: ", txResponse.gasLimit?.toString())
 
       const txReceipt: TransactionReceipt = await txResponse.wait()
-
       console.log(`swap() TX receipt:`)
       console.dir(txReceipt)
-      console.log(`swap() Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
-
-      /*
-      // The other approach here is to execute the swap directly on the pool contract, skipping the
-      // router.
-      // See: https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol#L596
-      // We may need to calculate the sqrtPriceLimitX96 based on the unchecked trade object.
-      this.swapPoolContract = this.swapPoolContract.connect(wallet)
-
-      const recipient = wallet.address
-
-      // The direction of the swap, true for token0 to token1, false for token1 to token0
-      const zeroForOne = true
-
-      // The amount of the swap, which implicitly configures the swap as exact input (positive), or exact output (negative)
-      const amountSpecified = 1
-
-      // The Q64.96 sqrt price limit. If zero for one, the price cannot be less than this value after the swap. If one for zero, the price cannot be greater than this value after the swap
-      const sqrtPriceLimitX96 = 1
-
-      // Any data to be passed through to the callback
-      const data = 0x0
-
-      const calldata: string = this.swapPoolContract.interface.encodeFunctionData('swap', [
-          recipient,
-          zeroForOne,
-          amountSpecified,
-          sqrtPriceLimitX96,
-          data
-      ])
-
-      console.log("calldata: ", calldata)
-  
-      const nonce = await wallet.getTransactionCount("latest")
-  
-      // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
-      const txRequest = {
-        from: wallet.address,
-        to: this.chainConfig.addrPoolSwaps,
-        value: VALUE_ZERO_ETHER,
-        nonce: nonce,
-        gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: this.chainConfig.gasPrice,
-        data: calldata
-      }
-
-      // Send the transaction to the provider.
-      // TODO: Fix:
-      //   reason: 'transaction failed',
-      //   code: 'CALL_EXCEPTION',
-      const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-
-      console.log("swap() TX response: ", txResponse)
-      console.log("swap() Max fee per gas: ", txResponse.maxFeePerGas?.toString())
-      console.log("swap() Gas limit: ", txResponse.gasLimit?.toString())
-
-      const txReceipt: TransactionReceipt = await txResponse.wait()
-
-      console.log("swap() TX receipt:")
-      console.dir(txReceipt)
-      console.log("swap(): Effective gas price: ", txReceipt.effectiveGasPrice.toString())
-
-      // TODO: Fails with UNPREDICTABLE_GAS_LIMIT. Execute this using the same approach as the other methods, ie:
-      //   await wallet.sendTransaction(txRequest)
-      // Construct the calldata from these parameters.
-      // await this.swapPoolContract.swap(recipient,
-      //   zeroForOne,
-      //   amountSpecified,
-      //   sqrtPriceLimitX96,
-      //   data
-      // )
-      */
     }
   
     async addLiquidity() {
