@@ -7,8 +7,8 @@ import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract
 import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet } from './wallet'
-import { insertRerangeEvent } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, extractTokenId, firstTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import invariant from 'tiny-invariant'
 
 const OUT_DIR = './out'
@@ -39,14 +39,16 @@ export class DRO {
       this.noops = _noops
     }
 
-    // Get the token ID and position instance from the Uniswap v3 position manager contract. We
-    // assume we're only ever in one position concurrently for now.
-    async init() {
-      const tokenId = await firstTokenId()
+    async init() {      
+      // const tokenId = await firstTokenId()
+
+      // Get the token ID for out position from the database.
+      const tokenId = await getTokenIdForPosition(this.rangeWidthTicks)
 
       if (tokenId) {
         this.tokenId = tokenId
 
+        // Now get the position from Uniswap for the given token ID.
         const position: Position = await positionByTokenId(tokenId)
 
         if (position) {
@@ -193,7 +195,8 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         collectOptions: collectOptions
       }
   
-      const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position, removeLiquidityOptions)
+      const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position,
+        removeLiquidityOptions)
   
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -214,6 +217,10 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       const txReceipt: TransactionReceipt = await txResponse.wait()
       console.log(`removeLiquidity() TX receipt:`)
       console.dir(txReceipt)
+
+      // Forget our old token ID and position details so that we can move on.
+      this.tokenId = undefined
+      this.position = undefined
     }
   
     async swap() {
@@ -432,7 +439,7 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         )
 
         // Rather than require minTick and maxTick to be valid, replace them with valid values on
-        // testnets. These were observed on a manually created position, therefore valid.
+        // testnets. These were observed on a manually created position, therefore they're valid.
         this.minTick = 191580
         this.maxTick = 195840
       }
@@ -499,22 +506,28 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       this.tokenId = extractTokenId(txReceipt)
       this.position = position
 
-      console.log(`TokenID from logs: ${this.tokenId}`)
+      if (this.tokenId) {
+        console.log(`Token ID from logs: ${this.tokenId}`)
+
+        insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
+      }
+      else {
+        console.error(`No token ID from logs. We won't be able to remove this liquidity.`)
+      }
 
       // writeFileSync(this.positionFilename, JSON.stringify(this.position), 'utf8')
       // writeFileSync(this.positionFilename, `${this.tokenId}`, 'utf8')
 
-      const tokenIdFromPositionManagerContract = firstTokenId()
+      // const tokenIdFromPositionManagerContract = await firstTokenId()
 
-      console.log(`TokenId from position manager contract: ${tokenIdFromPositionManagerContract}`)
+      // if (tokenIdFromPositionManagerContract) {
+      //   console.log(`TokenId from position manager contract: ${tokenIdFromPositionManagerContract}`)
 
-      // TODO: Call tokenOfOwnerByIndex() on an ERC-721 ABI and pass in our own address to get the
-      // token ID. Or get it from the logs. See this tx from createPoolOnTestnet() on Kovan:
-      //   https://kovan.etherscan.io/tx/0xfdf5704a01bcd90bec183ed091856c4845fe2bb12129c6bb474942ec75fbc4a7#eventlog
-      // Which created this pool:
-      //   https://kovan.etherscan.io/address/0x36f114d17fdcf3df2a96b4ad317345ac62a6a6f7
-      // And minted us this NFT with TokenID 8187:
-      //   https://kovan.etherscan.io/token/0xc36442b4a4522e871399cd717abdd847ab11fe88?a=8187
+      //   insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), tokenIdFromPositionManagerContract)
+      // }
+      // else {
+      //   console.error(`No token ID from position manager contract. We won't be able to remove this liquidity.`)
+      // }
     }
 
     async onBlock() {
@@ -530,7 +543,7 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       // Are we now out of range?
       if (this.outOfRange()) {
         if (this.locked) {
-          console.log(`[${this.rangeWidthTicks}] Skipping block. Already busy re-ranging.`)
+          // console.log(`[${this.rangeWidthTicks}] Skipping block. Already busy re-ranging.`)
           return
         }
 
@@ -549,7 +562,6 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         // Take note of what assets we now hold
         await wallet.logBalances()
 
-        /*
         // Find our new range around the current price.
         this.updateRange()
 
@@ -561,7 +573,6 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()
-        */
 
         this.locked = false
       }

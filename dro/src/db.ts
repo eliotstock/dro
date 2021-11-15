@@ -27,7 +27,41 @@ export async function init() {
             width INTEGER NOT NULL, \
             datetime TEXT NOT NULL, \
             direction TEXT NOT NULL)')
+
+        // We are only ever in one position at a time for now, and certainly only ever one per
+        // range width.
+        await db.exec('CREATE TABLE IF NOT EXISTS position (\
+            width INTEGER PRIMARY KEY, \
+            datetime TEXT NOT NULL, \
+            token_id INTEGER NULL)')
     }
+}
+
+// Pass dates as ISO8601 strings ("YYYY-MM-DD HH:MM:SS.SSS"). Sqlite does not have a DATETIME
+// column type.
+export async function insertOrReplacePosition(width: number, datetimeUtc: string, tokenId: number) {
+    const db: Database = await openDb()
+
+    const result = await db.run('INSERT OR REPLACE INTO position (width, datetime, token_id) \
+VALUES (?, ?, ?)', width, datetimeUtc, tokenId)
+
+    // console.log(`Row ID: ${result}.rowID`)
+}
+
+export async function getTokenIdForPosition(width: number): Promise<number | undefined> {
+    const db: Database = await openDb()
+
+    const rowsCount = await db.each('SELECT token_id FROM position WHERE width = ?', width, (err, row) => {
+        if (err) {
+          throw err
+        }
+    
+        // console.log(`Token ID: ${row.token_id}`)
+
+        return row.token_id
+      })
+
+    return undefined
 }
 
 // Pass dates as ISO8601 strings ("YYYY-MM-DD HH:MM:SS.SSS"). Sqlite does not have a DATETIME

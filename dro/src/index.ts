@@ -19,6 +19,7 @@ import yargs from 'yargs/yargs'
 // (P2) Don't re-range when the current price of gas is over a constant threshold
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
 // (P3) Build the URL of the position, based on the serial number, and log it
+// (P3) Build out exponential backoff for 50x server errors from Infura
 
 // Done
 // ----
@@ -183,7 +184,7 @@ async function main() {
   if (argv.wrapEth) {
     // Required 1_250_000_000_000_000_000
     // Got      1_186_361_607_590_516_298
-    await wallet.wrapEth('0.25')
+    await wallet.wrapEth('0.5')
 
     return
   }

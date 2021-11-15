@@ -93,6 +93,9 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
     return undefined
 }
 
+// The index passed in here increments up from 0. Older positions have lower tokens IDs and
+// indices. Only the most recent token ID should have any liquidity.
+/*
 export async function firstTokenId(): Promise<number | undefined> {
     try {
         const tokenId = await positionManagerContract.tokenOfOwnerByIndex(wallet.address, 0)
@@ -106,19 +109,18 @@ export async function firstTokenId(): Promise<number | undefined> {
         return undefined
     }
 }
+*/
 
 export async function positionByTokenId(tokenId: number): Promise<Position> {
     const position: Position = await positionManagerContract.positions(tokenId)
 
-    console.log(`Type of position.liquidity: ${typeof(position.liquidity)}`)
-    console.dir(position.liquidity)
-
+    // The Pool instance on the position at this point is sorely lacking. Replace it.
+    // The liquidity property on the Position instance at this point is a BigNumber. We need a JSBI
+    // in order for removeCallParameters() to work.
     const liquidityJsbi = JSBI.BigInt(position.liquidity)
 
-    console.log(`Type of liquidityJsbi: ${typeof(liquidityJsbi)}`)
-    console.dir(liquidityJsbi)
+    console.log(`Position liquidity: ${liquidityJsbi.toString()}`)
 
-    // The Pool instance on the position at this point is sorely lacking. Replace it.
     const slot = await rangeOrderPoolContract.slot0()
     const liquidity = await rangeOrderPoolContract.liquidity()
 
