@@ -19,8 +19,7 @@ export interface ChainConfig {
     addrPoolSwaps: string
     slippageTolerance: Percent
     gasPrice: BigNumber
-
-    // Not chain-specific. All chains use the same value as Ethereum Mainnet.
+    gasPriceMax: number
     addrPositionManager: string
     addrQuoter: string
     addrSwapRouter: string
@@ -61,14 +60,17 @@ const ETHEREUM_MAINNET: ChainConfig = {
     // specify here. Typical range: 30 - 200 gwei.
     gasPrice: ethers.utils.parseUnits("100", "gwei"),
 
+    // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
+    gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
+
+    // Above what gas price, in gwei, are we unwilling to re-range?
+    gasPriceMax: 100, // We could be waiting a day or two for gas prices to drop at 100 here.
+
     addrPositionManager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
 
     addrQuoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
 
-    addrSwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
-
-    // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
-    gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
+    addrSwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564"
 }
 
 const ETHEREUM_KOVAN: ChainConfig = {
@@ -95,20 +97,24 @@ const ETHEREUM_KOVAN: ChainConfig = {
     // Would normally be different to the range order pool, but is the same on Kovan.
     addrPoolSwaps: "0x36f114d17fdcf3df2a96b4ad317345ac62a6a6f7",
 
-    slippageTolerance: new Percent(50, 10_000), // 0.005%
+    // Go crazy high here. We will probably be the only liquidity in the pool anyway.
+    slippageTolerance: new Percent(1000, 100), // 1000%
 
     // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
     // specify here. Typical range: 30 - 200 gwei.
     gasPrice: ethers.utils.parseUnits("100", "gwei"), // Sensible: 100
 
+    // Go crazy high on testnets, where we need to create the pool and also we don't care about cost.
+    gasLimit: ethers.utils.hexlify(10_000_000),
+
+    // Above what gas price, in gwei, are we unwilling to re-range?
+    gasPriceMax: 2, // 2 gwei is a typical gas price for Kovan.
+
     addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
 
     addrQuoter: ETHEREUM_MAINNET.addrQuoter,
 
-    addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter,
-
-    // Go crazy high on testnets, where we need to create the pool and also we don't care about cost.
-    gasLimit: ethers.utils.hexlify(10_000_000)
+    addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter
 }
 
 const CHAIN_CONFIGS = {

@@ -6,7 +6,7 @@ import { TickMath } from '@uniswap/v3-sdk/'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
-import { wallet } from './wallet'
+import { wallet, gasPriceInGwei } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import invariant from 'tiny-invariant'
@@ -527,6 +527,11 @@ ${u.toString()} USDC worth of WETH.`)
       if (this.outOfRange()) {
         if (this.locked) {
           // console.log(`[${this.rangeWidthTicks}] Skipping block. Already busy re-ranging.`)
+          return
+        }
+
+        if (gasPriceInGwei > CHAIN_CONFIG.gasPriceMax) {
+          console.log(`Gas price of ${gasPriceInGwei} over our max of ${CHAIN_CONFIG.gasPriceMax}. Not re-ranging yet.`)
           return
         }
 

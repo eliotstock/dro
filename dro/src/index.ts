@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 import { useConfig, ChainConfig } from './config'
-import { wallet } from './wallet'
+import { wallet, updateGasPrice, gasPriceInGwei } from './wallet'
 import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
@@ -8,14 +8,12 @@ import { init, dumpToCsv, meanTimeToReranging } from './db'
 import { createPoolOnTestnet } from './uniswap'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
+import { ethers } from 'ethers'
 
 // TODO
 // ----
-// (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
-// (P1) Get the swap tx working, when re-ranging up (in: USDC, out: WETH)
+// (P2) More swap testing
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
-// (P2) Know the current price of gas
-// (P2) Don't re-range when the current price of gas is over a constant threshold
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
 // (P3) Build the URL of the position, based on the serial number, and log it
 // (P3) Build out exponential backoff for 50x server errors from Infura
@@ -23,6 +21,8 @@ import yargs from 'yargs/yargs'
 // Done
 // ----
 // (P1) Get the 'remove liquidity' tx working
+// (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
+// (P1) Get the swap tx working, when re-ranging up (in: USDC, out: WETH)
 // (P1) Get the 'add liquidity' tx working, including capturing the Token ID
 // (P1) Swap some WETH to USDC so the DRO account has some on Kovan.
 // (P1) Get hold of some WETH for the DRO account
@@ -33,6 +33,8 @@ import yargs from 'yargs/yargs'
 // (P1) Know when we're out of range, indirectly, based on the current price in the pool and the current min/max, which we'll store for now
 // (P1) Timestamps in logging
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
+// (P2) Know the current price of gas
+// (P2) Don't re-range when the current price of gas is over a constant threshold
 // (P2) Execute everything on every new block by subscribing to "block""
 // (P2) Mint a new liquidity position (but fail because no balances in account) centred on the current price, providing half ETH and half USDC
 // (P2) Execute a swap for a known amount of WETH (half our account balance, less some savings for execution)
@@ -85,12 +87,15 @@ let noops: boolean = false
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
-  // This is a single Infura API call to get the price in the range order pool.
+  // This is a single API call to get the price in the range order pool.
   await updateTick()
 
-  // Log the timestamp and block number first. Only log the price when it changes.
+  await updateGasPrice()
+
+  // Log the timestamp, block number and gas price first. Only log anything when the price changes.
   if (rangeOrderPoolPriceUsdc != price) {
-    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${rangeOrderPoolPriceUsdc} USDC`)
+    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceInGwei} gwei \
+${rangeOrderPoolPriceUsdc} USDC`)
   }
 
   price = rangeOrderPoolPriceUsdc
