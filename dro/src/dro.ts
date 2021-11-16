@@ -6,9 +6,9 @@ import { TickMath } from '@uniswap/v3-sdk/'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
-import { wallet, gasPriceInGwei } from './wallet'
+import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import invariant from 'tiny-invariant'
 
 const OUT_DIR = './out'
@@ -40,8 +40,6 @@ export class DRO {
     }
 
     async init() {      
-      // const tokenId = await firstTokenId()
-
       // Get the token ID for out position from the database.
       const tokenId = await getTokenIdForPosition(this.rangeWidthTicks)
 
@@ -490,35 +488,21 @@ ${u.toString()} USDC worth of WETH.`)
       this.position = position
 
       if (this.tokenId) {
-        console.log(`Token ID from logs: ${this.tokenId}`)
+        const webUrl = positionWebUrl(this.tokenId)
+        console.log(`Position URL: ${webUrl}`)
 
         insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
       }
       else {
         console.error(`No token ID from logs. We won't be able to remove this liquidity.`)
       }
-
-      // writeFileSync(this.positionFilename, JSON.stringify(this.position), 'utf8')
-      // writeFileSync(this.positionFilename, `${this.tokenId}`, 'utf8')
-
-      // const tokenIdFromPositionManagerContract = await firstTokenId()
-
-      // if (tokenIdFromPositionManagerContract) {
-      //   console.log(`TokenId from position manager contract: ${tokenIdFromPositionManagerContract}`)
-
-      //   insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), tokenIdFromPositionManagerContract)
-      // }
-      // else {
-      //   console.error(`No token ID from position manager contract. We won't be able to remove this liquidity.`)
-      // }
     }
 
     async onBlock() {
       // When in no-op mode, don't execute any transactions but do re-range when necessary.
       if (this.noops) {
         if (this.outOfRange()) {
-          if (gasPriceInGwei > CHAIN_CONFIG.gasPriceMax) {
-            console.log(`Gas price of ${gasPriceInGwei} over our max of ${CHAIN_CONFIG.gasPriceMax}. Not re-ranging yet.`)
+          if (gasPrice?.gt(CHAIN_CONFIG.gasPriceMax)) {
             return
           }
           
@@ -535,8 +519,9 @@ ${u.toString()} USDC worth of WETH.`)
           return
         }
 
-        if (gasPriceInGwei > CHAIN_CONFIG.gasPriceMax) {
-          console.log(`Gas price of ${gasPriceInGwei} over our max of ${CHAIN_CONFIG.gasPriceMax}. Not re-ranging yet.`)
+        if (gasPrice?.gt(CHAIN_CONFIG.gasPriceMax)) {
+          console.log(`Gas price of ${gasPrice.div(1e9).toNumber()} is over our max of \
+${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
           return
         }
 

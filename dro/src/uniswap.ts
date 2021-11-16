@@ -156,6 +156,10 @@ export async function positionByTokenId(tokenId: number): Promise<Position> {
     return usablePosition
 }
 
+export function positionWebUrl(tokenId: number): string {
+    return `https://app.uniswap.org/#/pool/${tokenId}`
+}
+
 export async function createPoolOnTestnet() {
     if (!CHAIN_CONFIG.isTestnet) {
         throw 'Not on a testnet'

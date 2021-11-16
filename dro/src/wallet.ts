@@ -15,7 +15,7 @@ config()
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
 
-export let gasPriceInGwei: number
+export let gasPrice: ethers.BigNumber
 
 class EthUsdcWallet extends ethers.Wallet {
 
@@ -152,16 +152,18 @@ export const wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
 // EIP-1559 maxFeePerGas seems to come in at about twice the value.
 export async function updateGasPrice() {
     // Legacy gas price.
-    const gasPrice = (await CHAIN_CONFIG.provider().getFeeData()).gasPrice
+    const p = (await CHAIN_CONFIG.provider().getFeeData()).gasPrice
 
     // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
     // const maxFeePerGas = (await CHAIN_CONFIG.provider().getFeeData()).maxFeePerGas
 
-    if (!gasPrice) return
+    if (!p) return
 
     // console.log(`Gas prices: legacy: ${gasPrice}, EIP-1559: ${maxFeePerGas}`)
 
-    gasPriceInGwei = gasPrice.div(1e9).toNumber()
+    // gasPriceInGwei = gasPrice.div(1e9).toNumber()
 
     // console.log(`  Gas price in gwei: ${gasPriceInGwei}`)
+
+    gasPrice = p
 }

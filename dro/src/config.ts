@@ -19,7 +19,7 @@ export interface ChainConfig {
     addrPoolSwaps: string
     slippageTolerance: Percent
     gasPrice: BigNumber
-    gasPriceMax: number
+    gasPriceMax: BigNumber
     addrPositionManager: string
     addrQuoter: string
     addrSwapRouter: string
@@ -64,7 +64,9 @@ const ETHEREUM_MAINNET: ChainConfig = {
     gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
 
     // Above what gas price, in gwei, are we unwilling to re-range?
-    gasPriceMax: 100, // We could be waiting a day or two for gas prices to drop at 100 here.
+    // At 100, we could be waiting a day or two
+    // Try 110 for now.
+    gasPriceMax: ethers.utils.parseUnits("110", "gwei"),
 
     addrPositionManager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
 
@@ -108,7 +110,7 @@ const ETHEREUM_KOVAN: ChainConfig = {
     gasLimit: ethers.utils.hexlify(10_000_000),
 
     // Above what gas price, in gwei, are we unwilling to re-range?
-    gasPriceMax: 2, // 2 gwei is a typical gas price for Kovan.
+    gasPriceMax: ethers.utils.parseUnits("2", "gwei"), // 2 gwei is a typical gas price for Kovan.
 
     addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
 

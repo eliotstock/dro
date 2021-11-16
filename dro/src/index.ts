@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 import { useConfig, ChainConfig } from './config'
-import { wallet, updateGasPrice, gasPriceInGwei } from './wallet'
+import { wallet, updateGasPrice, gasPrice } from './wallet'
 import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
@@ -15,7 +15,6 @@ import { ethers } from 'ethers'
 // (P2) More swap testing
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
-// (P3) Build the URL of the position, based on the serial number, and log it
 // (P3) Build out exponential backoff for 50x server errors from Infura
 
 // Done
@@ -42,6 +41,7 @@ import { ethers } from 'ethers'
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
 // (P3) Have this script execute transactions using the local account, using an Ethers.js Signer
 // (P3) Know how to create a new account locally and secure the private key (or destroy it if the mnemonic is secure), eg. enter mnemonic on process start every time
+// (P3) Build the URL of the position, based on the serial number, and log it
 
 // Read our .env file
 config()
@@ -94,8 +94,8 @@ async function onBlock(...args: Array<any>) {
 
   // Log the timestamp, block number and gas price first. Only log anything when the price changes.
   if (rangeOrderPoolPriceUsdc != price) {
-    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceInGwei} gwei \
-${rangeOrderPoolPriceUsdc} USDC`)
+    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPrice.div(1e9).toNumber()} \
+gwei ${rangeOrderPoolPriceUsdc} USDC`)
   }
 
   price = rangeOrderPoolPriceUsdc
