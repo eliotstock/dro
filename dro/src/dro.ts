@@ -517,6 +517,11 @@ ${u.toString()} USDC worth of WETH.`)
       // When in no-op mode, don't execute any transactions but do re-range when necessary.
       if (this.noops) {
         if (this.outOfRange()) {
+          if (gasPriceInGwei > CHAIN_CONFIG.gasPriceMax) {
+            console.log(`Gas price of ${gasPriceInGwei} over our max of ${CHAIN_CONFIG.gasPriceMax}. Not re-ranging yet.`)
+            return
+          }
+          
           this.updateRange()
         }
 
