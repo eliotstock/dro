@@ -20,21 +20,19 @@ const mean = (numbers: number[]) => sum(numbers) / numbers.length
 
 // Create the database if it doesn't already exist.
 export async function init() {
-    if (!existsSync(SQLITE_DB_FILE)) {
-        const db: Database = await openDb()
+    const db: Database = await openDb()
 
-        await db.exec('CREATE TABLE IF NOT EXISTS rerange_event (\
-            width INTEGER NOT NULL, \
-            datetime TEXT NOT NULL, \
-            direction TEXT NOT NULL)')
+    await db.exec('CREATE TABLE IF NOT EXISTS rerange_event (\
+        width INTEGER NOT NULL, \
+        datetime TEXT NOT NULL, \
+        direction TEXT NOT NULL)')
 
-        // We are only ever in one position at a time for now, and certainly only ever one per
-        // range width.
-        await db.exec('CREATE TABLE IF NOT EXISTS position (\
-            width INTEGER PRIMARY KEY, \
-            datetime TEXT NOT NULL, \
-            token_id INTEGER NULL)')
-    }
+    // We are only ever in one position at a time for now, and certainly only ever one per
+    // range width.
+    await db.exec('CREATE TABLE IF NOT EXISTS position (\
+        width INTEGER PRIMARY KEY, \
+        datetime TEXT NOT NULL, \
+        token_id INTEGER NULL)')
 }
 
 // Pass dates as ISO8601 strings ("YYYY-MM-DD HH:MM:SS.SSS"). Sqlite does not have a DATETIME
