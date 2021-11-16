@@ -202,14 +202,6 @@ export async function createPoolOnTestnet() {
     // ~0.1 WETH, 18 decimals. Works for the above price of 4,604.00 USDC.
     const amountWeth = '10860121633000000'
 
-    // TODO: Get some more Kovan ETH for gas.
-    //   Error: Insufficient funds. The account you tried to send transaction from does not have enough funds.
-    //   Required 45_000_000_000_000_000 (0.045 ETH)
-    //   and got: 22_440_525_093_280_227 (0.022 ETH)
-    // Amounts available:
-    //            22440525093280227 ETH
-    //  1000000000 USDC, 1000000000000000000 WETH
-
     const position = Position.fromAmounts({
         pool: newPool,
         tickLower: minTick,
@@ -238,7 +230,6 @@ export async function createPoolOnTestnet() {
         from: wallet.address,
         to: CHAIN_CONFIG.addrPositionManager,
         value: VALUE_ZERO_ETHER,
-        // value: amountEth,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
         gasPrice: CHAIN_CONFIG.gasPrice,
@@ -251,14 +242,13 @@ export async function createPoolOnTestnet() {
     console.log(`createPoolOnTestnet() TX response:`)
     console.dir(txResponse)
 
-    console.log(`createPoolOnTestnet() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
-    console.log(`createPoolOnTestnet() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
+    // console.log(`createPoolOnTestnet() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
+    // console.log(`createPoolOnTestnet() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
 
     const txReceipt: TransactionReceipt = await txResponse.wait()
 
     console.log(`createPoolOnTestnet() TX receipt:`)
     console.dir(txReceipt)
-    console.log(`createPoolOnTestnet() Effective gas price: ${txReceipt.effectiveGasPrice.toString()}`)
 
     // If we get a revert with `Fail with error: 'STF'` here, STF is `safe transfer from` and this
     // is thrown by:

@@ -64,7 +64,7 @@ class EthUsdcWallet extends ethers.Wallet {
         w.usdcContract = w.usdcContract.connect(w)
         w.wethContract = w.wethContract.connect(w)
 
-        console.log("DRO account: ", w.address)
+        console.log(`DRO account: ${w.address}`)
 
         return w
     }
@@ -85,16 +85,23 @@ class EthUsdcWallet extends ethers.Wallet {
                 await this.getBalance("latest"),
             ])
 
-        console.log("Balances:")
-
         // USDC has 6 decimals. We should really get this from the contract but it's another call and
         // our ABI is incomplete.
-        console.log(`  USDC ${ethers.utils.formatUnits(usdcBalance, 6)}`)
-
         // WETH has 18 decimals, just like Ether.
-        console.log(`  WETH ${ethers.utils.formatEther(wethBalance)}`)
 
-        console.log(`  ETH ${ethers.utils.formatEther(ethBalance)}`)
+        // Formatting to a goiven number of decimal places is fiddly. We are truncating here, not
+        // rounding.
+        const usdcBalanceReadable = ethers.utils.formatUnits(
+            usdcBalance.sub(usdcBalance.mod(1e4)), 6)
+
+        const wethBalanceReadable = ethers.utils.formatEther(
+            wethBalance.sub(wethBalance.mod(1e14)))
+
+        const ethBalanceReadable = ethers.utils.formatEther(
+            ethBalance.sub(ethBalance.mod(1e14)))
+
+        console.log(`Balances: USDC ${usdcBalanceReadable}, WETH ${wethBalanceReadable}, \
+ETH ${ethBalanceReadable}`)
     }
 
     async approveAll(address: string) {

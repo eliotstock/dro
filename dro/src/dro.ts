@@ -284,8 +284,6 @@ ${u.toString()} USDC worth of WETH.`)
 
         // The order of the tokens here is significant. Input first.
         swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
-
-        
       }
       else {
         console.log(`[${this.rangeWidthTicks}] We're mostly in WETH now. Swapping half our WETH to USDC.`)
@@ -299,6 +297,8 @@ ${u.toString()} USDC worth of WETH.`)
   
       // This will revert with code -32015 on testnets if there is no pool for the token addresses
       // passed in. Create a pool first.
+      // It would be nice to try/catch here, inspect error.body.error.code here and handle -32015
+      // but the type of e is always unknown.
       const quotedAmountOut = await quoterContract.callStatic.quoteExactInputSingle(
         tokenIn,
         tokenOut,
