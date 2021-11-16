@@ -8,7 +8,7 @@ import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import invariant from 'tiny-invariant'
 
 const OUT_DIR = './out'
@@ -246,12 +246,25 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       const usdc = await wallet.usdc()
       const weth = await wallet.weth()
 
-      const usdcValueOfWethBalance: BigNumber = BigNumber.from(rangeOrderPoolPriceUsdc).mul(weth)
+      // TODO: Zero is no use to us here. Fake it on testnets, or fix the pool we're in.
+      console.log(`Range order pool price: ${rangeOrderPoolPriceUsdc} USDC`)
+
+      // This is USDC * 10^-6 as an integer (BigNumber).
+      const u = rangeOrderPoolPriceUsdcAsBigNumber()
+
+      let usdcValueOfWethBalance = BigNumber.from(u).mul(weth)
+
+      // Avoid a division by zero error below. Any very small integer will do here.
+      if (usdcValueOfWethBalance.eq(BigNumber.from(0))) {
+        usdcValueOfWethBalance = BigNumber.from(1)
+      }
 
       console.log(`[${this.rangeWidthTicks}] We have ${usdc.toString()} USDC and \
-${usdcValueOfWethBalance.toString()} USDC worth of WETH.`)
+${u.toString()} USDC worth of WETH.`)
 
-      // What is the ratio of the value of our USDC balance to our WETH balance?
+      // What is the ratio of the value of our USDC balance to our WETH balance? Note that we're
+      // using the price in the range order pool, not the swap pool, but the difference will be
+      // small and we only need very low precision here.
       const ratioUsdcToWeth = usdc.div(usdcValueOfWethBalance)
 
       let tokenIn
@@ -260,14 +273,14 @@ ${usdcValueOfWethBalance.toString()} USDC worth of WETH.`)
       let swapRoute
 
       // We should be almost entirely in one asset or the other, because we only removed liquidity
-      // once we were at the edge of our range. we do have some fees just claimed in the other
+      // once we were at the edge of our range. We do have some fees just claimed in the other
       // asset, however.
       if (ratioUsdcToWeth.gt(1.0)) {
-        console.log(`[${this.rangeWidthTicks}] We're mostly in USDC now. Swapping USDC to WETH.`)
+        console.log(`[${this.rangeWidthTicks}] We're mostly in USDC now. Swapping half our USDC to WETH.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenUsdc
         tokenOut = CHAIN_CONFIG.addrTokenWeth
-        amountIn = usdc
+        amountIn = usdc.div(2)
 
         // The order of the tokens here is significant. Input first.
         swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
@@ -275,11 +288,11 @@ ${usdcValueOfWethBalance.toString()} USDC worth of WETH.`)
         
       }
       else {
-        console.log(`[${this.rangeWidthTicks}] We're mostly in WETH now. Swapping WETH to USDC.`)
+        console.log(`[${this.rangeWidthTicks}] We're mostly in WETH now. Swapping half our WETH to USDC.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenWeth
         tokenOut = CHAIN_CONFIG.addrTokenUsdc
-        amountIn = weth
+        amountIn = weth.div(2)
 
         swapRoute = new Route([poolEthUsdcForSwaps], wethToken, usdcToken)
       }
@@ -300,8 +313,8 @@ ${usdcValueOfWethBalance.toString()} USDC worth of WETH.`)
         // Swapping USDC to WETH
         trade = await Trade.createUncheckedTrade({
           route: swapRoute,
-          inputAmount: CurrencyAmount.fromRawAmount(wethToken, weth.toString()),
-          outputAmount: CurrencyAmount.fromRawAmount(usdcToken, quotedAmountOut.toString()),
+          inputAmount: CurrencyAmount.fromRawAmount(usdcToken, usdc.toString()),
+          outputAmount: CurrencyAmount.fromRawAmount(wethToken, quotedAmountOut.toString()),
           tradeType: TradeType.EXACT_INPUT,
         })
       }
@@ -309,8 +322,8 @@ ${usdcValueOfWethBalance.toString()} USDC worth of WETH.`)
         // Swapping WETH to USDC
         trade = await Trade.createUncheckedTrade({
           route: swapRoute,
-          inputAmount: CurrencyAmount.fromRawAmount(usdcToken, usdc.toString()),
-          outputAmount: CurrencyAmount.fromRawAmount(wethToken, quotedAmountOut.toString()),
+          inputAmount: CurrencyAmount.fromRawAmount(wethToken, weth.toString()),
+          outputAmount: CurrencyAmount.fromRawAmount(usdcToken, quotedAmountOut.toString()),
           tradeType: TradeType.EXACT_INPUT,
         })
       }
@@ -440,6 +453,13 @@ ${usdcValueOfWethBalance.toString()} USDC worth of WETH.`)
   
       // addCallParameters() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
+      // TODO: Prevent this error here when on testnets:
+      /*
+      Error: Invariant failed: ZERO_LIQUIDITY
+          at invariant (/home/e/r/dro/dro/node_modules/tiny-invariant/dist/tiny-invariant.cjs.js:13:11)
+          at Function.addCallParameters (/home/e/r/dro/dro/node_modules/@uniswap/v3-sdk/src/nonfungiblePositionManager.ts:200:5)
+          at DRO.<anonymous> (/home/e/r/dro/dro/src/dro.ts:456:62)
+      */
       const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
   
       // console.log(`addLiquidity() calldata: ${calldata}`)

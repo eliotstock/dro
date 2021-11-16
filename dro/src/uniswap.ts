@@ -75,6 +75,17 @@ export async function updateTick() {
     }
 }
 
+export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
+    // TODO: Remove once tested:
+    rangeOrderPoolPriceUsdc = '4000.00'
+
+    // Ethers.js's BigNumber does not deal with decimals.
+    const usdcAsFloat: number = parseFloat(rangeOrderPoolPriceUsdc)
+    const usdcTimesTenToTheMinusSix: number = usdcAsFloat * 1_000_000
+
+    return ethers.BigNumber.from(usdcTimesTenToTheMinusSix)
+}
+
 const TOPIC_0_INCREASE_LIQUIDITY = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f'
 
 export function extractTokenId(txReceipt: TransactionReceipt): number | undefined {
