@@ -73,7 +73,7 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 //    8.4%           840   ?
 //    9.6%           960   ?
 const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960]
-// const rangeWidths: number[] = [120]
+// const rangeWidths: number[] = [1800]
 
 // Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []

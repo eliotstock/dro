@@ -27,7 +27,7 @@ export interface ChainConfig {
 }
 
 const ETHEREUM_MAINNET: ChainConfig = {
-    name: "Ethereum Mainnet",
+    name: 'Ethereum Mainnet',
 
     chainId: 1,
 
@@ -35,7 +35,7 @@ const ETHEREUM_MAINNET: ChainConfig = {
 
     // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
     // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
-    endpoint: "https://mainnet.infura.io/v3/" + process.env.INFURA_PROJECT_ID,
+    endpoint: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
 
     provider() {
         return new ethers.providers.JsonRpcProvider(this.endpoint)
@@ -75,6 +75,48 @@ const ETHEREUM_MAINNET: ChainConfig = {
     addrSwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564"
 }
 
+// Block explorer: https://arbiscan.io/.
+const ARBITRUM_MAINNET: ChainConfig = {
+    name: 'Arbitrum Mainnet',
+
+    chainId: 42161,
+
+    isTestnet: false,
+
+    endpoint: `https://arbitrum-mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+
+    provider() {
+        return new ethers.providers.JsonRpcProvider(this.endpoint)
+    },
+
+    addrTokenUsdc: '0xff970a61a04b1ca14834a43f5de4533ebddb5cc8',
+
+    addrTokenWeth: '0x82af49447d8a07e3bd95bd0d56f35241523fbab1',
+
+    // USDC/ETH pool with 0.3% fee: https://info.uniswap.org/#/arbitrum/pools/0x17c14d2c404d167802b16c450d3c99f88f2c4f4d
+    addrPoolRangeOrder: '0x17c14D2c404D167802b16C450d3c99F88F2c4F4d',
+
+    // USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/arbitrum/pools/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
+    addrPoolSwaps: '0xc31e54c7a869b9fcbecc14363cf510d1c41fa443',
+
+    slippageTolerance: new Percent(50, 10_000), // 0.005%
+
+    gasPrice: ethers.utils.parseUnits("10", "gwei"),
+
+    // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
+    gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
+
+    // Above what gas price, in gwei, are we unwilling to re-range?
+    gasPriceMax: ethers.utils.parseUnits("20", "gwei"),
+
+    // TODO(P1): Confirm these are all at the same address as on Ethereum Mainnet.
+    addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
+
+    addrQuoter: ETHEREUM_MAINNET.addrQuoter,
+
+    addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter
+}
+
 const ETHEREUM_KOVAN: ChainConfig = {
     name: "Ethereum Kovan",
 
@@ -82,7 +124,7 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     isTestnet: true,
 
-    endpoint: "https://kovan.infura.io/v3/" + process.env.INFURA_PROJECT_ID,
+    endpoint: `https://kovan.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
 
     provider() {
         return new ethers.providers.JsonRpcProvider(this.endpoint)
@@ -121,7 +163,8 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
 const CHAIN_CONFIGS = {
     'ethereumMainnet': ETHEREUM_MAINNET,
-    'ethereumKovan': ETHEREUM_KOVAN
+    'ethereumKovan': ETHEREUM_KOVAN,
+    'arbitrumMainnet': ARBITRUM_MAINNET
 }
 
 export function useConfig(): ChainConfig {
