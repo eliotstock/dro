@@ -94,8 +94,15 @@ async function onBlock(...args: Array<any>) {
 
   // Log the timestamp, block number and gas price first. Only log anything when the price changes.
   if (rangeOrderPoolPriceUsdc != price) {
-    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPrice.div(1e9).toNumber()} \
-gwei ${rangeOrderPoolPriceUsdc} USDC`)
+    // Only show the gas price on L1.
+    let gasPriceReadable = ''
+
+    if (!CHAIN_CONFIG.isL2) {
+      gasPriceReadable = `${gasPrice.div(1e9).toNumber()} gwei `
+    }
+
+    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceReadable}\
+${rangeOrderPoolPriceUsdc} USDC`)
   }
 
   price = rangeOrderPoolPriceUsdc

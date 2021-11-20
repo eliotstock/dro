@@ -11,6 +11,7 @@ export interface ChainConfig {
     name: string
     chainId: number
     isTestnet: boolean
+    isL2: boolean
     endpoint: string
     provider(): JsonRpcProvider
     addrTokenUsdc: string
@@ -32,6 +33,8 @@ const ETHEREUM_MAINNET: ChainConfig = {
     chainId: 1,
 
     isTestnet: false,
+
+    isL2: false,
 
     // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
     // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
@@ -83,6 +86,8 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     isTestnet: false,
 
+    isL2: true,
+
     endpoint: `https://arbitrum-mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
 
     provider() {
@@ -123,6 +128,8 @@ const ETHEREUM_KOVAN: ChainConfig = {
     chainId: 42,
 
     isTestnet: true,
+
+    isL2: false,
 
     endpoint: `https://kovan.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
 
