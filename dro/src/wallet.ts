@@ -151,6 +151,11 @@ export const wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
 // We use the legacy gas price as a reference, just like everybody else seems to be doing. The new
 // EIP-1559 maxFeePerGas seems to come in at about twice the value.
 export async function updateGasPrice() {
+    // These API calls are costly. Avoid them on L2 where we don't care so much about gas.
+    if (CHAIN_CONFIG.isL2) {
+        return
+    }
+
     // Legacy gas price.
     const p = (await CHAIN_CONFIG.provider().getFeeData()).gasPrice
 
