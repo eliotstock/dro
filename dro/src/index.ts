@@ -15,7 +15,7 @@ import { ethers } from 'ethers'
 // (P2) More swap testing
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
-// (P3) Build out exponential backoff for 50x server errors from Infura
+// (P3) Build out exponential backoff for 50x server errors from Infura. Error codes: https://infura.io/docs/ethereum#section/Error-codes
 
 // Done
 // ----

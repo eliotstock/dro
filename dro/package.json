@@ -5,8 +5,8 @@
   "main": "build/main/index.js",
   "scripts": {
     "dev": "nodemon",
-    "prod": "ts-node ./src/index.ts",
-    "n": "ts-node ./src/index.ts --n"
+    "prod": "ts-node ./src/index.ts >>./out/dro.log 2>&1 && tail ./out/dro.log",
+    "n": "ts-node ./src/index.ts --n >>./out/dro.log 2>&1 && tail ./out/dro.log"
   },
   "author": "",
   "license": "ISC",
