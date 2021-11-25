@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon",
     "prod": "ts-node ./src/index.ts >>./out/dro.log 2>&1",
-    "n": "ts-node ./src/index.ts --n >>./out/dro.log 2>&1"
+    "n": "ts-node ./src/index.ts --n >>./out/dro.log 2>&1",
+    "log": "tail -f -n +1 ./out/dro.log"
   },
   "author": "",
   "license": "ISC",
