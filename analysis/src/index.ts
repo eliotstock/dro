@@ -90,8 +90,8 @@ const expectedGrossYields = new Map<number, number>()
 //                      bps  percent
 //                      ---  -------
 expectedGrossYields.set(120, 1_280)
-expectedGrossYields.set(240, 710)
-expectedGrossYields.set(360, 320)
+// expectedGrossYields.set(240, 710)
+// expectedGrossYields.set(360, 320)
 
 let rangeWidthTicks: number
 
@@ -285,8 +285,9 @@ async function main() {
 
     console.log(`Analysing...`)
 
-    // Run the analysis once per key in expectedGrossYields
-    expectedGrossYields.forEach((expectedGrossYield: number, rangeWidth: number) => {
+    // Run the analysis once per key/value pair in expectedGrossYields
+    for (let [rangeWidth, expectedGrossYield] of expectedGrossYields) {
+        let swapEventCounter = 0
         rangeWidthTicks = rangeWidth
     
         // Start out with a range centered on the price of the first block in our data.
@@ -296,19 +297,25 @@ async function main() {
         rerange()
         rerangeCounter = 0
         positionValue = INITIAL_POSTION_VALUE_USDC
+
+        console.log(`[${rangeWidthTicks}] Iterating over ${swapEvents.length} swap events, starting at price ${priceUsdc} range ${minPriceUsdc} <-> ${maxPriceUsdc}`)
     
-        swapEvents.forEach(e => {
+        for (const e of swapEvents) {
+            // TODO: Remove when debugged. Only look at very recent data.
+            // if (!e.blockTimestamp.startsWith('2021-10-')) continue
+
             if (e.blockTimestamp == blockTimestamp) {
                 // Disregard all but the first swap event in a given block. We will never re-range
                 // more than once per block because it takes us a whole block to re-range.
                 // The last swap in the block would be just as good - doesn't matter much.
-                return
+                continue
             }
     
             tick = e.tick
             priceUsdc = e.priceUsdc || 0
     
             if (outOfRange()) {
+                // console.log(`#${swapEventCounter} ${e.blockTimestamp} ${priceUsdc} out of range`)
                 rerange()
 
                 // We'll claim some fees at the time of removing liquidity.
@@ -319,6 +326,19 @@ async function main() {
                 // console.log(`  Expect gross yield of ${expectedGrossYield}% APY for ${yearsInRange} years is ${unclaimedFees.toFixed(6)}`)
 
                 positionValue += unclaimedFees
+
+                // TODO: Calculate "impermanent loss", more correctly now a realised loss or gain,
+                // from moving completed into the less valueable asset in the pool.
+
+                // If we re-ranged down, all the USDC we added is now ETH at an average price of
+                // half way between the price we last re-ranged at and the minimum price for that
+                // range.
+
+                // If we re-ranged up, all the ETH we added is now USDC at an average price of
+                // half way between the price we last re-ranged at and the maximum price for that
+                // range.
+
+                // Stick to USDC-denominated return calculation for now, then do ETH-denominated.
 
                 // But we'll also incur the cost of the swap and the gas for the set of re-ranging
                 // transactions (remove liquidity, swap, add liquidity)
@@ -332,26 +352,43 @@ async function main() {
                 //     console.log(`  Position: +${unclaimedFees.toFixed(6)} -${fee.toFixed(2)} -${gas} = USDC ${positionValue.toFixed(2)}`)
                 // }
             }
+            else {
+                // console.log(`#${swapEventCounter} ${e.blockTimestamp} ${priceUsdc} in range`)
+            }
 
             blockTimestamp = e.blockTimestamp
-        })
+
+            swapEventCounter++
+
+            // TODO: Remove when debugged:
+            // if (swapEventCounter > 100) break
+        }
 
         const lastSwapEvent = swapEvents[swapEvents.length - 1]
         const totalIntervalYears = intervalYears(firstSwapEvent.blockTimestamp, lastSwapEvent.blockTimestamp)
     
         console.log(`  Range width ${rangeWidthTicks} re-ranged ${rerangeCounter} times in ${totalIntervalYears} years`)
     
-        // Note that forEach() above is blocking.
         const meanTimeToReranging = totalIntervalYears / rerangeCounter
-        const humanized = moment.duration(meanTimeToReranging, 'years').humanize()
-        console.log(`  Mean time to re-ranging: ${humanized}`)
+        // const humanized = moment.duration(meanTimeToReranging, 'years').humanize()
+
+        // See: https://stackoverflow.com/questions/70141752/does-moment-duration-and-humanize-handle-small-decimals
+        // const shouldBe18Mins = moment.duration(0.00003408923868091461, 'years').humanize()
+        // console.log(`Should be 18 mins: ${shouldBe18Mins}`)
+
+        // TODO: Debug this. Forward testing gives us an MTR of 135 mins for a 120 bps range width.
+        // Backtesting gives us 22 mins for the life of the pool, but things started out very volatile.
+        // Backtesting just October gives us 45 mins (more plausible)
+        // Forward testing Nov gives us 125 mins.
+        // TODO: Get November's data and backtest it.
+        console.log(`  Mean time to re-ranging: ${meanTimeToReranging * 365 * 24 * 60} mins`)
         console.log(`  Closing position value: USDC ${positionValue.toFixed(2)}`)
 
         const expectedApy = apy(firstSwapEvent.blockTimestamp, lastSwapEvent.blockTimestamp,
             INITIAL_POSTION_VALUE_USDC, positionValue)
         console.log(`  Expected net APY: ${(expectedApy * 100).toFixed(0)}%`)
         console.log('')
-    })
+    }
 }
 
 main().catch((error) => {

@@ -6,4 +6,4 @@ Scripts for performing on-chain data analysis.
 
 1. `nvm use`
 1. `npm install`
-1. `npm run start`
+1. `npm run run`

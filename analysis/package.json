@@ -2,7 +2,7 @@
   "main": "build/main/index.js",
   "scripts": {
     "dev": "nodemon",
-    "prod": "ts-node ./src/index.ts",
+    "run": "ts-node ./src/index.ts",
     "test": "mocha -r ts-node/register 'test/*.ts'"
   },
   "dependencies": {
