@@ -328,7 +328,7 @@ async function main() {
                 positionValue += unclaimedFees
 
                 // TODO: Calculate "impermanent loss", more correctly now a realised loss or gain,
-                // from moving completed into the less valueable asset in the pool.
+                // from moving completely into one asset in the pool.
 
                 // If we re-ranged down, all the USDC we added is now ETH at an average price of
                 // half way between the price we last re-ranged at and the minimum price for that
@@ -340,7 +340,7 @@ async function main() {
 
                 // Stick to USDC-denominated return calculation for now, then do ETH-denominated.
 
-                // But we'll also incur the cost of the swap and the gas for the set of re-ranging
+                // We'll also incur the cost of the swap and the gas for the set of re-ranging
                 // transactions (remove liquidity, swap, add liquidity)
                 const fee = swapFee(positionValue)
                 const gas = gasCost()

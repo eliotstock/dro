@@ -69,7 +69,7 @@ const ETHEREUM_MAINNET: ChainConfig = {
     // Above what gas price, in gwei, are we unwilling to re-range?
     // At 100, we could be waiting a day or two
     // Try 110 for now.
-    gasPriceMax: ethers.utils.parseUnits("110", "gwei"),
+    gasPriceMax: ethers.utils.parseUnits("200", "gwei"),
 
     addrPositionManager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
 
