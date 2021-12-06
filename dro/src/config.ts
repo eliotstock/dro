@@ -175,6 +175,7 @@ const ETHEREUM_KOVAN: ChainConfig = {
     addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter
 }
 
+// Set the CHAIN env var to one of these keys.
 const CHAIN_CONFIGS = {
     'ethereumMainnet': ETHEREUM_MAINNET,
     'ethereumKovan': ETHEREUM_KOVAN,
@@ -182,7 +183,9 @@ const CHAIN_CONFIGS = {
 }
 
 export function useConfig(): ChainConfig {
-    if (process.env.INFURA_PROJECT_ID == undefined) throw "No INFURA_PROJECT_ID in .env file."
+    if (process.env.INFURA_PROJECT_ID == undefined &&
+        process.env.ALCHEMY_PROJECT_ID_ARBITRUM_MAINNET == undefined &&
+        process.env.ALCHEMY_PROJECT_ID_ETHEREUM_MAINNET == undefined) throw "No project ID in .env file."
 
     if (process.env.CHAIN == undefined) throw "No CHAIN in .env file."
 
