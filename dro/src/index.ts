@@ -12,6 +12,8 @@ import { ethers } from 'ethers'
 
 // TODO
 // ----
+// (P1) Give Alchemy a spin and see a) whether we fall within the free tier b) if we get fewer errors than on Infura.
+// (P1) Fix down/up re-ranging indicator on Arbitrum
 // (P2) More swap testing
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
@@ -72,9 +74,10 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 //    7.2%           720   ?
 //    8.4%           840   ?
 //    9.6%           960   ?
-const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960, 1080]
+// const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960, 1080]
 // const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960, 1080, 1200, 1320, 1440, 1560, 1680, 1800]
 // const rangeWidths: number[] = [1800]
+const rangeWidths: number[] = [120]
 
 // Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []

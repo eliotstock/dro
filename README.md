@@ -4,9 +4,11 @@
 
 1. `nvm use`
 1. `npm install`
-1. Put a value for each of these variables in an `.env` file:
+1. Put a value for each of these variables in an `.env` file. Only one of the project IDs is required, strictly speaking.
     1. `DRO_ACCOUNT_MNEMONIC`
     1. `INFURA_PROJECT_ID`
+    1. `ALCHEMY_PROJECT_ID_ETHEREUM_MAINNET`
+    1. `ALCHEMY_PROJECT_ID_ARBITRUM_MAINNET`
     1. `CHAIN` eg. `CHAIN="ethereumMainnet"`
 1. `npm run start`
 

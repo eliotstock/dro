@@ -27,6 +27,8 @@ export interface ChainConfig {
     gasLimit: string
 }
 
+// Infura: Free quota is 100K requests per day, which is more than one a second.
+// Alchemy: Free quota is 100M "compute units" per day. We seem to need only about 1M of these.
 const ETHEREUM_MAINNET: ChainConfig = {
     name: 'Ethereum Mainnet',
 
@@ -36,9 +38,10 @@ const ETHEREUM_MAINNET: ChainConfig = {
 
     isL2: false,
 
-    // My personal Infura project (dro). Free quota is 100K requests per day, which is more than one a second.
-    // WSS doesn't work ("Error: could not detect network") and HTTPS works for event subscriptions anyway.
-    endpoint: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+    // Infura:
+    // endpoint: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+    // Alchemy:
+    endpoint: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_PROJECT_ID_ETHEREUM_MAINNET}`,
 
     provider() {
         return new ethers.providers.JsonRpcProvider(this.endpoint)
@@ -88,7 +91,10 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     isL2: true,
 
-    endpoint: `https://arbitrum-mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+    // Infura:
+    // endpoint: `https://arbitrum-mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+    // Alchemy:
+    endpoint: `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_PROJECT_ID_ARBITRUM_MAINNET}`,
 
     provider() {
         return new ethers.providers.JsonRpcProvider(this.endpoint)
@@ -106,12 +112,13 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     slippageTolerance: new Percent(50, 10_000), // 0.005%
 
-    gasPrice: ethers.utils.parseUnits("10", "gwei"),
+    gasPrice: ethers.utils.parseUnits("3", "gwei"),
 
     // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
     gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
 
     // Above what gas price, in gwei, are we unwilling to re-range?
+    // Gas on Arbitrum is never so high that we'd want to wait to re-range, in practice.
     gasPriceMax: ethers.utils.parseUnits("20", "gwei"),
 
     // TODO(P1): Confirm these are all at the same address as on Ethereum Mainnet.
