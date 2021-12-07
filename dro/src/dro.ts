@@ -8,7 +8,7 @@ import moment from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import invariant from 'tiny-invariant'
 
 const OUT_DIR = './out'
@@ -25,6 +25,7 @@ export class DRO {
 
     minTick: number = 0
     maxTick: number = 0
+    wethFirst: boolean = true
     position?: Position
     tokenId?: BigintIsh
     unclaimedFeesUsdc?: BigintIsh
@@ -40,7 +41,7 @@ export class DRO {
     }
 
     async init() {      
-      // Get the token ID for out position from the database.
+      // Get the token ID for our position from the database.
       const tokenId = await getTokenIdForPosition(this.rangeWidthTicks)
 
       if (tokenId) {
@@ -64,6 +65,11 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       else {
         console.log(`[${this.rangeWidthTicks}] No existing position NFT`)
       }
+
+      // The order of the tokens in the pool varies from chain to chain, annoyingly.
+      // Ethereum mainnet: USDC is first
+      // Arbitrum mainnet: WETH is first
+      const wethFirst = await tokenOrderIsWethFirst()
     }
   
     outOfRange() {
@@ -78,8 +84,16 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
 
       const noRangeYet: boolean = (this.minTick == 0)
 
-      // A lower tick value means a higher price in USDC.
-      const direction: string = rangeOrderPoolTick < this.minTick ? 'up' : 'down'
+      const direction: string = 'unknown'
+      
+      if (this.wethFirst) {
+        // Arbitrum mainnet: A lower tick value means a lower price in USDC.
+        rangeOrderPoolTick < this.minTick ? 'down' : 'up'
+      }
+      else {
+        // Ethereum mainnet: A lower tick value means a higher price in USDC.
+        rangeOrderPoolTick < this.minTick ? 'up' : 'down'
+      }
 
       let timeInRange: string = 'an unknown period'
 
@@ -104,11 +118,25 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       this.maxTick = Math.min(this.maxTick, TickMath.MAX_TICK)
       this.maxTick = nearestUsableTick(this.maxTick, rangeOrderPoolTickSpacing)
   
+      let minUsdc = 'unknown'
+      let maxUsdc = 'unknown'
+
       // tickToPrice() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
-      // Note that minimum USDC value per ETH corresponds to the maximum tick value and vice versa.
-      const minUsdc = tickToPrice(wethToken, usdcToken, this.maxTick).toFixed(2)
-      const maxUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
+      if (this.wethFirst) {
+        // Arbitrum mainnet
+        //   WETH is token 0, USDC is token 1
+        //   Minimum USDC value per ETH corresponds to the minimum tick value
+        minUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
+        maxUsdc = tickToPrice(wethToken, usdcToken, this.maxTick).toFixed(2)
+      }
+      else {
+        // Ethereum mainnet:
+        //   USDC is token 0, WETH is token 1
+        //   Minimum USDC value per ETH corresponds to the minimum tick value
+        minUsdc = tickToPrice(usdcToken, wethToken, this.minTick).toFixed(2)
+        maxUsdc = tickToPrice(usdcToken, wethToken, this.maxTick).toFixed(2)
+      }
 
       if (noRangeYet) {
         console.log(`[${this.rangeWidthTicks}] Initial range: ${minUsdc} <-> ${maxUsdc}`)

@@ -75,6 +75,25 @@ export async function updateTick() {
     }
 }
 
+// Every range order pool we use has WETH as one token and USDC as the other, but the order varies
+// from mainnet to Arbitrum, annoyingly.
+export async function tokenOrderIsWethFirst(): Promise<boolean> {
+    const token0 = await rangeOrderPoolContract.token0()
+    const token1 = await rangeOrderPoolContract.token1()
+
+    if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase() &&
+        token1.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase()) {
+        return true
+    }
+    else if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase() &&
+        token1.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase()) {
+        return false
+    }
+    else {
+        throw 'Tokens in range order pool contract are not WETH and USDC. WTF.'
+    }
+}
+
 export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
     // TODO: Remove once tested:
     rangeOrderPoolPriceUsdc = '4000.00'
