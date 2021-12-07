@@ -19,18 +19,18 @@
             "cwd": "${workspaceFolder}/dro"
         },
         {
-            "name": "analysis",
+            "name": "backtest",
             "type": "node",
-            "program": "${workspaceFolder}/analysis/src/index.ts",
+            "program": "${workspaceFolder}/backtest/src/index.ts",
             "request": "launch",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "preLaunchTask": "tsc: build - analysis/tsconfig.json",
+            "preLaunchTask": "tsc: build - backtest/tsconfig.json",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
             ],
-            "cwd": "${workspaceFolder}/analysis"
+            "cwd": "${workspaceFolder}/backtest"
         }
     ]
 }

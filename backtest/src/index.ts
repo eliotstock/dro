@@ -30,9 +30,14 @@ const POOL_TICK_SPACING = 60
 // The fee in the pool in which we execute our swaps is 0.05%.
 const SWAP_POOL_FEE = 0.05 / 100
 
+// Ethereum mainnet
 // This constant gas cost is a mean taken from 7 sets of the three transactions (remove liquidity,
 // swap, add liquidity) when manually executing re-ranging.
-const GAS_COST = 92.20
+// const GAS_COST = 92.20
+
+// Arbitrum mainnet
+// Taken from only three manual re-ranges.
+const GAS_COST = 30.00
 
 // Start out with this in the position and see how we get on.
 const INITIAL_POSTION_VALUE_USDC = 100_000
@@ -90,8 +95,8 @@ const expectedGrossYields = new Map<number, number>()
 //                      bps  percent
 //                      ---  -------
 expectedGrossYields.set(120, 1_280)
-// expectedGrossYields.set(240, 710)
-// expectedGrossYields.set(360, 320)
+expectedGrossYields.set(240, 710)
+expectedGrossYields.set(360, 320)
 
 let rangeWidthTicks: number
 

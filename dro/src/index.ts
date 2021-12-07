@@ -12,14 +12,14 @@ import { ethers } from 'ethers'
 
 // TODO
 // ----
-// (P1) Give Alchemy a spin and see a) whether we fall within the free tier b) if we get fewer errors than on Infura.
+// (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network.
 // (P2) More swap testing
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
-// (P3) Build out exponential backoff for 50x server errors from Infura. Error codes: https://infura.io/docs/ethereum#section/Error-codes
 
 // Done
 // ----
+// (P1) Give Alchemy a spin and see a) whether we fall within the free tier b) if we get fewer errors than on Infura.
 // (P1) Get the 'remove liquidity' tx working
 // (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
 // (P1) Get the swap tx working, when re-ranging up (in: USDC, out: WETH)
