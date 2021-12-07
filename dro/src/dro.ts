@@ -51,6 +51,8 @@ export class DRO {
         const position: Position = await positionByTokenId(tokenId)
 
         if (position) {
+          // TODO: Won't this.minTick be undefined at this point? updateRange() has not been called
+          // yet.
           if (position.tickLower != this.minTick || position.tickUpper != this.maxTick) {
             console.log(`Expected min and max ticks: ${this.minTick}, ${this.maxTick}. \
 Got: ${position.tickLower}, ${position.tickUpper}`)
@@ -84,15 +86,15 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
 
       const noRangeYet: boolean = (this.minTick == 0)
 
-      const direction: string = 'unknown'
+      let direction: string = 'unknown'
       
       if (this.wethFirst) {
         // Arbitrum mainnet: A lower tick value means a lower price in USDC.
-        rangeOrderPoolTick < this.minTick ? 'down' : 'up'
+        direction = rangeOrderPoolTick < this.minTick ? 'down' : 'up'
       }
       else {
         // Ethereum mainnet: A lower tick value means a higher price in USDC.
-        rangeOrderPoolTick < this.minTick ? 'up' : 'down'
+        direction = rangeOrderPoolTick < this.minTick ? 'up' : 'down'
       }
 
       let timeInRange: string = 'an unknown period'

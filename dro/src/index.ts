@@ -4,7 +4,7 @@ import { wallet, updateGasPrice, gasPrice } from './wallet'
 import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
-import { init, dumpToCsv, meanTimeToReranging } from './db'
+import { init, dumpRerangeEventsToCsv, meanTimeToReranging } from './db'
 import { createPoolOnTestnet } from './uniswap'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
@@ -13,7 +13,6 @@ import { ethers } from 'ethers'
 // TODO
 // ----
 // (P1) Give Alchemy a spin and see a) whether we fall within the free tier b) if we get fewer errors than on Infura.
-// (P1) Fix down/up re-ranging indicator on Arbitrum
 // (P2) More swap testing
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
@@ -33,6 +32,7 @@ import { ethers } from 'ethers'
 // (P1) Get the current price in the pool synchronously and in terms of the quote currency
 // (P1) Know when we're out of range, indirectly, based on the current price in the pool and the current min/max, which we'll store for now
 // (P1) Timestamps in logging
+// (P1) Fix down/up re-ranging indicator on Arbitrum
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Know the current price of gas
 // (P2) Don't re-range when the current price of gas is over a constant threshold
@@ -212,7 +212,7 @@ async function main() {
   if (argv.dbDump) {
     console.log(`Database:`)
 
-    await dumpToCsv()
+    await dumpRerangeEventsToCsv()
 
     return
   }

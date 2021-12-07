@@ -73,7 +73,7 @@ VALUES (?, ?, ?)', width, datetimeUtc, direction)
     // console.log(`Row ID: ${result}.rowID`)
 }
 
-export async function dumpToCsv() {
+export async function dumpRerangeEventsToCsv() {
     const db: Database = await openDb()
 
     console.log(`Width, Datetime, Direction`)
