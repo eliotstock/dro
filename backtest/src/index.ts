@@ -40,7 +40,7 @@ const SWAP_POOL_FEE = 0.05 / 100
 const GAS_COST = 30.00
 
 // Start out with this in the position and see how we get on.
-const INITIAL_POSTION_VALUE_USDC = 100_000
+const INITIAL_POSTION_VALUE_USDC = 50_000
 
 const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
 
@@ -95,8 +95,8 @@ const expectedGrossYields = new Map<number, number>()
 //                      bps  percent
 //                      ---  -------
 expectedGrossYields.set(120, 1_280)
-expectedGrossYields.set(240, 710)
-expectedGrossYields.set(360, 320)
+// expectedGrossYields.set(240, 710)
+// expectedGrossYields.set(360, 320)
 
 let rangeWidthTicks: number
 
@@ -247,6 +247,17 @@ function gasCost(): number {
     return GAS_COST
 }
 
+// Run this to just look at a given month, for example.
+function narrowToPeriod() {
+    const start = moment('2021-11-02T00:00:00.000Z')
+    const end = moment('2021-12-01T00:00:00.000Z')
+
+    swapEvents = swapEvents.filter(e => {
+        const t = moment(e.blockTimestamp)
+        return t.isAfter(start) && t.isBefore(end)
+    })
+}
+
 export function intervalYears(previousTimestamp: string, currentTimestamp: string): number {
     const previous = moment(previousTimestamp, TIMESTAMP_FORMAT)
     const current = moment(currentTimestamp, TIMESTAMP_FORMAT)
@@ -286,6 +297,8 @@ async function main() {
         await runQuery()
     }
 
+    narrowToPeriod()
+
     // We now have a price timeseries, both in terms of ticks and USDC.
 
     console.log(`Analysing...`)
@@ -306,13 +319,10 @@ async function main() {
         console.log(`[${rangeWidthTicks}] Iterating over ${swapEvents.length} swap events, starting at price ${priceUsdc} range ${minPriceUsdc} <-> ${maxPriceUsdc}`)
     
         for (const e of swapEvents) {
-            // TODO: Remove when debugged. Only look at very recent data.
-            // if (!e.blockTimestamp.startsWith('2021-10-')) continue
-
             if (e.blockTimestamp == blockTimestamp) {
                 // Disregard all but the first swap event in a given block. We will never re-range
                 // more than once per block because it takes us a whole block to re-range.
-                // The last swap in the block would be just as good - doesn't matter much.
+                // The last swap in the block would be a bit better - doesn't matter much.
                 continue
             }
     
@@ -381,11 +391,11 @@ async function main() {
         // const shouldBe18Mins = moment.duration(0.00003408923868091461, 'years').humanize()
         // console.log(`Should be 18 mins: ${shouldBe18Mins}`)
 
-        // TODO: Debug this. Forward testing gives us an MTR of 135 mins for a 120 bps range width.
-        // Backtesting gives us 22 mins for the life of the pool, but things started out very volatile.
-        // Backtesting just October gives us 45 mins (more plausible)
-        // Forward testing Nov gives us 125 mins.
-        // TODO: Get November's data and backtest it.
+        // TODO (P1): Backtesting results do not agree with forward testing results. For Nov 2021:
+        //   Backtesting: MTR: 50 mins
+        //   Forward testing: MTR: 122 mins
+        // Go no further with backtesting until we can validate the prices we're getting from
+        // BigQuery against another source, eg. Trading View using Uniswap as the exchange.
         console.log(`  Mean time to re-ranging: ${meanTimeToReranging * 365 * 24 * 60} mins`)
         console.log(`  Closing position value: USDC ${positionValue.toFixed(2)}`)
 
