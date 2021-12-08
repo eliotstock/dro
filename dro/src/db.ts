@@ -22,6 +22,8 @@ const mean = (numbers: number[]) => sum(numbers) / numbers.length
 export async function init() {
     const db: Database = await openDb()
 
+    // sqlite command line to query this:
+    // sqlite3 ./out/database.db "SELECT datetime, direction FROM rerange_event WHERE width = '120' AND datetime < '2021-12-01T00:00:00.000Z'"
     await db.exec('CREATE TABLE IF NOT EXISTS rerange_event (\
         width INTEGER NOT NULL, \
         datetime TEXT NOT NULL, \
