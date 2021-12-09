@@ -4,11 +4,12 @@ import { CollectOptions, FeeAmount, MintOptions, nearestUsableTick, NonfungibleP
 import { CurrencyAmount, Percent, BigintIsh, TradeType, Currency } from "@uniswap/sdk-core"
 import { TickMath } from '@uniswap/v3-sdk/'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
-import moment from 'moment'
+import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { forwardTestRerange, logResults } from './forward-test'
 import invariant from 'tiny-invariant'
 
 const OUT_DIR = './out'
@@ -97,13 +98,15 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         direction = rangeOrderPoolTick < this.minTick ? 'up' : 'down'
       }
 
-      let timeInRange: string = 'an unknown period'
+      let timeInRange: Duration
+      let timeInRangeReadable: string = 'an unknown period'
 
       if (this.lastRerangeTimestamp) {
         const a = moment(this.lastRerangeTimestamp)
         const b = moment() // Now
         const timeToRerangingMillis = b.diff(a)
-        timeInRange = moment.duration(timeToRerangingMillis, 'milliseconds').humanize()
+        timeInRange = moment.duration(timeToRerangingMillis, 'milliseconds')
+        timeInRangeReadable = timeInRange.humanize()
       }
 
       this.lastRerangeTimestamp = moment().toISOString()
@@ -148,7 +151,7 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         // no range yet.
         insertRerangeEvent(this.rangeWidthTicks, moment().toISOString(), direction)
 
-        console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRange} to ${minUsdc} <-> ${maxUsdc}`)
+        console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRangeReadable} to ${minUsdc} <-> ${maxUsdc}`)
       }
     }
   
