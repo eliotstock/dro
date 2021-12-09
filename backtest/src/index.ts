@@ -105,6 +105,7 @@ let rerangeCounter: number
 let positionValue: number
 
 // Query Google's public dataset for Ethereum mainnet transactions.
+// Billing: https://console.cloud.google.com/billing/005CEF-5B6B62-DD610F/reports;grouping=GROUP_BY_SKU;projects=dro-backtest?project=dro-backtest
 async function runQuery() {
     if (process.env.GCP_PROJECT_ID == undefined)
         throw "No GCP_PROJECT_ID in .env file (or no .env file)."
@@ -126,13 +127,14 @@ async function runQuery() {
 
     // First, query the logs of a single transaction that we know was a swap in the ETH/USDC 0.05%
     // fee pool, because it was our own swap.
-    // ## The result is one row with three topics. Only one topic has data. That topic is:
-    //   "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67"
 
     // const sqlQuery = `select * from
     //     bigquery-public-data.crypto_ethereum.logs
     //     where transaction_hash = "[HASH_OF_YOUR_OWN_TX]"
     //     and address = "[ADDRESS_OF_POOL]"`
+
+    // ## The result is one row with three topics. Only one topic has data. That topic is:
+    //   "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67"
 
     // Now find all logs with that topic for the above pool address.
     const sqlQuery = `select block_timestamp, topics, data from
@@ -249,12 +251,13 @@ function gasCost(): number {
 
 // Run this to just look at a given month, for example.
 function narrowToPeriod() {
-    const start = moment('2021-11-02T00:00:00.000Z')
-    const end = moment('2021-12-01T00:00:00.000Z')
+    const start = moment('2021-12-08T00:00:00.000Z')
+    // const end = moment('2021-12-01T00:00:00.000Z')
 
     swapEvents = swapEvents.filter(e => {
         const t = moment(e.blockTimestamp)
-        return t.isAfter(start) && t.isBefore(end)
+        // return t.isAfter(start) && t.isBefore(end)
+        return t.isAfter(start)
     })
 }
 
