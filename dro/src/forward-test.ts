@@ -1,4 +1,7 @@
 import moment, { Duration } from 'moment'
+import { tickToPrice } from "@uniswap/v3-sdk"
+import { usdcToken, wethToken, rangeOrderPoolPriceUsdc } from './uniswap'
+import { Direction } from './dro'
 
 const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
 
@@ -25,7 +28,13 @@ expectedGrossYields.set(120, 1_280)
 // expectedGrossYields.set(240, 710)
 // expectedGrossYields.set(360, 320)
 
+interface DroState {
+    liquidityEth: number,
+    liquidityUsdc: number
+}
+
 // TODO: Map of balances, USD-denominated, one per range width, starting at INITIAL_POSTION_VALUE_USDC.
+const droStates = new Map<number, DroState>()
 
 // Only half the value in our account needs to be swapped to the other asset when we re-range.
 function swapFee(amount: number): number {
@@ -44,25 +53,60 @@ function gasCost(): number {
 //     return current.diff(previous, 'years', true)
 // }
 
-export function forwardTestRerange(width: number, timeInRange: Duration) {
-    // Get position value for this range width
+export function forwardTestRerange(width: number,
+    lastMinTick: number,
+    lastMaxTick: number,
+    lastEntryTick: number,
+    timeInRange: Duration,
+    direction: Direction) {
+    // Get position state for this range width.
+    let state = droStates.get(width)
+
+    // If this is the initial range, just figure out our starting liquidity.
+    if (state == undefined) {
+        state = {
+            // Spend half our initial USDC balance on ETH at the current price in the pool.
+            liquidityEth: (INITIAL_POSTION_VALUE_USDC / 2) / parseFloat(rangeOrderPoolPriceUsdc),
+
+            // And keep the other half in USDC.
+            liquidityUsdc: INITIAL_POSTION_VALUE_USDC / 2
+        }
+
+        droStates.set(width, state)
+
+        return
+    }
 
     // Calculate expected fees given the range width and the time spent in range
     // const unclaimedFees = expectedGrossYield / 100 * yearsInRange * positionValue
     // positionValue += unclaimedFees
 
     // Calculate "impermanent loss", more correctly now a realised loss or gain,
-    // from moving completely into one asset in the pool.
+    // from moving completely into the devaluing asset in the pool.
+    // Stick to USDC-denominated return calculation for now.
 
     // If we re-ranged down, all the USDC we added is now ETH at an average price of
-    // half way between the price we last re-ranged at and the minimum price for that
-    // range.
+    // half way between the entry price and the min price for the last range.
 
     // If we re-ranged up, all the ETH we added is now USDC at an average price of
-    // half way between the price we last re-ranged at and the maximum price for that
-    // range.
+    // half way between entry price and the max price for the last range.
+    const entryPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastEntryTick).toFixed(2))
 
-    // Stick to USDC-denominated return calculation for now, then do ETH-denominated.
+    if (direction == Direction.Up) {
+        const maxPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMaxTick).toFixed(2))
+
+        const expectedDivergenceGainProportion = ((maxPriceUsdc - entryPriceUsdc) / 2) /
+            (2 * entryPriceUsdc)
+
+        const expectedDivergenceGainUsdc = expectedDivergenceGainProportion *
+            (state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc))
+
+        console.log(`[${width}] Expected divergence gain: ${expectedDivergenceGainUsdc}, \
+(${expectedDivergenceGainProportion / 100}%)`)
+    }
+    else if (direction == Direction.Down) {
+        console.log(`[${width}] Expected divergence loss: not yet implemented`)
+    }
 
     // We'll also incur the cost of the swap and the gas for the set of re-ranging
     // transactions (remove liquidity, swap, add liquidity)

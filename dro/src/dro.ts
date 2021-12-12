@@ -20,12 +20,18 @@ config()
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
 
+export enum Direction {
+  Up = 'up',
+  Down = 'down'
+}
+
 export class DRO {
     readonly rangeWidthTicks: number
     readonly noops: boolean
 
     minTick: number = 0
     maxTick: number = 0
+    entryTick: number = 0
     wethFirst: boolean = true
     position?: Position
     tokenId?: BigintIsh
@@ -87,15 +93,15 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
 
       const noRangeYet: boolean = (this.minTick == 0)
 
-      let direction: string = 'unknown'
+      let direction: Direction
       
       if (this.wethFirst) {
-        // Arbitrum mainnet: A lower tick value means a lower price in USDC.
-        direction = rangeOrderPoolTick < this.minTick ? 'down' : 'up'
+        // Pool on Arbitrum mainnet: A lower tick value means a lower price in USDC.
+        direction = rangeOrderPoolTick < this.minTick ? Direction.Down : Direction.Up
       }
       else {
-        // Ethereum mainnet: A lower tick value means a higher price in USDC.
-        direction = rangeOrderPoolTick < this.minTick ? 'up' : 'down'
+        // Pool on Ethereum mainnet: A lower tick value means a higher price in USDC.
+        direction = rangeOrderPoolTick < this.minTick ? Direction.Up : Direction.Down
       }
 
       let timeInRange: Duration
@@ -107,6 +113,14 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         const timeToRerangingMillis = b.diff(a)
         timeInRange = moment.duration(timeToRerangingMillis, 'milliseconds')
         timeInRangeReadable = timeInRange.humanize()
+
+        // Do some forward testing on how this range width is performing.
+        forwardTestRerange(this.rangeWidthTicks,
+          this.minTick,
+          this.maxTick,
+          this.entryTick,
+          timeInRange,
+          direction)
       }
 
       this.lastRerangeTimestamp = moment().toISOString()
@@ -142,6 +156,8 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         minUsdc = tickToPrice(usdcToken, wethToken, this.minTick).toFixed(2)
         maxUsdc = tickToPrice(usdcToken, wethToken, this.maxTick).toFixed(2)
       }
+
+      this.entryTick = rangeOrderPoolTick
 
       if (noRangeYet) {
         console.log(`[${this.rangeWidthTicks}] Initial range: ${minUsdc} <-> ${maxUsdc}`)
