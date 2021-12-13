@@ -33,7 +33,7 @@ interface DroState {
     liquidityUsdc: number
 }
 
-// TODO: Map of balances, USD-denominated, one per range width, starting at INITIAL_POSTION_VALUE_USDC.
+// Keys here are range widths.
 const droStates = new Map<number, DroState>()
 
 // Only half the value in our account needs to be swapped to the other asset when we re-range.
@@ -52,6 +52,9 @@ function gasCost(): number {
 //     // Do NOT round to the nearest integer here, by passing true.
 //     return current.diff(previous, 'years', true)
 // }
+
+// TODO (P1): Add an init() function and do what forwardTestRerange() currently does when there's
+// no state yet. we should not be waiting for the first re-range before doing anything.
 
 export function forwardTestRerange(width: number,
     lastMinTick: number,
@@ -91,10 +94,16 @@ export function forwardTestRerange(width: number,
     // If we re-ranged up, all the ETH we added is now USDC at an average price of
     // half way between entry price and the max price for the last range.
     const entryPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastEntryTick).toFixed(2))
+    console.log(`[${width}] Entry price: ${entryPriceUsdc} USDC`)
 
     if (direction == Direction.Up) {
         const maxPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMaxTick).toFixed(2))
+        console.log(`[${width}] Max price: ${maxPriceUsdc} USDC`)
 
+        // TODO (P1): Because this is proportional, it actually doesn't depend on absolute prices
+        // at all. Calculate it based on the range width only and do that statically, not here.
+        // Do some algebra to express this in terms of the range width, not the absolute prices.
+        // Test it against our R&D sheet.
         const expectedDivergenceGainProportion = ((maxPriceUsdc - entryPriceUsdc) / 2) /
             (2 * entryPriceUsdc)
 

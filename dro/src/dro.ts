@@ -153,6 +153,7 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         // Ethereum mainnet:
         //   USDC is token 0, WETH is token 1
         //   Minimum USDC value per ETH corresponds to the minimum tick value
+        // TODO (P1): This still isn't right. min and max are reversed.
         minUsdc = tickToPrice(usdcToken, wethToken, this.minTick).toFixed(2)
         maxUsdc = tickToPrice(usdcToken, wethToken, this.maxTick).toFixed(2)
       }
