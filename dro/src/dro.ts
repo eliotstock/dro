@@ -152,9 +152,10 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       else {
         // Ethereum mainnet:
         //   USDC is token 0, WETH is token 1
-        //   Minimum USDC value per ETH corresponds to the minimum tick value
-        minUsdc = tickToPrice(usdcToken, wethToken, this.maxTick).toFixed(2)
-        maxUsdc = tickToPrice(usdcToken, wethToken, this.minTick).toFixed(2)
+        //   Minimum USDC value per ETH corresponds to the maximum tick value
+        //   Counterintuitively, WETH is still the first token we pass to tickToPrice()
+        minUsdc = tickToPrice(wethToken, usdcToken, this.maxTick).toFixed(2)
+        maxUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
       }
 
       this.entryTick = rangeOrderPoolTick
