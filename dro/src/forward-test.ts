@@ -36,6 +36,19 @@ interface DroState {
 // Keys here are range widths.
 const droStates = new Map<number, DroState>()
 
+// For a given range width, what's our expected divergence when the market trades up to the range
+// max or down to the range min, in USD terms, as a proportion?
+// Note that this only applies when the entry price for the position is the exact midpoint of the
+// range min and max.
+function divergenceProportion(rangeWidth: number, direction: Direction): number {
+    if (direction == Direction.Up) {
+        return rangeWidth / 8
+    }
+    else {
+        return rangeWidth * 3 / 4
+    }
+}
+
 // Only half the value in our account needs to be swapped to the other asset when we re-range.
 function swapFee(amount: number): number {
     return SWAP_POOL_FEE * 0.5 * amount
@@ -54,7 +67,7 @@ function gasCost(): number {
 // }
 
 // TODO (P1): Add an init() function and do what forwardTestRerange() currently does when there's
-// no state yet. we should not be waiting for the first re-range before doing anything.
+// no state yet. We should not be waiting for the first re-range before doing anything.
 
 export function forwardTestRerange(width: number,
     lastMinTick: number,
@@ -87,33 +100,27 @@ export function forwardTestRerange(width: number,
     // Calculate "impermanent loss", more correctly now a realised loss or gain,
     // from moving completely into the devaluing asset in the pool.
     // Stick to USDC-denominated return calculation for now.
-
-    // If we re-ranged down, all the USDC we added is now ETH at an average price of
-    // half way between the entry price and the min price for the last range.
-
-    // If we re-ranged up, all the ETH we added is now USDC at an average price of
-    // half way between entry price and the max price for the last range.
     const entryPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastEntryTick).toFixed(2))
     console.log(`[${width}] Entry price: ${entryPriceUsdc} USDC`)
 
+    const expectedDivergencePorportion = divergenceProportion(width, direction)
+    console.log(`[${width}] Expected divergence: ${expectedDivergencePorportion / 100}%`)
+
     if (direction == Direction.Up) {
+        // If we re-ranged up, all the ETH we added is now USDC at an average price of
+        // half way between entry price and the max price for the last range.
         const maxPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMaxTick).toFixed(2))
         console.log(`[${width}] Max price: ${maxPriceUsdc} USDC`)
 
-        // TODO (P1): Because this is proportional, it actually doesn't depend on absolute prices
-        // at all. Calculate it based on the range width only and do that statically, not here.
-        // Do some algebra to express this in terms of the range width, not the absolute prices.
-        // Test it against our R&D sheet.
-        const expectedDivergenceGainProportion = ((maxPriceUsdc - entryPriceUsdc) / 2) /
-            (2 * entryPriceUsdc)
-
-        const expectedDivergenceGainUsdc = expectedDivergenceGainProportion *
+        const expectedDivergenceGainUsdc = expectedDivergencePorportion *
+            // USDC value of our position:
             (state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc))
 
-        console.log(`[${width}] Expected divergence gain: ${expectedDivergenceGainUsdc}, \
-(${expectedDivergenceGainProportion / 100}%)`)
+        console.log(`[${width}] Expected divergence gain: ${expectedDivergenceGainUsdc}`)
     }
     else if (direction == Direction.Down) {
+        // If we re-ranged down, all the USDC we added is now ETH at an average price of
+        // half way between the entry price and the min price for the last range.
         console.log(`[${width}] Expected divergence loss: not yet implemented`)
     }
 
