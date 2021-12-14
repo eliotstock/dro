@@ -12,6 +12,7 @@ import { ethers } from 'ethers'
 
 // TODO
 // ----
+// (P1) Forward test many range widths
 // (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network.
 // (P2) More swap testing
 // (P2) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
@@ -63,21 +64,9 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 // possible width - we can't set a min tick 30 bps lower than the current price. The same applies
 // to range widths that are multiples of 60 bps but not 120 bps - they cannot be centered on the 
 // current price. Therefore, choose ranges widths that are multiples of 120 bps.
-//
-// Percent   bps (ticks)   Mean time to re-ranging, from forward testing
-// -------   -----------   ------------
-//    1.2%           120   2 hours
-//    2.4%           240   4 hours
-//    3.6%           360   8 hours
-//    4.8%           480   ?
-//    6.0%           600   ?
-//    7.2%           720   ?
-//    8.4%           840   ?
-//    9.6%           960   ?
-// const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960, 1080]
-// const rangeWidths: number[] = [120, 240, 360, 480, 600, 720, 840, 960, 1080, 1200, 1320, 1440, 1560, 1680, 1800]
-const rangeWidths: number[] = [1800]
-// const rangeWidths: number[] = [120]
+if (process.env.RANGE_WIDTHS == undefined) throw 'No RANGE_WIDTHS list in .env file.'
+
+const rangeWidths: number[] = process.env.RANGE_WIDTHS?.split(' ').map(Number)
 
 // Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []

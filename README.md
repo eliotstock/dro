@@ -10,6 +10,7 @@
     1. `ALCHEMY_PROJECT_ID_ETHEREUM_MAINNET`
     1. `ALCHEMY_PROJECT_ID_ARBITRUM_MAINNET`
     1. `CHAIN` eg. `CHAIN="ethereumMainnet"`
+    1. `RANGE_WIDTHS` eg. `RANGE_WIDTHS="120 240 360 480 600 720 840 960 1800"`
 1. `npm run start`
 
 ## Build a Raspberry Pi Ubuntu Server machine to run this
