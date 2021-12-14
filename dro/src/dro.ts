@@ -78,7 +78,7 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       // The order of the tokens in the pool varies from chain to chain, annoyingly.
       // Ethereum mainnet: USDC is first
       // Arbitrum mainnet: WETH is first
-      const wethFirst = await tokenOrderIsWethFirst()
+      this.wethFirst = await tokenOrderIsWethFirst()
     }
   
     outOfRange() {
