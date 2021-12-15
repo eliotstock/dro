@@ -9,7 +9,7 @@ import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
-import { forwardTestRerange, logResults } from './forward-test'
+import { forwardTestInit, forwardTestRerange, logResults } from './forward-test'
 import invariant from 'tiny-invariant'
 
 const OUT_DIR = './out'
@@ -79,6 +79,8 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
       // Ethereum mainnet: USDC is first
       // Arbitrum mainnet: WETH is first
       this.wethFirst = await tokenOrderIsWethFirst()
+
+      forwardTestInit(this.rangeWidthTicks)
     }
   
     outOfRange() {

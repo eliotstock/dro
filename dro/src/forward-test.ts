@@ -28,13 +28,6 @@ expectedGrossYields.set(120, 1_280)
 expectedGrossYields.set(240, 710)
 expectedGrossYields.set(360, 320)
 
-interface DroState {
-    liquidityEth: number,
-    liquidityUsdc: number
-}
-
-// Keys here are range widths.
-// const droStates = new Map<number, DroState>()
 
 const droPositionValuesUsdc = new Map<number, number>()
 
@@ -60,127 +53,66 @@ function gasCost(): number {
     return GAS_COST
 }
 
-// function intervalYears(previousTimestamp: string, currentTimestamp: string): number {
-//     const previous = moment(previousTimestamp, TIMESTAMP_FORMAT)
-//     const current = moment(currentTimestamp, TIMESTAMP_FORMAT)
-
-//     // Do NOT round to the nearest integer here, by passing true.
-//     return current.diff(previous, 'years', true)
-// }
-
-// TODO (P1): Add an init() function and do what forwardTestRerange() currently does when there's
-// no state yet. We should not be waiting for the first re-range before doing anything.
+export function forwardTestInit(width: number) {
+    droPositionValuesUsdc.set(width, INITIAL_POSTION_VALUE_USDC)
+}
 
 export function forwardTestRerange(width: number,
-    // lastMinTick: number,
-    // lastMaxTick: number,
-    // lastEntryTick: number,
     timeInRange: Duration,
     direction: Direction) {
-    // Get position state for this range width.
-    // let state = droStates.get(width)
-
-    // // If this is the initial range, just figure out our starting liquidity.
-    // if (state == undefined) {
-    //     state = {
-    //         // Spend half our initial USDC balance on ETH at the current price in the pool.
-    //         liquidityEth: (INITIAL_POSTION_VALUE_USDC / 2) / parseFloat(rangeOrderPoolPriceUsdc),
-
-    //         // And keep the other half in USDC.
-    //         liquidityUsdc: INITIAL_POSTION_VALUE_USDC / 2
-    //     }
-
-    //     droStates.set(width, state)
-
-    //     return
-    // }
 
     let positionValue = droPositionValuesUsdc.get(width)
 
     if (positionValue == undefined) {
-        positionValue = INITIAL_POSTION_VALUE_USDC
+        throw 'No initial value for width. Call forwardTestInit() first.'
     }
 
     const positionValueBefore = positionValue
 
-    let logLine = `[${width}] Position value = ${positionValue}`
+    let logLine = `[${width}] Position value = ${positionValue.toPrecision(7)}`
 
     // Calculate expected fees given the range width and the time spent in range
-    const expectGrossYieldApy = expectedGrossYields.get(width)
+    const expectGrossYieldPercent = expectedGrossYields.get(width)
 
-    if (expectGrossYieldApy == undefined) {
+    if (expectGrossYieldPercent == undefined) {
         console.log(`[${width}] No expected gross yield for this width`)
 
         return
     }
 
-    const yearsInRange = timeInRange.asYears()
-
-    const unclaimedFees = expectGrossYieldApy / 100 * yearsInRange * positionValue
-    logLine += ` +${unclaimedFees} (yield over ${yearsInRange} years in range)`
+    const unclaimedFees = expectGrossYieldPercent / 100 * timeInRange.asYears() * positionValue
+    logLine += ` +${unclaimedFees} (yield over ${timeInRange.asYears().toPrecision(6)} years in range)`
     positionValue += unclaimedFees
 
-    // Calculate "impermanent loss", more correctly now a realised loss or gain,
-    // from moving completely into the devaluing asset in the pool.
-    // Stick to USDC-denominated return calculation for now.
-    // TODO (P1): Move all tickToPrice() calls into uniswap.ts.
-    // const entryPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastEntryTick).toFixed(2))
-    // console.log(`[${width}] Entry price: ${entryPriceUsdc} USDC`)
+    const divergence = divergenceBps(width, direction)
+    console.log(`[${width}] Expected divergence: ${divergence} bps`)
 
-    const expectedDivergenceBps = divergenceBps(width, direction)
-    console.log(`[${width}] Expected divergence: ${expectedDivergenceBps / 100}%`)
-
-    // console.log(`[${width}] Liquidity in USDC: ${state.liquidityUsdc}`)
-    // console.log(`[${width}] Liquidity in ETH: ${state.liquidityEth}`)
-
-    // console.log(`[${width}] USDC value of liquidity in ETH: ${state.liquidityEth * entryPriceUsdc}`)
-    // console.log(`[${width}] Total liquidity value in USDC terms: ${state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc)}`)
-
-    const expectedDivergenceAbs = expectedDivergenceBps / (100 * 100) * positionValueBefore
-        // USDC value of our position:
-        // (state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc))
+    const expectedDivergenceAbs = divergence / (100 * 100) * positionValueBefore
 
     if (direction == Direction.Up) {
         // If we re-ranged up, all the ETH we added is now USDC at an average price of
         // half way between entry price and the max price for the last range.
-
-        // TODO (P1): Whether we use the lastMaxTick or lastMinTick to find the maxPriceUsdc depends
-        // on the token order.
-        // If the token order is WETH first, use lastMaxTick
-        // If the token order is USDC first, use lastMinTick
-        // const maxPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMinTick).toFixed(2))
-        // console.log(`[${width}] Max price: ${maxPriceUsdc} USDC`)
-
-        // console.log(`[${width}] Expected divergence gain: ${expectedDivergenceAbs} USDC`)
-        logLine += ` +${expectedDivergenceAbs} (divergence gain)`
+        logLine += ` +${expectedDivergenceAbs.toPrecision(4)} (divergence gain)`
         positionValue += expectedDivergenceAbs
     }
     else if (direction == Direction.Down) {
         // If we re-ranged down, all the USDC we added is now ETH at an average price of
         // half way between the entry price and the min price for the last range.
-
-        // TODO (P1): Whether we use the lastMaxTick or lastMinTick to find the maxPriceUsdc depends
-        // on the token order.
-        // const minPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMaxTick).toFixed(2))
-        // console.log(`[${width}] Min price: ${minPriceUsdc} USDC`)
-
-        // console.log(`[${width}] Expected divergence loss: ${expectedDivergenceAbs} USDC`)
-
-        logLine += ` -${expectedDivergenceAbs} (divergence loss)`
+        logLine += ` -${expectedDivergenceAbs.toPrecision(4)} (divergence loss)`
         positionValue -= expectedDivergenceAbs
     }
 
     // We'll also incur the cost of the swap and the gas for the set of re-ranging
     // transactions (remove liquidity, swap, add liquidity)
     const fee = swapFee(positionValue)
-    logLine += ` -${fee} (swap fee)`
+    logLine += ` -${fee.toPrecision(4)} (swap fee)`
     positionValue -= fee
 
     const gas = gasCost()
-    logLine += ` -${gas} (gas cost)`
+    logLine += ` -${gas.toPrecision(4)} (gas cost)`
     positionValue -= gas
 
-    logLine += ` = ${positionValue} USDC`
+    logLine += ` = ${positionValue.toPrecision(7)} USDC`
     console.log(logLine)
 
     droPositionValuesUsdc.set(width, positionValue)
