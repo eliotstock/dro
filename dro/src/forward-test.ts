@@ -107,6 +107,16 @@ export function forwardTestRerange(width: number,
     const expectedDivergencePorportion = divergenceProportion(width, direction)
     console.log(`[${width}] Expected divergence: ${expectedDivergencePorportion / 100}%`)
 
+    console.log(`[${width}] Liquidity in USDC: ${state.liquidityUsdc}`)
+    console.log(`[${width}] Liquidity in ETH: ${state.liquidityEth}`)
+
+    console.log(`[${width}] USDC value of liquidity in ETH: ${state.liquidityEth * entryPriceUsdc}`)
+    console.log(`[${width}] Total liquidity value in USDC terms: ${state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc)}`)
+
+    const expectedDivergenceAbs = expectedDivergencePorportion *
+        // USDC value of our position:
+        (state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc))
+
     if (direction == Direction.Up) {
         // If we re-ranged up, all the ETH we added is now USDC at an average price of
         // half way between entry price and the max price for the last range.
@@ -117,24 +127,21 @@ export function forwardTestRerange(width: number,
         // on the token order.
         // If the token order is WETH first, use lastMaxTick
         // If the token order is USDC first, use lastMinTick
-        const maxPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMinTick).toFixed(2))
-        console.log(`[${width}] Max price: ${maxPriceUsdc} USDC`)
+        // const maxPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMinTick).toFixed(2))
+        // console.log(`[${width}] Max price: ${maxPriceUsdc} USDC`)
 
-        console.log(`[${width}] Liquidity in USDC: ${state.liquidityUsdc}`)
-        console.log(`[${width}] Liquidity in ETH: ${state.liquidityEth}`)
-        console.log(`[${width}] USDC value of liquidity in ETH: ${state.liquidityEth * entryPriceUsdc}`)
-        console.log(`[${width}] Total liquidity value in USDC terms: ${state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc)}`)
-
-        const expectedDivergenceGainUsdc = expectedDivergencePorportion *
-            // USDC value of our position:
-            (state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc))
-
-        console.log(`[${width}] Expected divergence gain: ${expectedDivergenceGainUsdc}`)
+        console.log(`[${width}] Expected divergence gain: ${expectedDivergenceAbs} USDC`)
     }
     else if (direction == Direction.Down) {
         // If we re-ranged down, all the USDC we added is now ETH at an average price of
         // half way between the entry price and the min price for the last range.
-        console.log(`[${width}] Expected divergence loss: not yet implemented`)
+
+        // TODO (P1): Whether we use the lastMaxTick or lastMinTick to find the maxPriceUsdc depends
+        // on the token order.
+        // const minPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMaxTick).toFixed(2))
+        // console.log(`[${width}] Min price: ${minPriceUsdc} USDC`)
+
+        console.log(`[${width}] Expected divergence loss: ${expectedDivergenceAbs} USDC`)
     }
 
     // We'll also incur the cost of the swap and the gas for the set of re-ranging
