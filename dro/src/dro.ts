@@ -116,9 +116,9 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
 
         // Do some forward testing on how this range width is performing.
         forwardTestRerange(this.rangeWidthTicks,
-          this.minTick,
-          this.maxTick,
-          this.entryTick,
+          // this.minTick,
+          // this.maxTick,
+          // this.entryTick,
           timeInRange,
           direction)
       }
