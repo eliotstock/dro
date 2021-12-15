@@ -100,6 +100,7 @@ export function forwardTestRerange(width: number,
     // Calculate "impermanent loss", more correctly now a realised loss or gain,
     // from moving completely into the devaluing asset in the pool.
     // Stick to USDC-denominated return calculation for now.
+    // TODO (P1): Move all tickToPrice() calls into uniswap.ts.
     const entryPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastEntryTick).toFixed(2))
     console.log(`[${width}] Entry price: ${entryPriceUsdc} USDC`)
 
@@ -109,8 +110,20 @@ export function forwardTestRerange(width: number,
     if (direction == Direction.Up) {
         // If we re-ranged up, all the ETH we added is now USDC at an average price of
         // half way between entry price and the max price for the last range.
-        const maxPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMaxTick).toFixed(2))
+
+        // TODO (P1): Why is this higher than entryPriceUsdc?
+
+        // TODO (P1): Whether we use the lastMaxTick or lastMinTick to find the maxPriceUsdc depends
+        // on the token order.
+        // If the token order is WETH first, use lastMaxTick
+        // If the token order is USDC first, use lastMinTick
+        const maxPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastMinTick).toFixed(2))
         console.log(`[${width}] Max price: ${maxPriceUsdc} USDC`)
+
+        console.log(`[${width}] Liquidity in USDC: ${state.liquidityUsdc}`)
+        console.log(`[${width}] Liquidity in ETH: ${state.liquidityEth}`)
+        console.log(`[${width}] USDC value of liquidity in ETH: ${state.liquidityEth * entryPriceUsdc}`)
+        console.log(`[${width}] Total liquidity value in USDC terms: ${state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc)}`)
 
         const expectedDivergenceGainUsdc = expectedDivergencePorportion *
             // USDC value of our position:
