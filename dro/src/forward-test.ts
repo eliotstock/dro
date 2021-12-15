@@ -40,7 +40,7 @@ const droStates = new Map<number, DroState>()
 // max or down to the range min, in USD terms, as a proportion?
 // Note that this only applies when the entry price for the position is the exact midpoint of the
 // range min and max.
-function divergenceProportion(rangeWidth: number, direction: Direction): number {
+function divergenceBps(rangeWidth: number, direction: Direction): number {
     if (direction == Direction.Up) {
         return rangeWidth / 8
     }
@@ -104,8 +104,8 @@ export function forwardTestRerange(width: number,
     const entryPriceUsdc = parseFloat(tickToPrice(wethToken, usdcToken, lastEntryTick).toFixed(2))
     console.log(`[${width}] Entry price: ${entryPriceUsdc} USDC`)
 
-    const expectedDivergencePorportion = divergenceProportion(width, direction)
-    console.log(`[${width}] Expected divergence: ${expectedDivergencePorportion / 100}%`)
+    const expectedDivergenceBps = divergenceBps(width, direction)
+    console.log(`[${width}] Expected divergence: ${expectedDivergenceBps / 100}%`)
 
     console.log(`[${width}] Liquidity in USDC: ${state.liquidityUsdc}`)
     console.log(`[${width}] Liquidity in ETH: ${state.liquidityEth}`)
@@ -113,7 +113,7 @@ export function forwardTestRerange(width: number,
     console.log(`[${width}] USDC value of liquidity in ETH: ${state.liquidityEth * entryPriceUsdc}`)
     console.log(`[${width}] Total liquidity value in USDC terms: ${state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc)}`)
 
-    const expectedDivergenceAbs = expectedDivergencePorportion *
+    const expectedDivergenceAbs = expectedDivergenceBps / (100 * 100) *
         // USDC value of our position:
         (state.liquidityUsdc + (state.liquidityEth * entryPriceUsdc))
 
