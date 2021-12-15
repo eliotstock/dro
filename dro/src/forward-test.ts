@@ -20,14 +20,19 @@ const GAS_COST = 30.00
 // Start out with this amount in each position and see how we get on.
 const INITIAL_POSTION_VALUE_USDC = 50_000
 
+// What do we expect to make in fees, as an annual percentage, for each range width?
+// These numbers are from real positions, albeit very few of them.
 const expectedGrossYields = new Map<number, number>()
 
 //                      bps  percent
 //                      ---  -------
-expectedGrossYields.set(120, 1_280)
-expectedGrossYields.set(240, 710)
-expectedGrossYields.set(360, 320)
-
+expectedGrossYields.set(120, 1_050)
+expectedGrossYields.set(240, 600)
+expectedGrossYields.set(360, 400)
+expectedGrossYields.set(480, 313)
+expectedGrossYields.set(600, 251)
+expectedGrossYields.set(720, 209)
+expectedGrossYields.set(1800, 161)
 
 const droPositionValuesUsdc = new Map<number, number>()
 
