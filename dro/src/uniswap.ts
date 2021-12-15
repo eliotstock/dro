@@ -83,12 +83,12 @@ export async function tokenOrderIsWethFirst(): Promise<boolean> {
 
     if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase() &&
         token1.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase()) {
-        console.log(`Token order in the pool is 0: WETH, 1: USDC`)
+        // console.log(`Token order in the pool is 0: WETH, 1: USDC`)
         return true
     }
     else if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase() &&
         token1.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase()) {
-        console.log(`Token order in the pool is 0: USDC, 1: WETH`)
+        // console.log(`Token order in the pool is 0: USDC, 1: WETH`)
         return false
     }
     else {

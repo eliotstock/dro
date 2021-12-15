@@ -122,8 +122,3 @@ export function forwardTestRerange(width: number,
 
     droPositionValuesUsdc.set(width, positionValue)
 }
-
-export function logResults() {
-    console.log(`TODO`)
-}
-

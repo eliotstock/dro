@@ -9,7 +9,7 @@ import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
-import { forwardTestInit, forwardTestRerange, logResults } from './forward-test'
+import { forwardTestInit, forwardTestRerange } from './forward-test'
 import invariant from 'tiny-invariant'
 
 const OUT_DIR = './out'
