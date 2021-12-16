@@ -32,7 +32,7 @@ expectedGrossYields.set(360, 400)
 expectedGrossYields.set(480, 313)
 expectedGrossYields.set(600, 251)
 expectedGrossYields.set(720, 209)
-expectedGrossYields.set(1800, 161)
+expectedGrossYields.set(1800, 180)
 
 const droPositionValuesUsdc = new Map<number, number>()
 
@@ -86,7 +86,7 @@ export function forwardTestRerange(width: number,
     }
 
     const unclaimedFees = expectGrossYieldPercent / 100 * timeInRange.asYears() * positionValue
-    logLine += ` +${unclaimedFees} (yield over ${timeInRange.asYears().toPrecision(6)} years in range)`
+    logLine += ` +${unclaimedFees.toPrecision(4)} (yield over ${timeInRange.asYears().toPrecision(4)} years in range)`
     positionValue += unclaimedFees
 
     const divergence = divergenceBps(width, direction)
