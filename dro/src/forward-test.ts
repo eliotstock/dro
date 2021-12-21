@@ -38,15 +38,11 @@ const droPositionValuesUsdc = new Map<number, number>()
 
 // For a given range width, what's our expected divergence when the market trades up to the range
 // max or down to the range min, in USD terms, as a proportion?
-// Note that this only applies when the entry price for the position is the exact midpoint of the
-// range min and max.
+// Note that this is a linear approximation and the error is quite large when we get out to range
+// widths like 18%, for example.
+// TODO (P2): Find the proper (non-linear) solution for xa in terms of r. See sheet.
 function divergenceBps(rangeWidth: number, direction: Direction): number {
-    if (direction == Direction.Up) {
-        return rangeWidth / 8
-    }
-    else {
-        return rangeWidth * 3 / 4
-    }
+    return rangeWidth / 8
 }
 
 // Only half the value in our account needs to be swapped to the other asset when we re-range.
