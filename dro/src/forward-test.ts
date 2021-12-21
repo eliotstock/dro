@@ -42,7 +42,13 @@ const droPositionValuesUsdc = new Map<number, number>()
 // widths like 18%, for example.
 // TODO (P2): Find the proper (non-linear) solution for xa in terms of r. See sheet.
 function divergenceBps(rangeWidth: number, direction: Direction): number {
-    return rangeWidth / 8
+    if (direction == Direction.Down) {
+        return 3 * rangeWidth / 8
+    }
+    else {
+        // Up:
+        return rangeWidth / 8
+    }
 }
 
 // Only half the value in our account needs to be swapped to the other asset when we re-range.
