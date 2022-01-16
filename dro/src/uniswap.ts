@@ -96,15 +96,19 @@ export async function tokenOrderIsWethFirst(): Promise<boolean> {
     }
 }
 
+// We store rangeOrderPoolPriceUsdc as a string, but it can be useful to have it as a BigNumber.
 export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
-    // TODO: Remove once tested:
-    rangeOrderPoolPriceUsdc = '4000.00'
+    if (!rangeOrderPoolPriceUsdc)
+        throw 'Do not call rangeOrderPoolPriceUsdcAsBigNumber() before updateTick()'
 
     // Ethers.js's BigNumber does not deal with decimals.
     const usdcAsFloat: number = parseFloat(rangeOrderPoolPriceUsdc)
     const usdcTimesTenToTheMinusSix: number = usdcAsFloat * 1_000_000
 
-    return ethers.BigNumber.from(usdcTimesTenToTheMinusSix)
+    console.log(`usdcTimesTenToTheMinusSix: ${usdcTimesTenToTheMinusSix}`)
+    console.log(`usdcTimesTenToTheMinusSix rounded: ${Math.round(usdcTimesTenToTheMinusSix)}`)
+
+    return ethers.BigNumber.from(Math.round(usdcTimesTenToTheMinusSix))
 }
 
 const TOPIC_0_INCREASE_LIQUIDITY = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f'
