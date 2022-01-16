@@ -108,6 +108,7 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
 
       let timeInRange: Duration
       let timeInRangeReadable: string = 'an unknown period'
+      let forwardTestLogLine: string = ''
 
       if (this.lastRerangeTimestamp) {
         const a = moment(this.lastRerangeTimestamp)
@@ -117,10 +118,7 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         timeInRangeReadable = timeInRange.humanize()
 
         // Do some forward testing on how this range width is performing.
-        forwardTestRerange(this.rangeWidthTicks,
-          // this.minTick,
-          // this.maxTick,
-          // this.entryTick,
+        forwardTestLogLine = forwardTestRerange(this.rangeWidthTicks,
           timeInRange,
           direction)
       }
@@ -171,6 +169,10 @@ Got: ${position.tickLower}, ${position.tickUpper}`)
         insertRerangeEvent(this.rangeWidthTicks, moment().toISOString(), direction)
 
         console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRangeReadable} to ${minUsdc} <-> ${maxUsdc}`)
+      }
+
+      if (forwardTestLogLine.length > 0) {
+        console.log(forwardTestLogLine)
       }
     }
   

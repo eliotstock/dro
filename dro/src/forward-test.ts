@@ -39,7 +39,7 @@ const droPositionValuesUsdc = new Map<number, number>()
 // For a given range width, what's our expected divergence when the market trades up to the range
 // max or down to the range min, in USD terms, as a proportion?
 // Note that this is a linear approximation and the error is quite large when we get out to range
-// widths like 18%, for example.
+// widths like 1800 bps, for example.
 // TODO (P2): Find the proper (non-linear) solution for xa in terms of r. See sheet.
 function divergenceBps(rangeWidth: number, direction: Direction): number {
     if (direction == Direction.Down) {
@@ -66,7 +66,7 @@ export function forwardTestInit(width: number) {
 
 export function forwardTestRerange(width: number,
     timeInRange: Duration,
-    direction: Direction) {
+    direction: Direction): string {
 
     let positionValue = droPositionValuesUsdc.get(width)
 
@@ -82,9 +82,7 @@ export function forwardTestRerange(width: number,
     const expectGrossYieldPercent = expectedGrossYields.get(width)
 
     if (expectGrossYieldPercent == undefined) {
-        console.log(`[${width}] No expected gross yield for this width`)
-
-        return
+        return `[${width}] No expected gross yield for this width`
     }
 
     const unclaimedFees = expectGrossYieldPercent / 100 * timeInRange.asYears() * positionValue
@@ -120,7 +118,8 @@ export function forwardTestRerange(width: number,
     positionValue -= gas
 
     logLine += ` = ${positionValue.toPrecision(7)} USDC`
-    console.log(logLine)
 
     droPositionValuesUsdc.set(width, positionValue)
+
+    return logLine
 }
