@@ -104,8 +104,8 @@ export function forwardTestRerange(width: number,
     const usdcBefore = usdc
     const ethBefore = eth
 
-    let logLineUsdc = `[${width}] Position value (USDC) =\n  ${usdc.toPrecision(7)}`
-    let logLineEth = `[${width}] Position value (ETH) =\n  ${eth.toPrecision(4)}`
+    let logLineUsdc = `[${width}] Position value (USDC) =\n  ${usdc.toPrecision(7)}\n`
+    let logLineEth = `[${width}] Position value (ETH) =\n  ${eth.toPrecision(7)}\n`
 
     // Calculate expected fees given the range width and the time spent in range
     const expectGrossYieldPercent = expectedGrossYields.get(width)
@@ -115,11 +115,11 @@ export function forwardTestRerange(width: number,
     }
 
     const unclaimedFeesUsdc = expectGrossYieldPercent / 100 * timeInRange.asYears() * usdc
-    logLineUsdc += `   +${unclaimedFeesUsdc.toPrecision(4)} (yield over ${timeInRange.asYears().toPrecision(4)} years in range)\n`
+    logLineUsdc += `  + ${unclaimedFeesUsdc.toPrecision(4)} yield over ${timeInRange.asYears().toPrecision(2)} years in range\n`
     usdc += unclaimedFeesUsdc
 
     const unclaimedFeesEth = expectGrossYieldPercent / 100 * timeInRange.asYears() * eth
-    logLineEth += `   +${unclaimedFeesEth.toPrecision(4)} (yield over ${timeInRange.asYears().toPrecision(4)} years in range)\n`
+    logLineEth += `  + ${unclaimedFeesEth.toPrecision(4)} yield over ${timeInRange.asYears().toPrecision(2)} years in range\n`
     eth += unclaimedFeesEth
 
     const divergence = divergenceBps(width, direction)
@@ -131,19 +131,19 @@ export function forwardTestRerange(width: number,
     if (direction == Direction.Up) {
         // If we re-ranged up, all the ETH we added is now USDC at an average price of
         // half way between entry price and the max price for the last range.
-        logLineUsdc += `    +${expectedDivergenceAbsUsdc.toPrecision(4)} (divergence gain)\n`
+        logLineUsdc += `  + ${expectedDivergenceAbsUsdc.toPrecision(4)} divergence gain\n`
         usdc += expectedDivergenceAbsUsdc
 
-        logLineEth += `    -${expectedDivergenceAbsEth.toPrecision(4)} (divergence loss)\n`
+        logLineEth += `  - ${expectedDivergenceAbsEth.toPrecision(4)} divergence loss\n`
         eth -= expectedDivergenceAbsEth
     }
     else if (direction == Direction.Down) {
         // If we re-ranged down, all the USDC we added is now ETH at an average price of
         // half way between the entry price and the min price for the last range.
-        logLineUsdc += `    -${expectedDivergenceAbsUsdc.toPrecision(4)} (divergence loss)\n`
+        logLineUsdc += `   - ${expectedDivergenceAbsUsdc.toPrecision(4)} divergence loss\n`
         usdc -= expectedDivergenceAbsUsdc
 
-        logLineEth += `    +${expectedDivergenceAbsEth.toPrecision(4)} (divergence gain)\n`
+        logLineEth += `   + ${expectedDivergenceAbsEth.toPrecision(4)} divergence gain\n`
         eth += expectedDivergenceAbsEth
     }
 
@@ -151,23 +151,23 @@ export function forwardTestRerange(width: number,
     // transactions (remove liquidity, swap, add liquidity)
 
     const feeUsdc = swapFeeUsdc(usdc)
-    logLineUsdc += `    -${feeUsdc.toPrecision(4)} (swap fee)\n`
+    logLineUsdc += `   - ${feeUsdc.toPrecision(2)} swap fee\n`
     usdc -= feeUsdc
 
     const feeEth = swapFeeEth(eth)
-    logLineEth += `    -${feeEth.toPrecision(4)} (swap fee)\n`
+    logLineEth += `   - ${feeEth.toPrecision(4)} swap fee\n`
     eth -= feeEth
 
     const gasUsdc = gasCostUsdc()
-    logLineUsdc += `   -${gasUsdc.toPrecision(4)} (gas cost)\n`
+    logLineUsdc += `  - ${gasUsdc.toPrecision(4)} gas cost\n`
     usdc -= gasUsdc
 
     const gasEth = gasCostEth()
-    logLineEth += `   -${gasEth.toPrecision(4)} (gas cost)\n`
+    logLineEth += `  - ${gasEth.toPrecision(2)} gas cost\n`
     eth -= gasEth
 
-    logLineUsdc += ` = ${usdc.toPrecision(7)} USDC`
-    logLineEth += ` = ${eth.toPrecision(7)} ETH`
+    logLineUsdc += `  = ${usdc.toPrecision(7)} USDC`
+    logLineEth += `  = ${eth.toPrecision(7)} ETH`
 
     droPositionValuesUsdc.set(width, usdc)
     droPositionValuesEth.set(width, eth)
