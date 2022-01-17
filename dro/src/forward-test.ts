@@ -21,8 +21,9 @@ const GAS_COST = 30.00
 // Start out with this amount in each position and see how we get on.
 const INITIAL_POSTION_VALUE_USDC = 50_000
 
-// Based on a price of 3,360.
-const INITIAL_POSTION_VALUE_ETH = 14.88095
+// Update this once we move significantly.
+const ETH_PRICE = 3_360
+const INITIAL_POSTION_VALUE_ETH = INITIAL_POSTION_VALUE_USDC / ETH_PRICE // 14.88095
 
 // What do we expect to make in fees, as an annual percentage, for each range width?
 // These numbers are from real positions, albeit very few of them.
@@ -64,8 +65,16 @@ function swapFeeUsdc(amount: number): number {
     return SWAP_POOL_FEE * 0.5 * amount
 }
 
+function swapFeeEth(amount: number): number {
+    return (SWAP_POOL_FEE / ETH_PRICE) * 0.5 * amount
+}
+
 function gasCostUsdc(): number {
     return GAS_COST
+}
+
+function gasCostEth(): number {
+    return GAS_COST / ETH_PRICE
 }
 
 export function forwardTestInit(width: number) {
@@ -85,15 +94,18 @@ export function forwardTestRerange(width: number,
     timeInRange: Duration,
     direction: Direction): string {
 
-    let positionValue = droPositionValuesUsdc.get(width)
+    let usdc = droPositionValuesUsdc.get(width)
+    let eth = droPositionValuesEth.get(width)
 
-    if (positionValue == undefined) {
+    if (usdc == undefined || eth == undefined) {
         throw 'No initial value for width. Call forwardTestInit() first.'
     }
 
-    const positionValueBefore = positionValue
+    const usdcBefore = usdc
+    const ethBefore = eth
 
-    let logLine = `[${width}] Position value (USDC) =\n  ${positionValue.toPrecision(7)}`
+    let logLineUsdc = `[${width}] Position value (USDC) =\n  ${usdc.toPrecision(7)}`
+    let logLineEth = `[${width}] Position value (ETH) =\n  ${eth.toPrecision(4)}`
 
     // Calculate expected fees given the range width and the time spent in range
     const expectGrossYieldPercent = expectedGrossYields.get(width)
@@ -102,41 +114,63 @@ export function forwardTestRerange(width: number,
         return `[${width}] No expected gross yield for this width`
     }
 
-    const unclaimedFees = expectGrossYieldPercent / 100 * timeInRange.asYears() * positionValue
-    logLine += ` +${unclaimedFees.toPrecision(4)} (yield over ${timeInRange.asYears().toPrecision(4)} years in range)\n`
-    positionValue += unclaimedFees
+    const unclaimedFeesUsdc = expectGrossYieldPercent / 100 * timeInRange.asYears() * usdc
+    logLineUsdc += `   +${unclaimedFeesUsdc.toPrecision(4)} (yield over ${timeInRange.asYears().toPrecision(4)} years in range)\n`
+    usdc += unclaimedFeesUsdc
+
+    const unclaimedFeesEth = expectGrossYieldPercent / 100 * timeInRange.asYears() * eth
+    logLineEth += `   +${unclaimedFeesEth.toPrecision(4)} (yield over ${timeInRange.asYears().toPrecision(4)} years in range)\n`
+    eth += unclaimedFeesEth
 
     const divergence = divergenceBps(width, direction)
     // console.log(`[${width}] Expected divergence: ${divergence} bps`)
 
-    const expectedDivergenceAbs = divergence / (100 * 100) * positionValueBefore
+    const expectedDivergenceAbsUsdc = divergence / (100 * 100) * usdcBefore
+    const expectedDivergenceAbsEth = divergence / (100 * 100) * ethBefore
 
     if (direction == Direction.Up) {
         // If we re-ranged up, all the ETH we added is now USDC at an average price of
         // half way between entry price and the max price for the last range.
-        logLine += ` +${expectedDivergenceAbs.toPrecision(4)} (divergence gain)\n`
-        positionValue += expectedDivergenceAbs
+        logLineUsdc += `    +${expectedDivergenceAbsUsdc.toPrecision(4)} (divergence gain)\n`
+        usdc += expectedDivergenceAbsUsdc
+
+        logLineEth += `    -${expectedDivergenceAbsEth.toPrecision(4)} (divergence loss)\n`
+        eth -= expectedDivergenceAbsEth
     }
     else if (direction == Direction.Down) {
         // If we re-ranged down, all the USDC we added is now ETH at an average price of
         // half way between the entry price and the min price for the last range.
-        logLine += ` -${expectedDivergenceAbs.toPrecision(4)} (divergence loss)\n`
-        positionValue -= expectedDivergenceAbs
+        logLineUsdc += `    -${expectedDivergenceAbsUsdc.toPrecision(4)} (divergence loss)\n`
+        usdc -= expectedDivergenceAbsUsdc
+
+        logLineEth += `    +${expectedDivergenceAbsEth.toPrecision(4)} (divergence gain)\n`
+        eth += expectedDivergenceAbsEth
     }
 
     // We'll also incur the cost of the swap and the gas for the set of re-ranging
     // transactions (remove liquidity, swap, add liquidity)
-    const fee = swapFeeUsdc(positionValue)
-    logLine += ` -${fee.toPrecision(4)} (swap fee)\n`
-    positionValue -= fee
 
-    const gas = gasCostUsdc()
-    logLine += ` -${gas.toPrecision(4)} (gas cost)\n`
-    positionValue -= gas
+    const feeUsdc = swapFeeUsdc(usdc)
+    logLineUsdc += `    -${feeUsdc.toPrecision(4)} (swap fee)\n`
+    usdc -= feeUsdc
 
-    logLine += ` = ${positionValue.toPrecision(7)} USDC`
+    const feeEth = swapFeeEth(eth)
+    logLineEth += `    -${feeEth.toPrecision(4)} (swap fee)\n`
+    eth -= feeEth
 
-    droPositionValuesUsdc.set(width, positionValue)
+    const gasUsdc = gasCostUsdc()
+    logLineUsdc += `   -${gasUsdc.toPrecision(4)} (gas cost)\n`
+    usdc -= gasUsdc
 
-    return logLine
+    const gasEth = gasCostEth()
+    logLineEth += `   -${gasEth.toPrecision(4)} (gas cost)\n`
+    eth -= gasEth
+
+    logLineUsdc += ` = ${usdc.toPrecision(7)} USDC`
+    logLineEth += ` = ${eth.toPrecision(7)} ETH`
+
+    droPositionValuesUsdc.set(width, usdc)
+    droPositionValuesEth.set(width, eth)
+
+    return `${logLineUsdc}\n${logLineEth}`
 }
