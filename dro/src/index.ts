@@ -12,7 +12,7 @@ import { ethers } from 'ethers'
 
 // TODO
 // ----
-// (P1) Forward test many range widths
+// (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction.
 // (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network.
 // (P2) More swap testing
 // (P3) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
@@ -20,6 +20,7 @@ import { ethers } from 'ethers'
 
 // Done
 // ----
+// (P1) Forward test many range widths
 // (P1) Give Alchemy a spin and see a) whether we fall within the free tier b) if we get fewer errors than on Infura.
 // (P1) Get the 'remove liquidity' tx working
 // (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
