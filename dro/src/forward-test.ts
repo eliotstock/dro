@@ -104,8 +104,8 @@ export function forwardTestRerange(width: number,
     const usdcBefore = usdc
     const ethBefore = eth
 
-    let logLineUsdc = `[${width}] Position value (USDC)   =\n  ${usdc.toPrecision(7)}\n`
-    let logLineEth = `[${width}] Position value (ETH)   =\n  ${eth.toPrecision(7)}\n`
+    let logLineUsdc = `[${width}] Position value (USDC)   =\n    ${usdc.toPrecision(7)}\n`
+    let logLineEth = `[${width}] Position value (ETH)   =\n    ${eth.toPrecision(7)}\n`
 
     // Calculate expected fees given the range width and the time spent in range
     const expectGrossYieldPercent = expectedGrossYields.get(width)
