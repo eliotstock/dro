@@ -66,7 +66,7 @@ function swapFeeUsdc(amount: number): number {
 }
 
 function swapFeeEth(amount: number): number {
-    return (SWAP_POOL_FEE / ETH_PRICE) * 0.5 * amount
+    return swapFeeUsdc(amount) / ETH_PRICE
 }
 
 function gasCostUsdc(): number {
