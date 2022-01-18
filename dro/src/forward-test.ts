@@ -104,8 +104,8 @@ export function forwardTestRerange(width: number,
     const usdcBefore = usdc
     const ethBefore = eth
 
-    let logLineUsdc = `[${width}] Position value (USDC) =\n  ${usdc.toPrecision(7)}\n`
-    let logLineEth = `[${width}] Position value (ETH) =\n  ${eth.toPrecision(7)}\n`
+    let logLineUsdc = `[${width}] Position value (USDC)   =\n  ${usdc.toPrecision(7)}\n`
+    let logLineEth = `[${width}] Position value (ETH)   =\n  ${eth.toPrecision(7)}\n`
 
     // Calculate expected fees given the range width and the time spent in range
     const expectGrossYieldPercent = expectedGrossYields.get(width)
@@ -140,10 +140,10 @@ export function forwardTestRerange(width: number,
     else if (direction == Direction.Down) {
         // If we re-ranged down, all the USDC we added is now ETH at an average price of
         // half way between the entry price and the min price for the last range.
-        logLineUsdc += `   - ${expectedDivergenceAbsUsdc.toPrecision(4)} divergence loss\n`
+        logLineUsdc += `  - ${expectedDivergenceAbsUsdc.toPrecision(4)} divergence loss\n`
         usdc -= expectedDivergenceAbsUsdc
 
-        logLineEth += `   + ${expectedDivergenceAbsEth.toPrecision(4)} divergence gain\n`
+        logLineEth += `  + ${expectedDivergenceAbsEth.toPrecision(4)} divergence gain\n`
         eth += expectedDivergenceAbsEth
     }
 
@@ -151,11 +151,11 @@ export function forwardTestRerange(width: number,
     // transactions (remove liquidity, swap, add liquidity)
 
     const feeUsdc = swapFeeUsdc(usdc)
-    logLineUsdc += `   - ${feeUsdc.toPrecision(2)} swap fee\n`
+    logLineUsdc += `  - ${feeUsdc.toPrecision(2)} swap fee\n`
     usdc -= feeUsdc
 
     const feeEth = swapFeeEth(eth)
-    logLineEth += `   - ${feeEth.toPrecision(4)} swap fee\n`
+    logLineEth += `  - ${feeEth.toPrecision(4)} swap fee\n`
     eth -= feeEth
 
     const gasUsdc = gasCostUsdc()
