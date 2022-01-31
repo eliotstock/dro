@@ -432,6 +432,11 @@ ${u.toString()} USDC worth of WETH.`)
       const availableWeth = (await wallet.weth()).toString()
 
       const slot = await rangeOrderPoolContract.slot0()
+
+      // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+      // undefined. This will throw an error when the position gets created.
+      invariant(slot[5] > 0, 'Pool has no fee')
+
       const liquidity = await rangeOrderPoolContract.liquidity()
 
       // A position instance requires a Pool instance.
@@ -575,6 +580,12 @@ ${u.toString()} USDC worth of WETH.`)
       }
 
       const slot = await rangeOrderPoolContract.slot0()
+
+      // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+      // undefined. This will throw an error when the position gets created.
+      // invariant(slot[5] > 0, 'Pool has no fee')
+      const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
+
       const liquidity = await rangeOrderPoolContract.liquidity()
 
       // A position instance requires a Pool instance.
@@ -583,29 +594,10 @@ ${u.toString()} USDC worth of WETH.`)
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
       if (CHAIN_CONFIG.isTestnet) {
-        // If we don't pass some ticks to the Pool constructor, the pool's tick spacing is
-        // undefined and creating the position instance fails.
-        // const ticks: Tick[] = [
-        //   {
-        //     index: nearestUsableTick(TickMath.MIN_TICK, rangeOrderPoolTickSpacing),
-        //     liquidityNet: liquidity,
-        //     liquidityGross: liquidity
-        //   },
-        //   {
-        //     index: nearestUsableTick(TickMath.MAX_TICK, rangeOrderPoolTickSpacing),
-        //     liquidityNet: BigNumber.from(liquidity).mul(-1).toString(),
-        //     liquidityGross: liquidity
-        //   }
-        // ]
-        // TODO: Actually it's probably just passing FeeAmount.MEDIUM below that fixed this. Remove
-        // the above if so.
-
-        // This Pool is defined at @uniswap/v3-sdk/dist/entities/pool.d.ts. There is no Pool
-        // defined in @uniswap/smart-order-router.
         rangeOrderPool = new Pool(
           usdcToken,
           wethToken,
-          FeeAmount.MEDIUM, // Fee: 0.30%
+          fee, // Fee: 0.30%
           slot[0].toString(), // SqrtRatioX96
           liquidity.toString(), // Liquidity
           slot[1], // Tick
@@ -621,7 +613,7 @@ ${u.toString()} USDC worth of WETH.`)
         rangeOrderPool = new Pool(
           usdcToken,
           wethToken,
-          slot[5], // Fee: 0.30%
+          fee, // Fee: 0.30%
           slot[0].toString(), // SqrtRatioX96
           liquidity.toString(), // Liquidity
           slot[1] // Tick
@@ -701,7 +693,7 @@ ${u.toString()} USDC worth of WETH.`)
         }
       }
       else {
-        throw `Swap to ratio failed. Status: ${routeToRatioResponse.status}`
+        throw `Swap to ratio failed. Status: ${SwapToRatioStatus[routeToRatioResponse.status]}`
       } 
     }
 
