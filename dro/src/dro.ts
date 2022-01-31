@@ -1,7 +1,7 @@
 import { config } from 'dotenv'
 import { BigNumber } from '@ethersproject/bignumber'
 import { CollectOptions, FeeAmount, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SwapOptions, SwapRouter, Tick, tickToPrice, Trade } from "@uniswap/v3-sdk"
-import { CurrencyAmount, Percent, BigintIsh, TradeType, Currency } from "@uniswap/sdk-core"
+import { CurrencyAmount, Percent, BigintIsh, TradeType, Currency, Fraction } from "@uniswap/sdk-core"
 import { TickMath } from '@uniswap/v3-sdk/'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
@@ -9,6 +9,7 @@ import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import { forwardTestInit, forwardTestRerange } from './forward-test'
 import invariant from 'tiny-invariant'
 
@@ -550,6 +551,152 @@ ${u.toString()} USDC worth of WETH.`)
       else {
         console.error(`No token ID from logs. We won't be able to remove this liquidity.`)
       }
+    }
+
+    async swapAndAddLiquidity() {
+      if (this.position || this.tokenId)
+         throw "Refusing to swap and add liquidity. Still in a position. Remove liquidity first."
+
+      // The order of the tokens in the pool varies from chain to chain, annoyingly.
+      // Ethereum mainnet: USDC is first
+      // Arbitrum mainnet: WETH is first
+      let token0Balance
+      let token1Balance
+
+      // The wallet gives us BigNumbers for balances, but Uniswap's CurrencyAmount takes a
+      // BigintIsh, which is a JSBI, string or number.
+      if (this.wethFirst) {
+        token0Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
+        token1Balance = CurrencyAmount.fromRawAmount(usdcToken, await (await wallet.usdc()).toString())
+      }
+      else {
+        token0Balance = CurrencyAmount.fromRawAmount(usdcToken, await (await wallet.usdc()).toString())
+        token1Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
+      }
+
+      const slot = await rangeOrderPoolContract.slot0()
+      const liquidity = await rangeOrderPoolContract.liquidity()
+
+      // A position instance requires a Pool instance.
+      let rangeOrderPool: Pool
+
+      // It's difficult to keep a range order pool liquid on testnet, even one we've created
+      // ourselves.
+      if (CHAIN_CONFIG.isTestnet) {
+        // If we don't pass some ticks to the Pool constructor, the pool's tick spacing is
+        // undefined and creating the position instance fails.
+        // const ticks: Tick[] = [
+        //   {
+        //     index: nearestUsableTick(TickMath.MIN_TICK, rangeOrderPoolTickSpacing),
+        //     liquidityNet: liquidity,
+        //     liquidityGross: liquidity
+        //   },
+        //   {
+        //     index: nearestUsableTick(TickMath.MAX_TICK, rangeOrderPoolTickSpacing),
+        //     liquidityNet: BigNumber.from(liquidity).mul(-1).toString(),
+        //     liquidityGross: liquidity
+        //   }
+        // ]
+        // TODO: Actually it's probably just passing FeeAmount.MEDIUM below that fixed this. Remove
+        // the above if so.
+
+        // This Pool is defined at @uniswap/v3-sdk/dist/entities/pool.d.ts. There is no Pool
+        // defined in @uniswap/smart-order-router.
+        rangeOrderPool = new Pool(
+          usdcToken,
+          wethToken,
+          FeeAmount.MEDIUM, // Fee: 0.30%
+          slot[0].toString(), // SqrtRatioX96
+          liquidity.toString(), // Liquidity
+          slot[1], // Tick
+          // ticks
+        )
+
+        // Rather than require minTick and maxTick to be valid, replace them with valid values on
+        // testnets. These were observed on a manually created position, therefore they're valid.
+        this.minTick = 191580
+        this.maxTick = 195840
+      }
+      else {
+        rangeOrderPool = new Pool(
+          usdcToken,
+          wethToken,
+          slot[5], // Fee: 0.30%
+          slot[0].toString(), // SqrtRatioX96
+          liquidity.toString(), // Liquidity
+          slot[1] // Tick
+        )
+      }
+
+      // From the SDK docs: "The position liquidity can be set to 1, since liquidity is still
+      // unknown and will be set inside the call to routeToRatio()."
+      const p = new Position({
+        pool: rangeOrderPool,
+        tickLower: this.minTick,
+        tickUpper: this.maxTick,
+        liquidity: 1
+      })
+
+      const router = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
+
+      const routeToRatioResponse: SwapToRatioResponse = await router.routeToRatio(
+        token0Balance,
+        token1Balance,
+        p,
+        // swapAndAddConfig
+        {
+          ratioErrorTolerance: new Fraction(1, 100),
+          maxIterations: 6,
+        },
+        // swapAndAddOptions
+        {
+           swapOptions: {
+             recipient: wallet.address,
+             slippageTolerance: new Percent(5, 100),
+             deadline: 100
+           },
+           addLiquidityOptions: {
+             recipient: wallet.address,
+           }
+         }
+      )
+
+      if (routeToRatioResponse.status == SwapToRatioStatus.SUCCESS) {
+        const route: SwapToRatioRoute = routeToRatioResponse.result
+
+        const txRequest = {
+          data: route.methodParameters?.calldata,
+          to: CHAIN_CONFIG.addrSwapRouter,
+          value: BigNumber.from(route.methodParameters?.value),
+          from: wallet.address,
+          gasPrice: BigNumber.from(route.gasPriceWei),
+        }
+
+        // Send the transaction to the provider.
+        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+        console.log(`addLiquidity() TX response:`)
+        console.dir(txResponse)
+
+        const txReceipt: TransactionReceipt = await txResponse.wait()
+        console.log(`addLiquidity() TX receipt:`)
+        console.dir(txReceipt)
+
+        this.tokenId = extractTokenId(txReceipt)
+        this.position = p
+
+        if (this.tokenId) {
+          const webUrl = positionWebUrl(this.tokenId)
+          console.log(`Position URL: ${webUrl}`)
+
+          insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
+        }
+        else {
+          console.error(`No token ID from logs. We won't be able to remove this liquidity.`)
+        }
+      }
+      else {
+        console.error(`Swap to ratio failed.`)
+      } 
     }
 
     async onBlock() {
