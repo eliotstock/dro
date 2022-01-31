@@ -672,7 +672,13 @@ ${u.toString()} USDC worth of WETH.`)
           gasPrice: BigNumber.from(route.gasPriceWei),
         }
 
-        // Send the transaction to the provider.
+        // If we run out of gas here on a testnet, note this comment from Uniswap's Discord dev-chat
+        // channel:
+        //   looks like that pool is probably sitting at a bad price
+        //   in v3 it loops though the ticks and liquidity and when it has a bad price it has to
+        //   loop more causing need for more gas
+        //   if it's your pool fix the balance in the pool
+        //   right now there is a lot of the USDC and very little weth
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
         console.log(`addLiquidity() TX response:`)
         console.dir(txResponse)
@@ -691,11 +697,11 @@ ${u.toString()} USDC worth of WETH.`)
           insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
         }
         else {
-          console.error(`No token ID from logs. We won't be able to remove this liquidity.`)
+          throw `No token ID from logs. We won't be able to remove this liquidity.`
         }
       }
       else {
-        console.error(`Swap to ratio failed.`)
+        throw `Swap to ratio failed. Status: ${routeToRatioResponse.status}`
       } 
     }
 
@@ -745,13 +751,17 @@ ${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
         this.updateRange()
 
         // Swap half our assets to the other asset so that we have equal value of assets.
-        await this.swap()
-
-        // Take note of what assets we now hold after the swap
-        await wallet.logBalances()
+        // await this.swap()
 
         // Add all our WETH and USDC to a new liquidity position.
-        await this.addLiquidity()
+        // await this.addLiquidity()
+
+        // Deposit assets and let the protocol swap the optimal size for the liquidity position,
+        // then enter the liquidity position all in one transaction.
+        await this.swapAndAddLiquidity()
+
+        // Take note of what assets we now hold
+        await wallet.logBalances()
 
         this.locked = false
       }
