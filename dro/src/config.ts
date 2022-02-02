@@ -166,7 +166,7 @@ const ETHEREUM_KOVAN: ChainConfig = {
     gasLimit: ethers.utils.hexlify(10_000_000),
 
     // Above what gas price, in gwei, are we unwilling to re-range?
-    gasPriceMax: ethers.utils.parseUnits("2", "gwei"), // 2 gwei is a typical gas price for Kovan.
+    gasPriceMax: ethers.utils.parseUnits("6", "gwei"), // 2 gwei is a typical gas price for Kovan.
 
     addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
 

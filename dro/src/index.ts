@@ -13,7 +13,7 @@ import { ethers } from 'ethers'
 // TODO
 // ----
 // (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
-// (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network.
+// (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network. Ask in Alchemy Discord.
 // (P2) More swap testing
 // (P3) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
@@ -109,7 +109,7 @@ ${rangeOrderPoolPriceUsdc} USDC`)
 }
 
 async function main() {
-  console.log(`Using ${CHAIN_CONFIG.name}`)
+  console.log(`\nUsing ${CHAIN_CONFIG.name}`)
 
   // Process command line args using yargs. Pass these to `ts-node ./src/index.ts`
   const argv = yargs(process.argv.slice(2)).options({

@@ -579,6 +579,8 @@ ${u.toString()} USDC worth of WETH.`)
         token1Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
       }
 
+      console.log(`Token 0 balance: ${token0Balance.toFixed(2)}, token 1 balance: ${token1Balance.toFixed(2)}`)
+
       const slot = await rangeOrderPoolContract.slot0()
 
       // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
@@ -631,6 +633,8 @@ ${u.toString()} USDC worth of WETH.`)
 
       const router = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
 
+      // Source: https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/alpha-router.ts
+      //         https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts#L17
       const routeToRatioResponse: SwapToRatioResponse = await router.routeToRatio(
         token0Balance,
         token1Balance,
