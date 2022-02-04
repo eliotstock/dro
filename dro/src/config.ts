@@ -112,10 +112,11 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     slippageTolerance: new Percent(50, 10_000), // 0.005%
 
-    gasPrice: ethers.utils.parseUnits("3", "gwei"),
+    gasPrice: ethers.utils.parseUnits("6", "gwei"),
 
     // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
-    gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
+    // For the combined "swap and add liquidity" transaction, this could be twice that.
+    gasLimit: ethers.utils.hexlify(1_000_000), // Sensible: 450_000
 
     // Above what gas price, in gwei, are we unwilling to re-range?
     // Gas on Arbitrum is never so high that we'd want to wait to re-range, in practice.

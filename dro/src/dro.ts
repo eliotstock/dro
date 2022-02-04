@@ -579,7 +579,7 @@ ${u.toString()} USDC worth of WETH.`)
         token1Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
       }
 
-      console.log(`Token 0 balance: ${token0Balance.toFixed(2)}, token 1 balance: ${token1Balance.toFixed(2)}`)
+      console.log(`Token 0 balance: ${token0Balance.toFixed(4)}, token 1 balance: ${token1Balance.toFixed(4)}`)
 
       const slot = await rangeOrderPoolContract.slot0()
 
@@ -633,6 +633,8 @@ ${u.toString()} USDC worth of WETH.`)
 
       const router = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
 
+      console.log(`Calling routeToRatio()`)
+
       // Source: https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/alpha-router.ts
       //         https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts#L17
       const routeToRatioResponse: SwapToRatioResponse = await router.routeToRatio(
@@ -657,15 +659,33 @@ ${u.toString()} USDC worth of WETH.`)
          }
       )
 
+      console.log(`routeToRatioResponse:`)
+      console.dir(routeToRatioResponse)
+
       if (routeToRatioResponse.status == SwapToRatioStatus.SUCCESS) {
         const route: SwapToRatioRoute = routeToRatioResponse.result
 
+        console.log(`route:`)
+        console.dir(route)
+
+        console.log(`Gas price from route: ${route.gasPriceWei} wei`)
+        console.log(`Gas price from config: ${CHAIN_CONFIG.gasPrice.toString()}`)
+
+        const nonce = await wallet.getTransactionCount("latest")
+
+        // Not providing the gasLimit will throw UNPREDICTABLE_GAS_LIMIT.
+        // Using gasLimit of 1_000_000 will throw "not enough funds for gas", even with 0.04 ETH in the account.
+        // Same for 500_000.
+        // Same for 100_000.
         const txRequest = {
-          data: route.methodParameters?.calldata,
+          from: wallet.address,
           to: CHAIN_CONFIG.addrSwapRouter,
           value: BigNumber.from(route.methodParameters?.value),
-          from: wallet.address,
-          gasPrice: BigNumber.from(route.gasPriceWei),
+          nonce: nonce,
+          // gasPrice: BigNumber.from(route.gasPriceWei),
+          gasPrice: CHAIN_CONFIG.gasPrice,
+          gasLimit: CHAIN_CONFIG.gasLimit,
+          data: route.methodParameters?.calldata,
         }
 
         // If we run out of gas here on a testnet, note this comment from Uniswap's Discord dev-chat
@@ -676,11 +696,11 @@ ${u.toString()} USDC worth of WETH.`)
         //   if it's your pool fix the balance in the pool
         //   right now there is a lot of the USDC and very little weth
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-        console.log(`addLiquidity() TX response:`)
+        console.log(`swapAndAddLiquidity() TX response:`)
         console.dir(txResponse)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
-        console.log(`addLiquidity() TX receipt:`)
+        console.log(`swapAndAddLiquidity() TX receipt:`)
         console.dir(txReceipt)
 
         this.tokenId = extractTokenId(txReceipt)

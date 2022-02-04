@@ -95,7 +95,7 @@ class EthUsdcWallet extends ethers.Wallet {
         // our ABI is incomplete.
         // WETH has 18 decimals, just like Ether.
 
-        // Formatting to a goiven number of decimal places is fiddly. We are truncating here, not
+        // Formatting to a given number of decimal places is fiddly. We are truncating here, not
         // rounding.
         const usdcBalanceReadable = ethers.utils.formatUnits(
             usdcBalance.sub(usdcBalance.mod(1e4)), 6)
