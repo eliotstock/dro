@@ -168,8 +168,9 @@ async function main() {
     // Approve the position manager contract to spend our tokens.
     await wallet.approveAll(CHAIN_CONFIG.addrPositionManager)
 
-    // Approve the swap router to spend our tokens.
+    // Approve the swap routers to spend our tokens.
     await wallet.approveAll(CHAIN_CONFIG.addrSwapRouter)
+    await wallet.approveAll(CHAIN_CONFIG.addrSwapRouter2)
 
     return
   }

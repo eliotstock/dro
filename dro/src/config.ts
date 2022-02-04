@@ -24,6 +24,7 @@ export interface ChainConfig {
     addrPositionManager: string
     addrQuoter: string
     addrSwapRouter: string
+    addrSwapRouter2: string
     gasLimit: string
 }
 
@@ -78,7 +79,9 @@ const ETHEREUM_MAINNET: ChainConfig = {
 
     addrQuoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
 
-    addrSwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+    addrSwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+
+    addrSwapRouter2: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
 }
 
 // Block explorer: https://arbiscan.io/.
@@ -112,11 +115,11 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     slippageTolerance: new Percent(50, 10_000), // 0.005%
 
-    gasPrice: ethers.utils.parseUnits("6", "gwei"),
+    gasPrice: ethers.utils.parseUnits("2", "gwei"),
 
     // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
     // For the combined "swap and add liquidity" transaction, this could be twice that.
-    gasLimit: ethers.utils.hexlify(1_000_000), // Sensible: 450_000
+    gasLimit: ethers.utils.hexlify(2_000_000), // TX created, but fails: 2_000_000.
 
     // Above what gas price, in gwei, are we unwilling to re-range?
     // Gas on Arbitrum is never so high that we'd want to wait to re-range, in practice.
@@ -127,7 +130,9 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     addrQuoter: ETHEREUM_MAINNET.addrQuoter,
 
-    addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter
+    addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter,
+
+    addrSwapRouter2: ETHEREUM_MAINNET.addrSwapRouter2,
 }
 
 const ETHEREUM_KOVAN: ChainConfig = {
@@ -173,7 +178,9 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     addrQuoter: ETHEREUM_MAINNET.addrQuoter,
 
-    addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter
+    addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter,
+
+    addrSwapRouter2: ETHEREUM_MAINNET.addrSwapRouter2
 }
 
 // Set the CHAIN env var to one of these keys.

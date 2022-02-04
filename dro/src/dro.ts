@@ -659,8 +659,8 @@ ${u.toString()} USDC worth of WETH.`)
          }
       )
 
-      console.log(`routeToRatioResponse:`)
-      console.dir(routeToRatioResponse)
+      // console.log(`routeToRatioResponse:`)
+      // console.dir(routeToRatioResponse)
 
       if (routeToRatioResponse.status == SwapToRatioStatus.SUCCESS) {
         const route: SwapToRatioRoute = routeToRatioResponse.result
@@ -668,8 +668,8 @@ ${u.toString()} USDC worth of WETH.`)
         console.log(`route:`)
         console.dir(route)
 
-        console.log(`Gas price from route: ${route.gasPriceWei} wei`)
-        console.log(`Gas price from config: ${CHAIN_CONFIG.gasPrice.toString()}`)
+        // console.log(`Gas price from route: ${route.gasPriceWei} wei`)
+        // console.log(`Gas price from config: ${CHAIN_CONFIG.gasPrice.toString()}`)
 
         const nonce = await wallet.getTransactionCount("latest")
 
@@ -679,7 +679,7 @@ ${u.toString()} USDC worth of WETH.`)
         // Same for 100_000.
         const txRequest = {
           from: wallet.address,
-          to: CHAIN_CONFIG.addrSwapRouter,
+          to: CHAIN_CONFIG.addrSwapRouter2,
           value: BigNumber.from(route.methodParameters?.value),
           nonce: nonce,
           // gasPrice: BigNumber.from(route.gasPriceWei),
