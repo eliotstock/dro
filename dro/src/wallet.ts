@@ -44,6 +44,10 @@ class EthUsdcWallet extends ethers.Wallet {
             process.exit()
         }
 
+        // This will get the first account for this seed phrase. There's an optional second
+        // argument here for the BIP-32 derivation path.
+        //   m/44'/60'/0'/0/0 (default): account 0
+        //   m/44'/60'/0'/0/1:           account 1 etc.
         const s: ethers.Wallet = super.fromMnemonic(mnemonic)
 
         const usdcContract = new ethers.Contract(
