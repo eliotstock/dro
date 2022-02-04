@@ -70,7 +70,7 @@ class EthUsdcWallet extends ethers.Wallet {
         w.usdcContract = w.usdcContract.connect(w)
         w.wethContract = w.wethContract.connect(w)
 
-        console.log(`DRO account: ${w.address}`)
+        console.log(`\nDRO account: ${w.address}`)
 
         return w
     }

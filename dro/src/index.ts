@@ -109,7 +109,7 @@ ${rangeOrderPoolPriceUsdc} USDC`)
 }
 
 async function main() {
-  console.log(`\nUsing ${CHAIN_CONFIG.name}`)
+  console.log(`Using ${CHAIN_CONFIG.name}`)
 
   // Process command line args using yargs. Pass these to `ts-node ./src/index.ts`
   const argv = yargs(process.argv.slice(2)).options({
