@@ -641,6 +641,9 @@ ${u.toString()} USDC worth of WETH.`)
 
       // Source: https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/alpha-router.ts
       //         https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts#L17
+      // calldata built here:
+      //   https://github.com/Uniswap/smart-order-router/blob/b19ebcb3f3e2b6b10a8021884f5336c8735ba8a5/src/routers/alpha-router/alpha-router.ts#L1303
+      //   SwapRouter.swapAndAddCallParameters(): https://github.com/Uniswap/router-sdk/blob/7d989fbe285abf32a63c602221cd136651e39103/src/swapRouter.ts#L376
       const routeToRatioResponse: SwapToRatioResponse = await router.routeToRatio(
         token0Balance,
         token1Balance,
