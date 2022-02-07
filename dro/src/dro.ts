@@ -644,6 +644,15 @@ ${u.toString()} USDC worth of WETH.`)
       // calldata built here:
       //   https://github.com/Uniswap/smart-order-router/blob/b19ebcb3f3e2b6b10a8021884f5336c8735ba8a5/src/routers/alpha-router/alpha-router.ts#L1303
       //   SwapRouter.swapAndAddCallParameters(): https://github.com/Uniswap/router-sdk/blob/7d989fbe285abf32a63c602221cd136651e39103/src/swapRouter.ts#L376
+      // Adding the repos for the Uniswap projects locally and then adding this to package.json doesn't work for debugging:
+      //     "@uniswap/sdk-core": "file:../sdk-core",
+      //     "@uniswap/smart-order-router": "file:../smart-order-router",
+      //     "@uniswap/v3-sdk": "file:../v3-sdk",
+      //     "@uniswap/router-sdk": "file:../router-sdk",
+      // Latest version numbers:
+      //     "@uniswap/sdk-core": "^3.0.1",
+      //     "@uniswap/smart-order-router": "^2.5.15",
+      //     "@uniswap/v3-sdk": "^3.8.1",
       const routeToRatioResponse: SwapToRatioResponse = await router.routeToRatio(
         token0Balance,
         token1Balance,
