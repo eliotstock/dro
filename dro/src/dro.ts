@@ -1,17 +1,18 @@
 import { config } from 'dotenv'
 import { BigNumber } from '@ethersproject/bignumber'
-import { CollectOptions, FeeAmount, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SwapOptions, SwapRouter, Tick, tickToPrice, Trade } from "@uniswap/v3-sdk"
-import { CurrencyAmount, Percent, BigintIsh, TradeType, Currency, Fraction } from "@uniswap/sdk-core"
-import { TickMath } from '@uniswap/v3-sdk/'
+import { CollectOptions, FeeAmount, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SwapOptions, SwapRouter, Tick, tickToPrice, Trade } from '@uniswap/v3-sdk'
+import { CurrencyAmount, Percent, BigintIsh, TradeType, Currency, Fraction } from '@uniswap/sdk-core'
+import { TickMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
-import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
+import { AlphaRouter, SwapToRatioFail, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import { forwardTestInit, forwardTestRerange } from './forward-test'
 import invariant from 'tiny-invariant'
+import JSBI from 'jsbi'
 
 const OUT_DIR = './out'
 
@@ -391,7 +392,7 @@ ${u.toString()} USDC worth of WETH.`)
       }
 
       const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-      // console.log("calldata: ", calldata)
+      console.log(`[${this.rangeWidthTicks}] calldata: `, calldata)
 
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -579,7 +580,9 @@ ${u.toString()} USDC worth of WETH.`)
         token1Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
       }
 
-      console.log(`Token 0 balance: ${token0Balance.toFixed(4)}, token 1 balance: ${token1Balance.toFixed(4)}`)
+      console.log(`[dro.ts] Token 0 balance: ${token0Balance.toFixed(4)}, token 1 balance: ${token1Balance.toFixed(4)}`)
+
+      console.log(`[dro.ts] output balance quotient: ${token1Balance.quotient}`)
 
       const slot = await rangeOrderPoolContract.slot0()
 
@@ -587,6 +590,19 @@ ${u.toString()} USDC worth of WETH.`)
       // undefined. This will throw an error when the position gets created.
       // invariant(slot[5] > 0, 'Pool has no fee')
       const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
+
+      const sqrtRatioX96 = slot[0]
+
+      console.log(`[dro.ts] sqrtRatioX96.toString(): ${sqrtRatioX96.toString()}`)
+      console.log(`[dro.ts] sqrtRatioX96 instanceof JSBI: ${sqrtRatioX96 instanceof JSBI}`)
+      console.log(`[dro.ts] typeof sqrtRatioX96 ${typeof(sqrtRatioX96)}`)
+
+      // Do NOT pass a string for the sqrtRatioX96 parameter below! JSBI does very little type checking.
+      const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
+
+      console.log(`[dro.ts] sqrtRatioX96AsJsbi.toString(): ${sqrtRatioX96AsJsbi.toString()}`)
+      console.log(`[dro.ts] sqrtRatioX96AsJsbi instanceof JSBI: ${sqrtRatioX96AsJsbi instanceof JSBI}`)
+      console.log(`[dro.ts] typeof sqrtRatioX96AsJsbi ${typeof(sqrtRatioX96AsJsbi)}`)
 
       const liquidity = await rangeOrderPoolContract.liquidity()
 
@@ -600,7 +616,7 @@ ${u.toString()} USDC worth of WETH.`)
           usdcToken,
           wethToken,
           fee, // Fee: 0.30%
-          slot[0].toString(), // SqrtRatioX96
+          sqrtRatioX96AsJsbi, // SqrtRatioX96 of type BigIntish which includes JSBI
           liquidity.toString(), // Liquidity
           slot[1], // Tick
           // ticks
@@ -616,7 +632,7 @@ ${u.toString()} USDC worth of WETH.`)
           usdcToken,
           wethToken,
           fee, // Fee: 0.30%
-          slot[0].toString(), // SqrtRatioX96
+          sqrtRatioX96AsJsbi, // SqrtRatioX96 of type BigIntish which includes JSBI
           liquidity.toString(), // Liquidity
           slot[1] // Tick
         )
@@ -624,6 +640,16 @@ ${u.toString()} USDC worth of WETH.`)
 
       // From the SDK docs: "The position liquidity can be set to 1, since liquidity is still
       // unknown and will be set inside the call to routeToRatio()."
+
+      /*
+      Position from smart-order-router's node_modules/.../v3-sdk is not compatible with node_modules/.../v3-sdk.
+      Does smart-order-router depend on the right version of v3-sdk?
+      v3-sdk version (from Github latest at time of pulling): 3.8.2
+      smart-order-router's dependency: "@uniswap/v3-sdk": "^3.7.0"
+
+      sdk-core uses "jsbi": "^3.1.4",
+      smart-order-router uses JSBI: "3.2.4" indirectly
+      */
       const p = new Position({
         pool: rangeOrderPool,
         tickLower: this.minTick,
@@ -633,11 +659,25 @@ ${u.toString()} USDC worth of WETH.`)
 
       const deadlineValue = moment().unix() + 1800
 
-      console.log(`deadline: ${deadlineValue}`)
+      console.log(`[dro.ts] deadline: ${deadlineValue}`)
 
       const router = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
 
-      console.log(`Calling routeToRatio()`)
+      console.log(`[dro.ts] Poistion tickLower: ${p.tickLower}`)
+      console.log(`[dro.ts] Poistion tickUpper: ${p.tickUpper}`)
+
+      const ZERO = JSBI.BigInt(0) // Same as v3-sdk/src/internalConstants.ts
+      const slippageTolerance = new Percent(5, 100)
+      console.log(`[dro.ts] slippageTolerance.lessThan(ZERO): ${slippageTolerance.lessThan(ZERO)}`)
+
+      // From sdk-core:
+      if (slippageTolerance instanceof JSBI || typeof slippageTolerance === 'number' || typeof slippageTolerance === 'string')
+        console.log(`[dro.ts] sdk-core will use new Fraction for tryParseFraction()`)
+      else if ('numerator' in slippageTolerance && 'denominator' in slippageTolerance)
+        console.log(`[dro.ts] sdk-core will use argument as return value`)
+      else console.log(`[dro.ts] sdk-core will throw 'Could not parse fraction'`)
+
+      console.log(`[dro.ts] Calling routeToRatio()`)
 
       // Source: https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/alpha-router.ts
       //         https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts#L17
@@ -660,13 +700,13 @@ ${u.toString()} USDC worth of WETH.`)
         // swapAndAddConfig
         {
           ratioErrorTolerance: new Fraction(5, 100),
-          maxIterations: 1,
+          maxIterations: 2,
         },
         // swapAndAddOptions
         {
            swapOptions: {
              recipient: wallet.address,
-             slippageTolerance: new Percent(5, 100),
+             slippageTolerance: slippageTolerance,
              deadline: deadlineValue
            },
            addLiquidityOptions: {
@@ -681,21 +721,27 @@ ${u.toString()} USDC worth of WETH.`)
       if (routeToRatioResponse.status == SwapToRatioStatus.SUCCESS) {
         const route: SwapToRatioRoute = routeToRatioResponse.result
 
-        console.log(`route:`)
+        console.log(`[dro.ts] route:`)
         console.dir(route)
 
-        console.log(`methodParameters:`)
+        console.log(`[dro.ts] methodParameters:`)
         console.dir(route.methodParameters)
 
-        console.log(`first trade swap:`)
+        console.log(`[dro.ts] number of swaps:`)
+        console.dir(route.trade.swaps.length)
+
+        console.log(`[dro.ts] first trade swap:`)
         console.dir(route.trade.swaps[0])
 
-        console.log(`first trade route:`)
+        console.log(`[dro.ts] number of routes:`)
+        console.dir(route.trade.routes.length)
+
+        console.log(`[dro.ts] first trade route:`)
         console.dir(route.trade.routes[0])
 
-        console.log(`trade input amount: ${route.trade.inputAmount.toFixed(2)} ${route.trade.inputAmount.currency.symbol}, output amount: ${route.trade.outputAmount.toFixed(2)} ${route.trade.outputAmount.currency.symbol}`)
+        console.log(`[dro.ts] trade input amount: ${route.trade.inputAmount.toFixed(2)} ${route.trade.inputAmount.currency.symbol}, output amount: ${route.trade.outputAmount.toFixed(2)} ${route.trade.outputAmount.currency.symbol}`)
 
-        console.log(`optimalRatio: ${route.optimalRatio.toFixed(4)}`)
+        console.log(`[dro.ts] optimalRatio: ${route.optimalRatio.toFixed(4)}`)
 
         // console.log(`Gas price from route: ${route.gasPriceWei} wei`)
         // console.log(`Gas price from config: ${CHAIN_CONFIG.gasPrice.toString()}`)
@@ -749,8 +795,13 @@ ${u.toString()} USDC worth of WETH.`)
         }
       }
       else {
+        console.log(`[dro.ts] routeToRatioResponse:`)
+        console.dir(routeToRatioResponse)
+
+        // const responseAsFail: SwapToRatioFail = routeToRatioResponse
+        // throw `Swap to ratio failed. Status: ${SwapToRatioStatus[routeToRatioResponse.status]}, error: ${responseAsFail.error}`
         throw `Swap to ratio failed. Status: ${SwapToRatioStatus[routeToRatioResponse.status]}`
-      } 
+      }
     }
 
     async onBlock() {
@@ -799,14 +850,17 @@ ${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
         this.updateRange()
 
         // Swap half our assets to the other asset so that we have equal value of assets.
-        // await this.swap()
+        await this.swap()
 
         // Add all our WETH and USDC to a new liquidity position.
-        // await this.addLiquidity()
+        await this.addLiquidity()
 
         // Deposit assets and let the protocol swap the optimal size for the liquidity position,
         // then enter the liquidity position all in one transaction.
-        await this.swapAndAddLiquidity()
+        // Uniswap repo smart-order-router is not ready for production use. Wait for these blocking bugs to get a response before using it:
+        //   https://github.com/Uniswap/smart-order-router/issues/64
+        //   https://github.com/Uniswap/smart-order-router/issues/65
+        // await this.swapAndAddLiquidity()
 
         // Take note of what assets we now hold
         await wallet.logBalances()
