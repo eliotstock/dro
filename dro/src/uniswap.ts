@@ -153,8 +153,8 @@ export async function positionByTokenId(tokenId: number): Promise<Position> {
     // The Pool instance on the position at this point is sorely lacking. Replace it.
     // The liquidity property on the Position instance at this point is a BigNumber. We need a JSBI
     // in order for removeCallParameters() to work.
+    // TODO: No longer required with recent Uniswap lib versions?
     const liquidityJsbi = JSBI.BigInt(position.liquidity)
-
     console.log(`Position liquidity: ${liquidityJsbi.toString()}`)
 
     const slot = await rangeOrderPoolContract.slot0()
@@ -173,7 +173,9 @@ export async function positionByTokenId(tokenId: number): Promise<Position> {
 
     const usablePosition = new Position({
         pool: usablePool,
+        // TODO: No longer required with recent Uniswap lib versions?
         liquidity: liquidityJsbi,
+        // liquidity: position.liquidity,
         tickLower: position.tickLower,
         tickUpper: position.tickUpper
     })
