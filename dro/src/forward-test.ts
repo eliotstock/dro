@@ -1,7 +1,4 @@
 import moment, { Duration } from 'moment'
-import { tickToPrice } from "@uniswap/v3-sdk"
-import { rangeOrderPoolPriceUsdcAsBigNumber } from './uniswap'
-import { ethers } from 'ethers'
 import { Direction } from './dro'
 
 const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
