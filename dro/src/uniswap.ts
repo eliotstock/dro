@@ -105,8 +105,8 @@ export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
     const usdcAsFloat: number = parseFloat(rangeOrderPoolPriceUsdc)
     const usdcTimesTenToTheMinusSix: number = usdcAsFloat * 1_000_000
 
-    console.log(`usdcTimesTenToTheMinusSix: ${usdcTimesTenToTheMinusSix}`)
-    console.log(`usdcTimesTenToTheMinusSix rounded: ${Math.round(usdcTimesTenToTheMinusSix)}`)
+    // console.log(`usdcTimesTenToTheMinusSix: ${usdcTimesTenToTheMinusSix}`)
+    // console.log(`usdcTimesTenToTheMinusSix rounded: ${Math.round(usdcTimesTenToTheMinusSix)}`)
 
     return ethers.BigNumber.from(Math.round(usdcTimesTenToTheMinusSix))
 }
@@ -147,35 +147,55 @@ export async function firstTokenId(): Promise<number | undefined> {
 }
 */
 
-export async function positionByTokenId(tokenId: number): Promise<Position> {
+export async function positionByTokenId(tokenId: number, wethFirst: boolean): Promise<Position> {
     const position: Position = await positionManagerContract.positions(tokenId)
 
-    // The Pool instance on the position at this point is sorely lacking. Replace it.
-    // The liquidity property on the Position instance at this point is a BigNumber. We need a JSBI
-    // in order for removeCallParameters() to work.
-    // TODO: No longer required with recent Uniswap lib versions?
-    const liquidityJsbi = JSBI.BigInt(position.liquidity)
-    console.log(`Position liquidity: ${liquidityJsbi.toString()}`)
+    // The Pool instance on the position at this point is sorely lacking. Replace it. Because all
+    // the properties on the Position are readonly this means constructing a new one.
 
     const slot = await rangeOrderPoolContract.slot0()
     const liquidity = await rangeOrderPoolContract.liquidity()
 
+    // The order of the tokens in the pool varies from chain to chain, annoyingly.
+    //   Ethereum mainnet: USDC is first
+    //   Arbitrum mainnet: WETH is first
+    let token0
+    let token1
+
+    if (wethFirst) {
+        token0 = wethToken
+        token1 = usdcToken
+    }
+    else {
+        token0 = usdcToken
+        token1 = wethToken
+    }
+
+    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+    // undefined. This will throw an error when the position gets created.
+    // invariant(slot[5] > 0, 'Pool has no fee')
+    const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
+
     const usablePool = new Pool(
-        usdcToken,
-        wethToken,
-        FeeAmount.MEDIUM, // Fee: 0.30%, TODO: Only force this on testnets.
+        token0,
+        token1,
+        fee,
         slot[0].toString(), // SqrtRatioX96
         liquidity.toString(), // Liquidity
         slot[1] // Tick
     )
 
-    console.log(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
+    // console.log(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
+
+    // Note that in some previous versions of the Uniswap modules we used to have to replace the
+    // position.liquidity property with a JSBI in order for removeCallParameters() to work. We no
+    // longer need to, it seems.
+    // const liquidityJsbi = JSBI.BigInt(position.liquidity)
+    // console.log(`Position liquidity: ${liquidityJsbi.toString()}`)
 
     const usablePosition = new Position({
         pool: usablePool,
-        // TODO: No longer required with recent Uniswap lib versions?
-        liquidity: liquidityJsbi,
-        // liquidity: position.liquidity,
+        liquidity: position.liquidity,
         tickLower: position.tickLower,
         tickUpper: position.tickUpper
     })
