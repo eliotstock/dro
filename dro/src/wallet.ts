@@ -8,6 +8,7 @@ import { BigNumber } from '@ethersproject/bignumber'
 import { abi as ERC20ABI } from './abi/erc20.json'
 import { abi as WETHABI } from './abi/weth.json'
 import { useConfig, ChainConfig } from './config'
+import { rangeOrderPoolPriceUsdcAsBigNumber } from './uniswap'
 
 // Read our .env file
 config()
@@ -83,6 +84,39 @@ class EthUsdcWallet extends ethers.Wallet {
         return await this.wethContract.balanceOf(this.address)
     }
 
+    async tokenRatioByValue(): Promise<number> {
+        const usdc: BigNumber = await wallet.usdc()
+        const weth: BigNumber = await wallet.weth()
+
+        // console.log(`usdc: ${usdc}`)
+        // console.log(`weth: ${weth}`) // 86_387_721_003_586_366
+
+        // This is USDC * 1e6, eg. 3_000_000_000 when the price of ETH is USD 3,000.
+        const price: BigNumber = rangeOrderPoolPriceUsdcAsBigNumber()
+        // console.log(`price: ${price}`)
+
+        // If we have 1 WETH and the price is USD 3,000, this is then 3_000_000_000 again. But
+        // adjust the scale for the fact that WETH has 18 decimals and USDC has 6.
+        // eg. 263_773_675 means USDC 263.77
+        let usdcValueOfWeth = weth.mul(price).div(BigNumber.from(10).pow(18))
+
+        // Avoid a division by zero error below. Any very small integer will do here.
+        if (usdcValueOfWeth.eq(BigNumber.from(0))) {
+            usdcValueOfWeth = BigNumber.from(1)
+        }
+
+        // console.log(`usdcValueOfWeth: ${usdcValueOfWeth}`)
+
+        // What is the ratio of our USDC balance to the USDC value of our WETH balance? Note that we're
+        // using the price in the range order pool, not the swap pool, but the difference will be
+        // small and we only need very low precision here.
+        // Note that because we're comparing two USDC values, there's no need to handle the difference
+        // in precision between WETH (18 decimals) and USDC (6 decimals)
+        let ratio: BigNumber = usdc.div(usdcValueOfWeth)
+
+        return ratio.toNumber()
+    }
+
     async logBalances() {
         const [usdcBalance, wethBalance, ethBalance] =
             await Promise.all([
@@ -108,6 +142,10 @@ class EthUsdcWallet extends ethers.Wallet {
 
         console.log(`Balances: USDC ${usdcBalanceReadable}, WETH ${wethBalanceReadable}, \
 ETH ${ethBalanceReadable}`)
+
+        const ratio = await this.tokenRatioByValue()
+
+        console.log(`Token ratio by value: ${ratio}`)
     }
 
     async approveAll(address: string) {
