@@ -63,6 +63,8 @@ export async function getTokenIdForPosition(width: number): Promise<number | und
 
     const row = await db.get('SELECT token_id FROM position WHERE width = ?', [width])
 
+    if (row === undefined) return undefined
+
     return row.token_id
 }
 
