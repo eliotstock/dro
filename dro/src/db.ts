@@ -1,7 +1,6 @@
 import sqlite3 from 'sqlite3'
 import { Database, open } from 'sqlite'
 import moment from 'moment'
-import { existsSync } from 'fs'
 
 const OUT_DIR = './out'
 const SQLITE_DB_FILE = OUT_DIR + '/database.db'
@@ -48,20 +47,23 @@ VALUES (?, ?, ?)', width, datetimeUtc, tokenId)
     // console.log(`Row ID: ${result}.rowID`)
 }
 
+export async function deletePosition(width: number) {
+    const db: Database = await openDb()
+
+    const result = await db.run('DELETE FROM position WHERE width = ?', width)
+
+    // console.log(`Result:`)
+    // console.dir(result)
+}
+
 export async function getTokenIdForPosition(width: number): Promise<number | undefined> {
     const db: Database = await openDb()
 
-    const rowsCount = await db.each('SELECT token_id FROM position WHERE width = ?', width, (err, row) => {
-        if (err) {
-          throw err
-        }
-    
-        // console.log(`Token ID: ${row.token_id}`)
+    // console.log(`Width: ${width}`)
 
-        return row.token_id
-      })
+    const row = await db.get('SELECT token_id FROM position WHERE width = ?', [width])
 
-    return undefined
+    return row.token_id
 }
 
 // Pass dates as ISO8601 strings ("YYYY-MM-DD HH:MM:SS.SSS"). Sqlite does not have a DATETIME
@@ -71,14 +73,26 @@ export async function insertRerangeEvent(width: number, datetimeUtc: string, dir
 
     const result = await db.run('INSERT INTO rerange_event (width, datetime, direction) \
 VALUES (?, ?, ?)', width, datetimeUtc, direction)
-
-    // console.log(`Row ID: ${result}.rowID`)
 }
 
-export async function dumpRerangeEventsToCsv() {
+export async function dumpTokenIds() {
     const db: Database = await openDb()
 
-    console.log(`Width, Datetime, Direction`)
+    console.log(`\nWidth, Token ID`)
+
+    const rowsCount = await db.each('SELECT width, token_id FROM position ORDER BY width', (err, row) => {
+        if (err) {
+          throw err
+        }
+    
+        console.log(`${row.width}, ${row.token_id}`)
+      })
+}
+
+export async function dumpRerangeEvents() {
+    const db: Database = await openDb()
+
+    console.log(`\nWidth, Datetime, Direction`)
 
     const rowsCount = await db.each('SELECT width, datetime, direction FROM rerange_event ORDER BY datetime', (err, row) => {
         if (err) {
