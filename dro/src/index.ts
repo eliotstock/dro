@@ -4,7 +4,7 @@ import { wallet, updateGasPrice, gasPrice } from './wallet'
 import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
-import { init, dumpRerangeEventsToCsv, meanTimeToReranging } from './db'
+import { init, dumpTokenIds, dumpRerangeEvents, meanTimeToReranging } from './db'
 import { createPoolOnTestnet } from './uniswap'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
@@ -132,6 +132,8 @@ async function main() {
 
   // `--balances` means just log our available balances.
   if (argv.balances) {
+    await updateTick()
+    
     await wallet.logBalances()
 
     return
@@ -203,7 +205,9 @@ async function main() {
   if (argv.dbDump) {
     console.log(`Database:`)
 
-    await dumpRerangeEventsToCsv()
+    await dumpTokenIds()
+
+    await dumpRerangeEvents()
 
     return
   }
