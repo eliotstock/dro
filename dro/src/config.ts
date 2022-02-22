@@ -61,7 +61,7 @@ const ETHEREUM_MAINNET: ChainConfig = {
     // This is the pool in which we execute our swaps.
     addrPoolSwaps: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
 
-    slippageTolerance: new Percent(50, 10_000), // 0.005%
+    slippageTolerance: new Percent(5, 1_000), // 0.5%
 
     // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
     // specify here. Typical range: 30 - 200 gwei.
@@ -113,7 +113,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
     // USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/arbitrum/pools/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
     addrPoolSwaps: '0xc31e54c7a869b9fcbecc14363cf510d1c41fa443',
 
-    slippageTolerance: new Percent(50, 10_000), // 0.005%
+    slippageTolerance: new Percent(5, 1_000), // 0.5%
 
     gasPrice: ethers.utils.parseUnits("2", "gwei"),
 
