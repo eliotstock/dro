@@ -14,7 +14,6 @@ import { ethers } from 'ethers'
 // ----
 // (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network. Ask in Alchemy Discord.
-// (P2) More swap testing
 // (P3) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
 
@@ -35,6 +34,7 @@ import { ethers } from 'ethers'
 // (P1) Know when we're out of range, indirectly, based on the current price in the pool and the current min/max, which we'll store for now
 // (P1) Timestamps in logging
 // (P1) Fix down/up re-ranging indicator on Arbitrum
+// (P2) More swap testing
 // (P2) While we're waiting for any transaction, don't begin re-ranging again
 // (P2) Know the current price of gas
 // (P2) Don't re-range when the current price of gas is over a constant threshold
