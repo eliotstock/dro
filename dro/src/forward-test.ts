@@ -12,15 +12,15 @@ const SWAP_POOL_FEE = 0.05 / 100
 // const GAS_COST = 92.20
 
 // Arbitrum mainnet
-// Taken from only three manual re-ranges.
-const GAS_COST = 30.00
+// Taken from a recent manual re-range.
+const GAS_COST = 10.70
 
 // Start out with this amount in each position and see how we get on.
-const INITIAL_POSTION_VALUE_USDC = 50_000
+const INITIAL_POSTION_VALUE_USDC = 233
 
 // Update this once we move significantly.
-const ETH_PRICE = 3_360
-const INITIAL_POSTION_VALUE_ETH = INITIAL_POSTION_VALUE_USDC / ETH_PRICE // 14.88095
+const ETH_PRICE = 2_530
+const INITIAL_POSTION_VALUE_ETH = INITIAL_POSTION_VALUE_USDC / ETH_PRICE
 
 // What do we expect to make in fees, as an annual percentage, for each range width?
 // These numbers are from real positions, albeit very few of them.
