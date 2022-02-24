@@ -992,17 +992,17 @@ ${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
         this.updateRange()
 
         // Swap half our assets to the other asset so that we have equal value of assets.
-        // await this.swap()
+        await this.swap()
 
         // Add all our WETH and USDC to a new liquidity position.
-        // await this.addLiquidity()
+        await this.addLiquidity()
 
         // Deposit assets and let the protocol swap the optimal size for the liquidity position,
         // then enter the liquidity position all in one transaction.
         // Uniswap repo smart-order-router is not ready for production use. Wait for these blocking bugs to get a response before using it:
         //   https://github.com/Uniswap/smart-order-router/issues/64
         //   https://github.com/Uniswap/smart-order-router/issues/65
-        await this.swapAndAddLiquidity()
+        // await this.swapAndAddLiquidity()
 
         // Take note of what assets we now hold
         await wallet.logBalances()
