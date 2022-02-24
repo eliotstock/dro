@@ -189,8 +189,8 @@ export class DRO {
     //   https://github.com/Uniswap/interface/blob/eff512deb8f0ab832eb8d1834f6d1a20219257d0/src/hooks/useV3PositionFees.ts#L32
     async checkUnclaimedFees() {
       if (!this.position || !this.tokenId) {
-        // This is expected when running in noop mode, or when running in prod but forward testing
-        // a bunch of other range widths. No need to log it.
+        // This is expected when running in noop mode, or when running one width in prod but
+        // forward testing a bunch of other range widths. No need to log it.
         // console.error(`[${this.rangeWidthTicks}] Can't check unclaimed fees. Not in a position yet.`)
         return
       }
@@ -975,8 +975,7 @@ ${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
 
         this.locked = true
 
-        // Check fees before removing liquidity. Not strictly required if we're never claiming fees
-        // in ETH.
+        // Check fees before removing liquidity.
         await this.checkUnclaimedFees()
 
         // Take note of what assets we now hold
