@@ -201,15 +201,6 @@ export class DRO {
 
       console.log(`[${this.rangeWidthTicks}] token ID: ${this.tokenId}, as hex: ${tokenIdHexString}`)
   
-      // const collectOptions: CollectOptions = {
-      //   tokenId: this.tokenId,
-      //   expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(this.usdc, 0),
-      //   expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(this.weth, 0),
-      //   recipient: w.address
-      // }
-  
-      // const { calldata, value } = NonfungiblePositionManager.collectCallParameters(collectOptions)
-  
       // Contract function: https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol#L309
       // Function params: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol#L160
       positionManagerContract.callStatic.collect({
@@ -220,12 +211,34 @@ export class DRO {
       },
       { from: wallet.address })
       .then((results) => {
-        console.log(`[${this.rangeWidthTicks}] Unclaimed fees: 0: ${results.amount0}, 1: ${results.amount1}`)
+        console.log(`results.amount0 is a JSBI: ${results.amount0 instanceof JSBI}`)
+        console.log(`results.amount0 is a string: ${results.amount0 instanceof String}`)
+        console.log(`results.amount0 is a number: ${results.amount0 instanceof Number}`)
 
-        this.unclaimedFeesUsdc = results.amount0
-        this.unclaimedFeesWeth = results.amount1
-  
-        console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${this.unclaimedFeesUsdc} USDC, ${this.unclaimedFeesWeth} WETH`)
+        console.log(`results.amount1 is a JSBI: ${results.amount1 instanceof JSBI}`)
+        console.log(`results.amount1 is a string: ${results.amount1 instanceof String}`)
+        console.log(`results.amount1 is a number: ${results.amount1 instanceof Number}`)
+
+        if (results.amount0 === undefined || results.amount1 === undefined) {
+          console.log(`[${this.rangeWidthTicks}] One amount is undefined`)
+          return
+        }
+
+        if (this.wethFirst) {
+          this.unclaimedFeesWeth = results.amount0 // === undefined ? JSBI.BigInt('0') : results.amount0
+          this.unclaimedFeesUsdc = results.amount1 // || JSBI.BigInt('0')
+
+          // const wethReadable = ethers.utils.formatEther(this.unclaimedFeesWeth.sub(this.unclaimedFeesWeth.mod(1e14)))
+          // const usdcReadable = ethers.utils.formatUnits(this.unclaimedFeesUsdc.sub(this.unclaimedFeesUsdc.mod(1e4)), 6)
+        }
+        else {
+          this.unclaimedFeesUsdc = results.amount0
+          this.unclaimedFeesWeth = results.amount1
+
+
+
+          console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${this.unclaimedFeesUsdc} USDC, ${this.unclaimedFeesWeth} WETH`)
+        }
       })
     }
   
