@@ -12,6 +12,7 @@ import { ethers } from 'ethers'
 
 // TODO
 // ----
+// (P1) Log unclaimed fees on every price change in the pool.
 // (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network. Ask in Alchemy Discord.
 // (P3) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
@@ -97,6 +98,10 @@ async function onBlock(...args: Array<any>) {
 
     console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceReadable}\
 ${rangeOrderPoolPriceUsdc} USDC`)
+
+    for (const dro of dros) {
+      await dro.onPriceChanged()
+    }
   }
 
   price = rangeOrderPoolPriceUsdc
