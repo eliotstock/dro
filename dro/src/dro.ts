@@ -12,6 +12,7 @@ import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManag
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import { forwardTestInit, forwardTestRerange } from './forward-test'
 import JSBI from 'jsbi'
+import { ethers } from 'ethers'
 
 const OUT_DIR = './out'
 
@@ -35,7 +36,7 @@ export class DRO {
     entryTick: number = 0
     wethFirst: boolean = true
     position?: Position
-    tokenId?: BigintIsh
+    tokenId?: number
     unclaimedFeesUsdc?: BigintIsh
     unclaimedFeesWeth?: BigintIsh
     lastRerangeTimestamp?: string
@@ -54,7 +55,7 @@ export class DRO {
       // Arbitrum mainnet: WETH is first
       this.wethFirst = await tokenOrderIsWethFirst()
 
-      // Get the token ID for our position from the database.
+      // Get the token ID for our position from the database. This is a small positive integer.
       const tokenId = await getTokenIdForPosition(this.rangeWidthTicks)
 
       if (tokenId === undefined) {
@@ -186,18 +187,19 @@ export class DRO {
     //   expectedCurrencyOwed0 and expectedCurrencyOwed1. To calculate this, quote the collect
     //   function and store the amounts. The interface does similar behavior here
     //   https://github.com/Uniswap/interface/blob/eff512deb8f0ab832eb8d1834f6d1a20219257d0/src/hooks/useV3PositionFees.ts#L32
-    /*
     async checkUnclaimedFees() {
       if (!this.position || !this.tokenId) {
-        console.error("Can't check unclaimed fees. Not in a position yet.")
+        // This is expected when running in noop mode, or when running in prod but forward testing
+        // a bunch of other range widths. No need to log it.
+        // console.error(`[${this.rangeWidthTicks}] Can't check unclaimed fees. Not in a position yet.`)
         return
       }
   
       const MAX_UINT128 = BigNumber.from(2).pow(128).sub(1)
   
-      // TODO: Set this once we know the real underlying type of tokenId. BigintIsh is no use.
-      // const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
-      const tokenIdHexString = "todo"
+      const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
+
+      console.log(`[${this.rangeWidthTicks}] token ID: ${this.tokenId}, as hex: ${tokenIdHexString}`)
   
       // const collectOptions: CollectOptions = {
       //   tokenId: this.tokenId,
@@ -208,6 +210,8 @@ export class DRO {
   
       // const { calldata, value } = NonfungiblePositionManager.collectCallParameters(collectOptions)
   
+      // Contract function: https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol#L309
+      // Function params: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol#L160
       positionManagerContract.callStatic.collect({
         tokenId: tokenIdHexString,
         recipient: wallet.address,
@@ -216,13 +220,14 @@ export class DRO {
       },
       { from: wallet.address })
       .then((results) => {
+        console.log(`[${this.rangeWidthTicks}] Unclaimed fees: 0: ${results.amount0}, 1: ${results.amount1}`)
+
         this.unclaimedFeesUsdc = results.amount0
         this.unclaimedFeesWeth = results.amount1
   
         console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${this.unclaimedFeesUsdc} USDC, ${this.unclaimedFeesWeth} WETH`)
       })
     }
-    */
   
     async removeLiquidity() {
       if (!this.position || !this.tokenId) {
@@ -913,6 +918,7 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
         console.log(`swapAndAddLiquidity() TX receipt:`)
         console.dir(txReceipt)
 
+        // The token ID is a small positive integer.
         this.tokenId = extractTokenId(txReceipt)
         this.position = p
 
@@ -934,6 +940,10 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
         // throw `Swap to ratio failed. Status: ${SwapToRatioStatus[routeToRatioResponse.status]}, error: ${responseAsFail.error}`
         throw `Swap to ratio failed. Status: ${SwapToRatioStatus[routeToRatioResponse.status]}`
       }
+    }
+
+    async onPriceChanged() {
+      await this.checkUnclaimedFees()
     }
 
     async onBlock() {
@@ -967,7 +977,7 @@ ${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
 
         // Check fees before removing liquidity. Not strictly required if we're never claiming fees
         // in ETH.
-        // await this.checkUnclaimedFees()
+        await this.checkUnclaimedFees()
 
         // Take note of what assets we now hold
         await wallet.logBalances()
