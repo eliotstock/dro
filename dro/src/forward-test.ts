@@ -95,7 +95,7 @@ export function forwardTestRerange(width: number,
     let eth = droPositionValuesEth.get(width)
 
     if (usdc == undefined || eth == undefined) {
-        throw 'No initial value for width. Call forwardTestInit() first.'
+        throw `No current position value(s) for width ${width}. Call forwardTestInit() first.`
     }
 
     const usdcBefore = usdc
