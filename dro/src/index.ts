@@ -8,7 +8,6 @@ import { init, dumpTokenIds, dumpRerangeEvents, meanTimeToReranging } from './db
 import { createPoolOnTestnet } from './uniswap'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
-import { ethers } from 'ethers'
 
 // TODO
 // ----
