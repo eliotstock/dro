@@ -8,6 +8,7 @@
     "prod": "ts-node ./src/index.ts >>./out/dro.log 2>&1",
     "n": "ts-node ./src/index.ts --n >>./out/dro.log 2>&1",
     "log": "tail -f -n +1 ./out/dro.log",
+    "balances": "ts-node ./src/index.ts --balances",
     "monitor": "ts-node ./src/index.ts --monitor >>./out/swap_events.csv 2>&1"
   },
   "author": "",
