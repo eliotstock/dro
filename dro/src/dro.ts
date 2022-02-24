@@ -647,7 +647,7 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
   
       // addCallParameters() implementation:
       //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/nonfungiblePositionManager.ts#L164
-      // TODO: Prevent this error here when on testnets:
+      // Expect this error here when on testnets. Just use Arbitrum and pay the tx costs.
       /*
       Error: Invariant failed: ZERO_LIQUIDITY
           at invariant (/home/e/r/dro/dro/node_modules/tiny-invariant/dist/tiny-invariant.cjs.js:13:11)
@@ -701,16 +701,25 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       // The order of the tokens in the pool varies from chain to chain, annoyingly.
       // Ethereum mainnet: USDC is first
       // Arbitrum mainnet: WETH is first
+      let token0
+      let token1
+
       let token0Balance
       let token1Balance
 
-      // The wallet gives us BigNumbers for balances, but Uniswap's CurrencyAmount takes a
-      // BigintIsh, which is a JSBI, string or number.
       if (this.wethFirst) {
+        token0 = wethToken
+        token1 = usdcToken
+
+        // The wallet gives us BigNumbers for balances, but Uniswap's CurrencyAmount takes a
+        // BigintIsh, which is a JSBI, string or number.
         token0Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
         token1Balance = CurrencyAmount.fromRawAmount(usdcToken, await (await wallet.usdc()).toString())
       }
       else {
+        token0 = usdcToken
+        token1 = wethToken
+
         token0Balance = CurrencyAmount.fromRawAmount(usdcToken, await (await wallet.usdc()).toString())
         token1Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
       }
@@ -742,35 +751,23 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       const liquidity = await rangeOrderPoolContract.liquidity()
 
       // A position instance requires a Pool instance.
-      let rangeOrderPool: Pool
+      const rangeOrderPool = new Pool(
+        token0,
+        token1,
+        fee, // Fee: 0.30%
+        sqrtRatioX96AsJsbi, // SqrtRatioX96 of type BigIntish which includes JSBI
+        liquidity.toString(), // Liquidity
+        slot[1], // Tick
+        // ticks
+      )
 
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
       if (CHAIN_CONFIG.isTestnet) {
-        rangeOrderPool = new Pool(
-          usdcToken,
-          wethToken,
-          fee, // Fee: 0.30%
-          sqrtRatioX96AsJsbi, // SqrtRatioX96 of type BigIntish which includes JSBI
-          liquidity.toString(), // Liquidity
-          slot[1], // Tick
-          // ticks
-        )
-
         // Rather than require minTick and maxTick to be valid, replace them with valid values on
         // testnets. These were observed on a manually created position, therefore they're valid.
         this.minTick = 191580
         this.maxTick = 195840
-      }
-      else {
-        rangeOrderPool = new Pool(
-          usdcToken,
-          wethToken,
-          fee, // Fee: 0.30%
-          sqrtRatioX96AsJsbi, // SqrtRatioX96 of type BigIntish which includes JSBI
-          liquidity.toString(), // Liquidity
-          slot[1] // Tick
-        )
       }
 
       // From the SDK docs: "The position liquidity can be set to 1, since liquidity is still
@@ -985,17 +982,17 @@ ${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
         this.updateRange()
 
         // Swap half our assets to the other asset so that we have equal value of assets.
-        await this.swap()
+        // await this.swap()
 
         // Add all our WETH and USDC to a new liquidity position.
-        await this.addLiquidity()
+        // await this.addLiquidity()
 
         // Deposit assets and let the protocol swap the optimal size for the liquidity position,
         // then enter the liquidity position all in one transaction.
         // Uniswap repo smart-order-router is not ready for production use. Wait for these blocking bugs to get a response before using it:
         //   https://github.com/Uniswap/smart-order-router/issues/64
         //   https://github.com/Uniswap/smart-order-router/issues/65
-        // await this.swapAndAddLiquidity()
+        await this.swapAndAddLiquidity()
 
         // Take note of what assets we now hold
         await wallet.logBalances()
