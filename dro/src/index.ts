@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
+// (P1) Create new accounting source to handle logging gas cost in USD given a transaction receipt, plus USD total of unclaimed fees from both asset amounts.
 // (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network. Ask in Alchemy Discord.
 // (P3) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally

@@ -69,8 +69,8 @@ export class DRO {
         // Now get the position from Uniswap for the given token ID.
         const position: Position = await positionByTokenId(tokenId, this.wethFirst)
 
-        console.log(`Position:`)
-        console.dir(position)
+        // console.log(`Position:`)
+        // console.dir(position)
 
         if (position) {
           this.position = position
