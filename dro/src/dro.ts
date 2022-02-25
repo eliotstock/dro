@@ -199,7 +199,7 @@ export class DRO {
   
       const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
 
-      console.log(`[${this.rangeWidthTicks}] token ID: ${this.tokenId}, as hex: ${tokenIdHexString}`)
+      // console.log(`[${this.rangeWidthTicks}] token ID: ${this.tokenId}, as hex: ${tokenIdHexString}`)
   
       // Contract function: https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol#L309
       // Function params: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol#L160
