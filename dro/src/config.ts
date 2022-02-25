@@ -113,7 +113,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
     // USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/arbitrum/pools/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
     addrPoolSwaps: '0xc31e54c7a869b9fcbecc14363cf510d1c41fa443',
 
-    slippageTolerance: new Percent(5, 1_000), // 0.5%
+    slippageTolerance: new Percent(10, 1_000), // 1.0%
 
     gasPrice: ethers.utils.parseUnits("2", "gwei"),
 
