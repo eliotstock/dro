@@ -287,6 +287,8 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       this.tokenId = undefined
       this.position = undefined
       deletePosition(this.rangeWidthTicks)
+
+      this.logGasUsed(txReceipt)
     }
   
     async swap() {
@@ -435,6 +437,8 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       const txReceipt: TransactionReceipt = await txResponse.wait()
       console.log(`swap() TX receipt:`)
       console.dir(txReceipt)
+
+      this.logGasUsed(txReceipt)
     }
   
     async addLiquidity() {
@@ -447,21 +451,12 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       const availableWeth = (await wallet.weth()).toString()
       console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
 
-      // const availableUsdcBigNumber: BigNumber = await wallet.usdcContract.balanceOf(wallet.address)
-      // const availableUsdcJsbi = JSBI.BigInt(availableUsdcBigNumber.toHexString())
-
-      // const availableWethBigNumber: BigNumber = await wallet.wethContract.balanceOf(wallet.address)
-      // const availableWethJsbi = JSBI.BigInt(availableWethBigNumber.toHexString())
-      // console.log(`addLiquidity() Amounts available as JSBIs: ${availableUsdcJsbi.toString()} USDC, ${availableWethJsbi.toString()} WETH`)
-
       const slot = await rangeOrderPoolContract.slot0()
 
       // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
       // undefined. This will throw an error when the position gets created.
       // invariant(slot[5] > 0, 'Pool has no fee')
       const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
-
-      // console.log(`addLiquidity() Fee from slot0: ${slot[5]}. Using fee: ${fee}`)
 
       // Do NOT pass a string for the sqrtRatioX96 parameter below! JSBI does very little type checking.
       const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
@@ -470,8 +465,6 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
 
       const tick = slot[1]
-
-      // console.log(`addLiquidity() Tick for pool constructor: ${tick}`)
 
       // The order of the tokens in the pool varies from chain to chain, annoyingly.
       // Ethereum mainnet: USDC is first
@@ -529,24 +522,6 @@ Can't create position.`
 ${rangeOrderPool.tickSpacing}. Can't create position.`
       }
 
-      // console.log(`addLiquidity() minTick: ${this.minTick}, maxTick: ${this.maxTick}, current tick: ${rangeOrderPoolTick}`)
-
-      // const amount0: JSBI = SqrtPriceMath.getAmount0Delta(
-      //   rangeOrderPool.sqrtRatioX96,
-      //   TickMath.getSqrtRatioAtTick(this.maxTick),
-      //   liquidityAsJsbi,
-      //   true
-      // )
-      
-      // const amount1: JSBI = SqrtPriceMath.getAmount1Delta(
-      //   TickMath.getSqrtRatioAtTick(this.minTick),
-      //   rangeOrderPool.sqrtRatioX96,
-      //   liquidityAsJsbi,
-      //   true
-      // )
-
-      // console.log(`addLiquidity() amount0 (USDC): ${amount0.toString()}, amount1 (WETH): ${amount1.toString()}`)
-
       // We don't know L, the liquidity, but we do know how much WETH and how much USDC we'd like
       // to add, which is all of it. Position.fromAmounts() just calls maxLiquidityForAmounts() to
       // figure out the liquidity then uses that in the Position constructor.
@@ -566,82 +541,6 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
         console.log(`addLiquidity() Mint amounts: ${position.mintAmounts.amount0.toString()} USDC, ${position.mintAmounts.amount1.toString()} WETH`)
       }
   
-//       console.log(`Using Position.fromAmounts(), mint amounts: 0: ${position.mintAmounts.amount0.toString()} \
-// 1: ${position.mintAmounts.amount1.toString()}, liquidity: ${position.liquidity.toString()}, price range: ${position.token0PriceLower.toFixed(2)}
-// ${position.token0PriceLower.quoteCurrency.symbol} - ${position.token0PriceUpper.toFixed(2)} ${position.token0PriceUpper.quoteCurrency.symbol}`)
-
-      // // This is the implementation of Position.fromAmounts() pulled in here to aid in debugging.
-      // const sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(this.minTick)
-      // const sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(this.maxTick)
-
-      // const maxLiquidity: JSBI = maxLiquidityForAmounts(rangeOrderPool.sqrtRatioX96,
-      //   sqrtRatioAX96,
-      //   sqrtRatioBX96,
-      //   amount0,
-      //   amount1,
-      //   true)
-
-      // console.log(`addLiquidity() From maxLiquidityForAmounts(), maxLiquidity: ${maxLiquidity}`)
-
-      // position = new Position({
-      //   pool: rangeOrderPool,
-      //   tickLower: this.minTick,
-      //   tickUpper: this.maxTick,
-      //   liquidity: maxLiquidity
-      // })
-
-      // // This at least agrees with the amounts we got by using Position.fromAmounts() above.
-      // console.log(`Using new Position() -> maxLiquidityForAmounts(), mint amounts: ${position.mintAmounts.amount0.toString()} USDC \
-      // ${position.mintAmounts.amount1.toString()} WETH, liquidity: ${position.liquidity.toString()}, price range: ${position.token0PriceLower.toFixed(2)}
-      // ${position.token0PriceLower.quoteCurrency.symbol} - ${position.token0PriceUpper.toFixed(2)} ${position.token0PriceUpper.quoteCurrency.symbol}`)
-
-      // position = Position.fromAmount0({
-      //   pool: rangeOrderPool,
-      //   tickLower: this.minTick,
-      //   tickUpper: this.maxTick,
-      //   amount0: amount0,
-      //   useFullPrecision: false
-      // })
-
-      // // This at least agrees with the amounts we got by using Position.fromAmounts() above.
-      // console.log(`Using Position.fromAmount0(), mint amounts: ${position.mintAmounts.amount0.toString()} USDC \
-      // ${position.mintAmounts.amount1.toString()} WETH, liquidity: ${position.liquidity.toString()}, price range: ${position.token0PriceLower.toFixed(2)}
-      // ${position.token0PriceLower.quoteCurrency.symbol} - ${position.token0PriceUpper.toFixed(2)} ${position.token0PriceUpper.quoteCurrency.symbol}`)
-
-      // const mintAmountUsdc = position.mintAmounts.amount0.toString()
-
-      // position = Position.fromAmount1({
-      //   pool: rangeOrderPool,
-      //   tickLower: this.minTick,
-      //   tickUpper: this.maxTick,
-      //   amount1: amount1
-      // })
-
-      // // This does NOT agree with the amounts we got by using Position.fromAmounts() above.
-      // console.log(`Using Position.fromAmount1(), mint amounts: ${position.mintAmounts.amount0.toString()} USDC \
-      // ${position.mintAmounts.amount1.toString()} WETH, liquidity: ${position.liquidity.toString()}, price range: ${position.token0PriceLower.toFixed(2)}
-      // ${position.token0PriceLower.quoteCurrency.symbol} - ${position.token0PriceUpper.toFixed(2)} ${position.token0PriceUpper.quoteCurrency.symbol}`)
-
-      // const mintAmountWeth = position.mintAmounts.amount1.toString()
-
-      // // Now combine the amounts from fromAmount0() and fromAmount1() into one call to fromAmounts().
-      // position = Position.fromAmounts({
-      //   pool: rangeOrderPool,
-      //   tickLower: this.minTick,
-      //   tickUpper: this.maxTick,
-      //   amount0: amount1,
-      //   amount1: amount0,
-      //   useFullPrecision: false
-      // })
-
-      // // Now we're back to the same amounts we got from using Position.fromAmounts() above.
-      // console.log(`Using Position.fromAmounts() again, mint amounts: ${position.mintAmounts.amount0.toString()} USDC \
-      // ${position.mintAmounts.amount1.toString()} WETH, liquidity: ${position.liquidity.toString()}, price range: ${position.token0PriceLower.toFixed(2)}
-      // ${position.token0PriceLower.quoteCurrency.symbol} - ${position.token0PriceUpper.toFixed(2)} ${position.token0PriceUpper.quoteCurrency.symbol}`)
-
-      // TODO: Remove when above debugged:
-      // if (position !== undefined) throw `Not executing past here.`
-  
       const mintOptions: MintOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
         deadline: moment().unix() + DEADLINE_SECONDS,
@@ -659,8 +558,6 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
           at DRO.<anonymous> (/home/e/r/dro/dro/src/dro.ts:456:62)
       */
       const {calldata, value} = NonfungiblePositionManager.addCallParameters(position, mintOptions)
-  
-      console.log(`addLiquidity() calldata: ${calldata}`)
   
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -696,6 +593,8 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       else {
         console.error(`No token ID from logs. We won't be able to remove this liquidity.`)
       }
+
+      this.logGasUsed(txReceipt)
     }
 
     async swapAndAddLiquidity() {
@@ -939,6 +838,18 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
         // throw `Swap to ratio failed. Status: ${SwapToRatioStatus[routeToRatioResponse.status]}, error: ${responseAsFail.error}`
         throw `Swap to ratio failed. Status: ${SwapToRatioStatus[routeToRatioResponse.status]}`
       }
+    }
+
+    logGasUsed(txReceipt: TransactionReceipt) {
+      // What did we just sepnd on gas? None of these are actually large integers.
+      const gasUsed: BigNumber = txReceipt.gasUsed
+      console.log(`addLiquidity() Gas used: ${gasUsed.toNumber()}`)
+
+      const cumulativeGasUsed: BigNumber = txReceipt.cumulativeGasUsed
+      console.log(`addLiquidity() Cummulative gas used: ${cumulativeGasUsed.toNumber()}`)
+
+      const effectiveGasPrice: BigNumber = txReceipt.effectiveGasPrice
+      console.log(`addLiquidity() Effective gas price: ${effectiveGasPrice.toNumber()}`)
     }
 
     async onPriceChanged() {
