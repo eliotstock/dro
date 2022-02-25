@@ -9,6 +9,7 @@ import { abi as ERC20ABI } from './abi/erc20.json'
 import { abi as WETHABI } from './abi/weth.json'
 import { useConfig, ChainConfig } from './config'
 import { rangeOrderPoolPriceUsdcAsBigNumber } from './uniswap'
+import JSBI from 'jsbi'
 
 // Read our .env file
 config()
@@ -214,4 +215,16 @@ export async function updateGasPrice() {
     // console.log(`  Gas price in gwei: ${gasPriceInGwei}`)
 
     gasPrice = p
+}
+
+// Return a readable string of a float from a large integer
+export function readableJsbi(a: JSBI, decimals: number, precision: number): string {
+    // See: https://stackoverflow.com/questions/54409854/how-to-divide-two-native-javascript-bigints-and-get-a-decimal-result
+    const tenToTheDecimals = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(decimals))
+    const tenToThePrecision = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(precision))
+    const tenToThePrecisionAsNumber = JSBI.toNumber(tenToThePrecision)
+
+    const f: number = JSBI.toNumber(JSBI.divide(JSBI.multiply(a, tenToThePrecision), tenToTheDecimals)) / tenToThePrecisionAsNumber
+
+    return `${f.toFixed(precision)}`
 }

@@ -6,7 +6,7 @@ import { TickMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
-import { wallet, gasPrice } from './wallet'
+import { wallet, gasPrice, readableJsbi } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition, deletePosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
@@ -211,34 +211,22 @@ export class DRO {
       },
       { from: wallet.address })
       .then((results) => {
-        console.log(`results.amount0 is a JSBI: ${results.amount0 instanceof JSBI}`)
-        console.log(`results.amount0 is a string: ${results.amount0 instanceof String}`)
-        console.log(`results.amount0 is a number: ${results.amount0 instanceof Number}`)
-
-        console.log(`results.amount1 is a JSBI: ${results.amount1 instanceof JSBI}`)
-        console.log(`results.amount1 is a string: ${results.amount1 instanceof String}`)
-        console.log(`results.amount1 is a number: ${results.amount1 instanceof Number}`)
-
         if (results.amount0 === undefined || results.amount1 === undefined) {
           console.log(`[${this.rangeWidthTicks}] One amount is undefined`)
           return
         }
 
         if (this.wethFirst) {
-          this.unclaimedFeesWeth = results.amount0 // === undefined ? JSBI.BigInt('0') : results.amount0
-          this.unclaimedFeesUsdc = results.amount1 // || JSBI.BigInt('0')
-
-          // const wethReadable = ethers.utils.formatEther(this.unclaimedFeesWeth.sub(this.unclaimedFeesWeth.mod(1e14)))
-          // const usdcReadable = ethers.utils.formatUnits(this.unclaimedFeesUsdc.sub(this.unclaimedFeesUsdc.mod(1e4)), 6)
+          this.unclaimedFeesWeth = JSBI.BigInt(results.amount0)
+          this.unclaimedFeesUsdc = JSBI.BigInt(results.amount1)
         }
         else {
-          this.unclaimedFeesUsdc = results.amount0
-          this.unclaimedFeesWeth = results.amount1
-
-
-
-          console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${this.unclaimedFeesUsdc} USDC, ${this.unclaimedFeesWeth} WETH`)
+          this.unclaimedFeesUsdc = JSBI.BigInt(results.amount0)
+          this.unclaimedFeesWeth = JSBI.BigInt(results.amount1)
         }
+
+        console.log(`[${this.rangeWidthTicks}] Unclaimed fees: \
+${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaimedFeesWeth, 18, 8)} WETH`)
       })
     }
   
