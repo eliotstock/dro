@@ -198,8 +198,6 @@ export class DRO {
       const MAX_UINT128 = BigNumber.from(2).pow(128).sub(1)
   
       const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
-
-      // console.log(`[${this.rangeWidthTicks}] token ID: ${this.tokenId}, as hex: ${tokenIdHexString}`)
   
       // Contract function: https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol#L309
       // Function params: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol#L160
@@ -226,7 +224,7 @@ export class DRO {
         }
 
         console.log(`[${this.rangeWidthTicks}] Unclaimed fees: \
-${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaimedFeesWeth, 18, 8)} WETH`)
+${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       })
     }
   
