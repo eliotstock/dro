@@ -843,13 +843,13 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
     logGasUsed(txReceipt: TransactionReceipt) {
       // What did we just sepnd on gas? None of these are actually large integers.
       const gasUsed: BigNumber = txReceipt.gasUsed
-      console.log(`addLiquidity() Gas used: ${gasUsed.toNumber()}`)
+      console.log(`Gas used: ${gasUsed.toNumber()}`)
 
       const cumulativeGasUsed: BigNumber = txReceipt.cumulativeGasUsed
-      console.log(`addLiquidity() Cummulative gas used: ${cumulativeGasUsed.toNumber()}`)
+      console.log(`Cummulative gas used: ${cumulativeGasUsed.toNumber()}`)
 
       const effectiveGasPrice: BigNumber = txReceipt.effectiveGasPrice
-      console.log(`addLiquidity() Effective gas price: ${effectiveGasPrice.toNumber()}`)
+      console.log(`Effective gas price: ${effectiveGasPrice.toNumber()}`)
     }
 
     async onPriceChanged() {
