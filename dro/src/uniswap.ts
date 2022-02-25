@@ -70,6 +70,8 @@ export async function updateTick() {
     rangeOrderPoolTick = slot[1]
 
     if (rangeOrderPoolTick) {
+        // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
+        // and denominator are both JSBIs.
         rangeOrderPoolPriceUsdc = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick).toFixed(2)
     }
 }

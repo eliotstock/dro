@@ -842,14 +842,26 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
 
     logGasUsed(txReceipt: TransactionReceipt) {
       // What did we just sepnd on gas? None of these are actually large integers.
+
+      // Corresponds to "Gas Used by Transaction" on Etherscan
       const gasUsed: BigNumber = txReceipt.gasUsed
       console.log(`Gas used: ${gasUsed.toNumber()}`)
 
-      const cumulativeGasUsed: BigNumber = txReceipt.cumulativeGasUsed
-      console.log(`Cummulative gas used: ${cumulativeGasUsed.toNumber()}`)
+      // txReceipt.cumulativeGasUsed: No idea what this is. Ignore it.
 
+      // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei, typically about 0.66 gwei for Arbitrum.
       const effectiveGasPrice: BigNumber = txReceipt.effectiveGasPrice
       console.log(`Effective gas price: ${effectiveGasPrice.toNumber()}`)
+
+      const price: BigNumber = rangeOrderPoolPriceUsdcAsBigNumber()
+
+      // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18
+      const usdCostOfTx: BigNumber = gasUsed.mul(effectiveGasPrice).mul(price)
+
+      const f: number = usdCostOfTx.mul(100).div(BigNumber.from(10).pow(18)).toNumber() / 100
+
+      // TODO: Test
+      console.log(`TX cost: USD ${f.toFixed(2)}`)
     }
 
     async onPriceChanged() {
