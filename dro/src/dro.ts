@@ -7,7 +7,7 @@ import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, readableJsbi } from './wallet'
-import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForPosition, deletePosition } from './db'
+import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import { forwardTestInit, forwardTestRerange } from './forward-test'
@@ -59,7 +59,7 @@ export class DRO {
       this.wethFirst = await tokenOrderIsWethFirst()
 
       // Get the token ID for our position from the database. This is a small positive integer.
-      const tokenId = await getTokenIdForPosition(this.rangeWidthTicks)
+      const tokenId = await getTokenIdForOpenPosition()
 
       if (tokenId === undefined) {
         console.log(`[${this.rangeWidthTicks}] No existing position NFT`)
@@ -78,9 +78,14 @@ export class DRO {
         if (position) {
           this.position = position
 
-          // Get our min and max ticks from the Position instance.
-          this.minTick = position.tickLower
-          this.maxTick = position.tickUpper
+          // Note that we never get our min and max ticks from the Position instance. Leave them as
+          // zero here, meaning outOfRange() will return true on the first call and updateRange()
+          // will set them based on the range width in the .env file.
+          // This enables us to kill the process, change the range width in the .env file, restart
+          // and get a re-range to happen based on the new range.
+          // this.minTick = position.tickLower
+          // this.maxTick = position.tickUpper
+          console.log(`[${this.rangeWidthTicks}] Using existing position NFT`)
         }
         else {
           throw `No position for token ID ${this.tokenId}`
@@ -91,6 +96,7 @@ export class DRO {
     }
   
     outOfRange() {
+      // When newly constructed, this.minTick == this.maxTick == 0 and we return true here.
         return rangeOrderPoolTick &&
           (rangeOrderPoolTick < this.minTick || rangeOrderPoolTick > this.maxTick)
     }
@@ -263,6 +269,12 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
         collectOptions: collectOptions
       }
   
+      /*
+      Width, Token ID
+      120, 35416, https://app.uniswap.org/#/pool/35416?chain=arbitrum, CLOSED
+      360, 35395, https://app.uniswap.org/#/pool/35395?chain=arbitrum, IN RANGE
+      */
+      // This will throw an error 'ZERO_LIQUIDITY' on an invariant if the position is already closed.
       const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position,
         removeLiquidityOptions)
   

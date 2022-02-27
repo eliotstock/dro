@@ -56,12 +56,10 @@ export async function deletePosition(width: number) {
     // console.dir(result)
 }
 
-export async function getTokenIdForPosition(width: number): Promise<number | undefined> {
+export async function getTokenIdForOpenPosition(): Promise<number | undefined> {
     const db: Database = await openDb()
 
-    // console.log(`Width: ${width}`)
-
-    const row = await db.get('SELECT token_id FROM position WHERE width = ?', [width])
+    const row = await db.get('SELECT token_id FROM position ORDER BY datetime DESC LIMIT 1', [])
 
     if (row === undefined) return undefined
 

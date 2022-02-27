@@ -10,6 +10,7 @@
     "r": "ts-node ./src/index.ts --r >>./out/dro.log 2>&1",
     "log": "tail -f -n 1000 ./out/dro.log",
     "balances": "ts-node ./src/index.ts --balances",
+    "sql": "sqlite3 ./out/database.db",
     "monitor": "ts-node ./src/index.ts --monitor >>./out/swap_events.csv 2>&1"
   },
   "author": "",
