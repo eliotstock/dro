@@ -11,7 +11,6 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
-// (P1) Support killing process, changing range and restarting.
 // (P1) Create new accounting source to handle logging gas cost in USD given a transaction receipt, plus USD total of unclaimed fees from both asset amounts.
 // (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network. Ask in Alchemy Discord.
@@ -20,6 +19,7 @@ import yargs from 'yargs/yargs'
 
 // Done
 // ----
+// (P1) Support killing process, changing range and restarting.
 // (P1) Log unclaimed fees on every price change in the pool.
 // (P1) Forward test many range widths
 // (P1) Give Alchemy a spin and see a) whether we fall within the free tier b) if we get fewer errors than on Infura.
