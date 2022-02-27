@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
+// (P1) Support killing process, changing range and restarting. Store one token ID only, not one per range.
 // (P1) Create new accounting source to handle logging gas cost in USD given a transaction receipt, plus USD total of unclaimed fees from both asset amounts.
 // (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network. Ask in Alchemy Discord.
@@ -79,6 +80,9 @@ let price: string
 // When invoked with the -n command line arg, don't execute any transactions.
 let noops: boolean = false
 
+// When invoked with the -r command line arg, just remove liquidity and exit.
+let removeOnly: boolean = false
+
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
@@ -133,6 +137,12 @@ async function main() {
   if (argv.n) {
     noops = true
     console.log(`Running in no-op mode. No transactions will be executed.`)
+  }
+
+  // `--r` means remove liquidity and exit.
+  if (argv.r) {
+    removeOnly = true
+    console.log(`Removing liquidity only.`)
   }
 
   // `--balances` means just log our available balances.
@@ -231,7 +241,7 @@ async function main() {
 
   try {
     for (const width of rangeWidths) {
-      const dro: DRO = new DRO(width, noops)
+      const dro: DRO = new DRO(width, noops, removeOnly)
       await dro.init()
       dros.push(dro)
     }
