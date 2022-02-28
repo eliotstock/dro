@@ -92,7 +92,8 @@ export class DRO {
         }
       }
 
-      forwardTestInit(this.rangeWidthTicks)
+      // No more forward testing for now.
+      // forwardTestInit(this.rangeWidthTicks)
     }
   
     outOfRange() {
@@ -119,7 +120,9 @@ export class DRO {
 
       let timeInRange: Duration
       let timeInRangeReadable: string = 'an unknown period'
-      let forwardTestLogLine: string = ''
+
+      // No more forward testing for now.
+      // let forwardTestLogLine: string = ''
 
       if (this.lastRerangeTimestamp) {
         const a = moment(this.lastRerangeTimestamp)
@@ -129,9 +132,9 @@ export class DRO {
         timeInRangeReadable = timeInRange.humanize()
 
         // Do some forward testing on how this range width is performing.
-        forwardTestLogLine = forwardTestRerange(this.rangeWidthTicks,
-          timeInRange,
-          direction)
+        // forwardTestLogLine = forwardTestRerange(this.rangeWidthTicks,
+        //   timeInRange,
+        //   direction)
       }
 
       this.lastRerangeTimestamp = moment().toISOString()
@@ -184,9 +187,9 @@ export class DRO {
         console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRangeReadable} to ${minUsdc} <-> ${maxUsdc}`)
       }
 
-      if (forwardTestLogLine.length > 0) {
-        console.log(forwardTestLogLine)
-      }
+      // if (forwardTestLogLine.length > 0) {
+      //   console.log(forwardTestLogLine)
+      // }
     }
   
     // Checking unclaimed fees is a nice-to-have for the logs but essential if we want to actually
@@ -304,7 +307,7 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       this.position = undefined
       deletePosition(this.rangeWidthTicks)
 
-      this.logGasUsed(txReceipt)
+      this.logGasUsed(`removeLiquidity()`, txReceipt)
     }
   
     async swap() {
@@ -346,8 +349,6 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       // What is the ratio of our USDC balance to the USDC value of our WETH balance?
       const ratio = await wallet.tokenRatioByValue()
 
-      console.log(`[${this.rangeWidthTicks}] We have USDC and WETH in the ratio: ${ratio}`)
-
       let tokenIn
       let tokenOut
       let amountIn
@@ -357,7 +358,7 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       // once we were at the edge of our range. We do have some fees just claimed in the other
       // asset, however.
       if (ratio > 1.5) {
-        console.log(`[${this.rangeWidthTicks}] We're mostly in USDC now. Swapping half our USDC to WETH.`)
+        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: ${ratio}. We're mostly in USDC now. Swapping half our USDC to WETH.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenUsdc
         tokenOut = CHAIN_CONFIG.addrTokenWeth
@@ -367,13 +368,13 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
         swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
-        console.log(`[${this.rangeWidthTicks}] We already have fairly even values of USDC and WETH.\
+        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: ${ratio}. We already have fairly even values of USDC and WETH.\
  No need for a swap.`)
 
         return
       }
       else { // ratio <= 0.5
-        console.log(`[${this.rangeWidthTicks}] We're mostly in WETH now. Swapping half our WETH to USDC.`)
+        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: ${ratio}. We're mostly in WETH now. Swapping half our WETH to USDC.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenWeth
         tokenOut = CHAIN_CONFIG.addrTokenUsdc
@@ -455,7 +456,7 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       // console.log(`swap() TX receipt:`)
       // console.dir(txReceipt)
 
-      this.logGasUsed(txReceipt)
+      this.logGasUsed(`swap()`, txReceipt)
     }
   
     async addLiquidity() {
@@ -466,7 +467,7 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       // easier.
       const availableUsdc = (await wallet.usdc()).toString()
       const availableWeth = (await wallet.weth()).toString()
-      console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
+      // console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
 
       const slot = await rangeOrderPoolContract.slot0()
 
@@ -552,10 +553,10 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       })
 
       if (this.wethFirst) {
-        console.log(`addLiquidity() Mint amounts: ${position.mintAmounts.amount1.toString()} USDC, ${position.mintAmounts.amount0.toString()} WETH`)
+        console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount1.toString()} USDC, ${position.mintAmounts.amount0.toString()} WETH`)
       }
       else {
-        console.log(`addLiquidity() Mint amounts: ${position.mintAmounts.amount0.toString()} USDC, ${position.mintAmounts.amount1.toString()} WETH`)
+        console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount0.toString()} USDC, ${position.mintAmounts.amount1.toString()} WETH`)
       }
   
       const mintOptions: MintOptions = {
@@ -604,15 +605,15 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
 
       if (this.tokenId) {
         const webUrl = positionWebUrl(this.tokenId)
-        console.log(`Position URL: ${webUrl}`)
+        console.log(`addLiquidity() Position URL: ${webUrl}`)
 
         insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
       }
       else {
-        console.error(`No token ID from logs. We won't be able to remove this liquidity.`)
+        console.error(`addLiquidity() No token ID from logs. We won't be able to remove this liquidity.`)
       }
 
-      this.logGasUsed(txReceipt)
+      this.logGasUsed(`addLiquidity()`, txReceipt)
     }
 
     async swapAndAddLiquidity() {
@@ -841,12 +842,12 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
 
         if (this.tokenId) {
           const webUrl = positionWebUrl(this.tokenId)
-          console.log(`Position URL: ${webUrl}`)
+          console.log(`swapAndAddLiquidity() Position URL: ${webUrl}`)
 
           insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
         }
         else {
-          throw `No token ID from logs. We won't be able to remove this liquidity.`
+          throw `swapAndAddLiquidity() No token ID from logs. We won't be able to remove this liquidity.`
         }
       }
       else {
@@ -859,7 +860,7 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       }
     }
 
-    logGasUsed(txReceipt: TransactionReceipt) {
+    logGasUsed(logLinePrefix: string, txReceipt: TransactionReceipt) {
       // What did we just sepnd on gas? None of these are actually large integers.
 
       // Corresponds to "Gas Used by Transaction" on Etherscan
@@ -879,7 +880,7 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
 
       const f: number = usdCostOfTx.mul(100).div(BigNumber.from(10).pow(24)).toNumber() / 100
 
-      console.log(`TX cost: USD ${f.toFixed(2)}`)
+      console.log(`${logLinePrefix} TX cost: USD ${f.toFixed(2)}`)
     }
 
     async onPriceChanged() {
