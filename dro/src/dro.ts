@@ -276,11 +276,6 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
         collectOptions: collectOptions
       }
   
-      /*
-      Width, Token ID
-      120, 35416, https://app.uniswap.org/#/pool/35416?chain=arbitrum, CLOSED
-      360, 35395, https://app.uniswap.org/#/pool/35395?chain=arbitrum, IN RANGE
-      */
       // This will throw an error 'ZERO_LIQUIDITY' on an invariant if the position is already closed.
       const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position,
         removeLiquidityOptions)
