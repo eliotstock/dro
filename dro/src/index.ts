@@ -11,10 +11,10 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
+// (P1) Killing the process and restarting it while in range should not remove liquidity and add it again.
 // (P1) Create new accounting source to handle logging gas cost in USD given a transaction receipt, plus USD total of unclaimed fees from both asset amounts.
 // (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 50x server errors from provider, or lost network. Ask in Alchemy Discord.
-// (P3) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs
 
 // Done
@@ -43,6 +43,7 @@ import yargs from 'yargs/yargs'
 // (P2) Execute everything on every new block by subscribing to "block""
 // (P2) Mint a new liquidity position (but fail because no balances in account) centred on the current price, providing half ETH and half USDC
 // (P2) Execute a swap for a known amount of WETH (half our account balance, less some savings for execution)
+// (P3) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
 // (P3) Understand whether executing on every block is going to spend the free quota at Infura
 // (P3) Switch to a local geth node if we're going to run out of Infura quota
 // (P3) Have this script execute transactions using the local account, using an Ethers.js Signer
