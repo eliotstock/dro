@@ -236,7 +236,8 @@ export class DRO {
         }
 
         console.log(`[${this.rangeWidthTicks}] Unclaimed fees: \
-${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
+${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, \
+${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       })
     }
   
@@ -246,7 +247,8 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
         return
       }
 
-      // TODO: Remove when run once:
+      // Uncomment then ru once to delete a position that's been closed but is stuck in the
+      // database.
       // await deletePosition(this.rangeWidthTicks)
       // if (this.tokenId !== undefined) throw `done`
   
@@ -254,8 +256,10 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, ${readableJsbi(this.unclaime
       // expectedCurrencyOwed1 can be zero (CurrencyAmount.fromRawAmount(usdcToken, 0). But if we
       // ever want fees in ETH, which we may do to cover gas costs, then we need to get these
       // using a callStatic on collect() ahead of time.
-      const expectedCurrencyOwed0 = CurrencyAmount.fromRawAmount(usdcToken, this.unclaimedFeesUsdc ?? 0)
-      const expectedCurrencyOwed1 = CurrencyAmount.fromRawAmount(wethToken, this.unclaimedFeesWeth ?? 0)
+      const expectedCurrencyOwed0 = CurrencyAmount.fromRawAmount(usdcToken,
+        this.unclaimedFeesUsdc ?? 0)
+      const expectedCurrencyOwed1 = CurrencyAmount.fromRawAmount(wethToken,
+        this.unclaimedFeesWeth ?? 0)
   
       const collectOptions: CollectOptions = {
         tokenId: this.tokenId,
