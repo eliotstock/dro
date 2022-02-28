@@ -177,7 +177,7 @@ export class DRO {
       this.entryTick = rangeOrderPoolTick
 
       if (noRangeYet) {
-        console.log(`[${this.rangeWidthTicks}] Initial range: ${minUsdc} <-> ${maxUsdc}`)
+        console.log(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
       }
       else {
         // Insert a row in the database for analytics, except when we're just starting up and there's
