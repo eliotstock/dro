@@ -38,8 +38,8 @@ export class DRO {
     wethFirst: boolean = true
     position?: Position
     tokenId?: number
-    unclaimedFeesUsdc?: BigintIsh
-    unclaimedFeesWeth?: BigintIsh
+    unclaimedFeesUsdc: JSBI = JSBI.BigInt(0)
+    unclaimedFeesWeth: JSBI = JSBI.BigInt(0)
     lastRerangeTimestamp?: string
     locked: boolean = false
     totalGasCost: number = 0
@@ -239,24 +239,26 @@ export class DRO {
           this.unclaimedFeesUsdc = JSBI.BigInt(results.amount0)
           this.unclaimedFeesWeth = JSBI.BigInt(results.amount1)
         }
-
-        const price: JSBI = rangeOrderPoolPriceUsdcAsJsbi()
-
-        const tenToTheEighteen = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
-
-        // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18 / 10^6
-        // Gives 187_476_817_506_985_888.0000 from 0.000064 WETH. Should give 0.187.
-        const usdVaueOfUnclaimedWeth = JSBI.divide(JSBI.multiply(this.unclaimedFeesWeth, price),
-          tenToTheEighteen)
-
-        const unclaimedFeesTotalUsdc = JSBI.ADD(this.unclaimedFeesUsdc, usdVaueOfUnclaimedWeth)
-  
-        // const f: number = JSBI.divide(JSBI.multiply(usdVaueOfUnclaimedWeth, JSBI.BigInt(100)).div(BigNumber.from(10).pow(24)).toNumber() / 100
-
-        console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 4)}\
- (${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
-${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
       })
+    }
+
+    logUnclaimedFees() {
+      const price: JSBI = rangeOrderPoolPriceUsdcAsJsbi()
+
+      const tenToTheEighteen = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
+
+      // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18 / 10^6
+      // Gives 187_476_817_506_985_888.0000 from 0.000064 WETH. Should give 0.187.
+      const usdVaueOfUnclaimedWeth = JSBI.divide(JSBI.multiply(this.unclaimedFeesWeth, price),
+        tenToTheEighteen)
+
+      const unclaimedFeesTotalUsdc = JSBI.ADD(this.unclaimedFeesUsdc, usdVaueOfUnclaimedWeth)
+
+      // const f: number = JSBI.divide(JSBI.multiply(usdVaueOfUnclaimedWeth, JSBI.BigInt(100)).div(BigNumber.from(10).pow(24)).toNumber() / 100
+
+      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 4)}\
+(${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
+${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
     }
 
     async sendTx(logLinePrefix: string, txRequest: TransactionRequest): Promise<TransactionReceipt> {
@@ -992,6 +994,7 @@ be able to remove this liquidity.`
 
     async onPriceChanged() {
       await this.checkUnclaimedFees()
+      this.logUnclaimedFees()
     }
 
     async onBlock() {
@@ -1023,16 +1026,18 @@ ${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
 
         this.locked = true
 
+        await wallet.logBalances()
+
         // Check fees before removing liquidity.
         await this.checkUnclaimedFees()
 
-        // Take note of what assets we now hold
-        await wallet.logBalances()
+        // Log the fees we're about to claim so that we can compare them to the total gas cost,
+        // coming next.
+        this.logUnclaimedFees()
 
-        // Remove all of our liquidity now and burn the NFT for our position.
+        // Remove all of our liquidity now and close our position.
         await this.removeLiquidity()
 
-        // Take note of what assets we now hold
         await wallet.logBalances()
 
         if (this.removeOnly) {
@@ -1051,12 +1056,13 @@ ${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
 
         // Deposit assets and let the protocol swap the optimal size for the liquidity position,
         // then enter the liquidity position all in one transaction.
-        // Uniswap repo smart-order-router is not ready for production use. Wait for these blocking bugs to get a response before using it:
+        // Uniswap repo smart-order-router is not ready for production use. Wait for these
+        // blocking bugs to get a response before using it:
         //   https://github.com/Uniswap/smart-order-router/issues/64
         //   https://github.com/Uniswap/smart-order-router/issues/65
         // await this.swapAndAddLiquidity()
 
-        // Take note of what assets we now hold
+        // We should now hold as close to zero USDC and WETH as possible.
         await wallet.logBalances()
 
         this.locked = false
