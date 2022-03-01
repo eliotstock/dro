@@ -98,8 +98,12 @@ export class DRO {
   
     outOfRange() {
       // When newly constructed, this.minTick == this.maxTick == 0 and we return true here.
-        return rangeOrderPoolTick &&
-          (rangeOrderPoolTick < this.minTick || rangeOrderPoolTick > this.maxTick)
+      return rangeOrderPoolTick &&
+        (rangeOrderPoolTick < this.minTick || rangeOrderPoolTick > this.maxTick)
+    }
+
+    inPosition(): boolean {
+      return this.position !== undefined
     }
   
     updateRange() {
@@ -906,8 +910,8 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
         return
       }
 
-      // Are we now out of range?
-      if (this.outOfRange()) {
+      // Are we now out of range (or are we not yet in a position)?
+      if (this.outOfRange() || !this.inPosition()) {
         if (this.locked) {
           // console.log(`[${this.rangeWidthTicks}] Skipping block. Already busy re-ranging.`)
           return
