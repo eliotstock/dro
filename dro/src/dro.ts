@@ -79,6 +79,11 @@ export class DRO {
         if (position) {
           this.position = position
 
+          if (JSBI.EQ(JSBI.BigInt(0), this.position.liquidity)) {
+            throw `[${this.rangeWidthTicks}] Existing position has no liquidity. Did we remove \
+liquidity but retain our token ID?`
+          }
+
           // Note that we never get our min and max ticks from the Position instance. Leave them as
           // zero here, meaning outOfRange() will return true on the first call and updateRange()
           // will set them based on the range width in the .env file.
