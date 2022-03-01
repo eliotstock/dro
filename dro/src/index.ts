@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
+// (P1) Identify when there's a token ID in the db on starting, but the position is closed.
 // (P1) Log the total unclaimed fees vs. total gas cost at the time of removing liquidity.
 // (P2) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 40x and 50x server errors from provider, or lost network. Ask in Alchemy Discord.
