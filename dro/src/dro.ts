@@ -456,16 +456,28 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       //   loop more causing need for more gas
       //   if it's your pool fix the balance in the pool
       //   right now there is a lot of the USDC and very little weth
-      const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-      console.log(`swap() TX hash: ${txResponse.hash}`) 
-      // console.log(`swap() TX response:`)
-      // console.dir(txResponse)
+      try {
+        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+        console.log(`swap() TX hash: ${txResponse.hash}`) 
+        // console.log(`swap() TX response:`)
+        // console.dir(txResponse)
 
-      const txReceipt: TransactionReceipt = await txResponse.wait()
-      // console.log(`swap() TX receipt:`)
-      // console.dir(txReceipt)
+        const txReceipt: TransactionReceipt = await txResponse.wait()
+        // console.log(`swap() TX receipt:`)
+        // console.dir(txReceipt)
 
-      this.logGasUsed(`swap()`, txReceipt)
+        this.logGasUsed(`swap()`, txReceipt)
+      }
+      catch (e: unknown) {
+        if (e instanceof Error) {
+          console.log(`swap() Error: ${e.message}`)
+        }
+        else {
+          console.log(`swap(): Error: ${e}`)
+        }
+
+        process.exit(1)
+      }
     }
   
     async addLiquidity() {
