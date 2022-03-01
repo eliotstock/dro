@@ -87,30 +87,20 @@ export class EthUsdcWallet extends ethers.Wallet {
 
     // Testable, internal implementation.
     static _tokenRatioByValue(usdc: BigNumber, weth: BigNumber, price: BigNumber): number {
-        // If we have 1 WETH and the price is USD 3,000, this is then 3_000_000_000 again. But
-        // adjust the scale for the fact that WETH has 18 decimals and USDC has 6.
-        // eg. 263_773_675 means USDC 263.77
-        let usdcValueOfWeth = weth.mul(price).div(BigNumber.from(10).pow(18))
+        // Use native BigInts from here on.
+        const usdcNative = usdc.toBigInt()
+        const wethNative = weth.toBigInt()
+        const priceNative = price.toBigInt()
+
+        let usdValueOfWeth = wethNative * priceNative / 1_000_000_000_000_000_000n
 
         // Avoid a division by zero error below. Any very small integer will do here.
-        if (usdcValueOfWeth.eq(BigNumber.from(0))) {
-            usdcValueOfWeth = BigNumber.from(1)
-        }
+        if (usdValueOfWeth == 0n) usdValueOfWeth = 1n
 
-        // console.log(`usdcValueOfWeth: ${usdcValueOfWeth}`)
+        // Do BigInt operations in the middle and floating point operations on the outside.
+        const r: number = Number(usdcNative * 100n / usdValueOfWeth) / 100
 
-        // What is the ratio of our USDC balance to the USDC value of our WETH balance? Note that
-        // we're using the price in the range order pool, not the swap pool, but the difference
-        // will be small and we only need very low precision here.
-        // Note that because we're comparing two USDC values, there's no need to handle the
-        // difference in precision between WETH (18 decimals) and USDC (6 decimals)
-
-        // TODO: Fix: BigNumber.div() will never return a decimal, only an integer.
-        //   Balances: USDC 1078.48, WETH 0.3926, ETH 0.0818 (token ratio by value: 0)
-        // This is USD 1159 worth of WETH, so the ratio should be closer to 1.
-        let ratio: BigNumber = usdc.div(usdcValueOfWeth)
-
-        return ratio.toNumber()
+        return r
     }
 
     async tokenRatioByValue(): Promise<number> {
