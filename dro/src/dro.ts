@@ -3,7 +3,7 @@ import { BigNumber } from '@ethersproject/bignumber'
 import { CollectOptions, FeeAmount, maxLiquidityForAmounts, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, RemoveLiquidityOptions, Route, SqrtPriceMath, SwapOptions, SwapRouter, Tick, tickToPrice, Trade } from '@uniswap/v3-sdk'
 import { CurrencyAmount, Percent, BigintIsh, TradeType, Currency, Fraction } from '@uniswap/sdk-core'
 import { TickMath } from '@uniswap/v3-sdk'
-import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
+import { TransactionResponse, TransactionReceipt, TransactionRequest } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, readableJsbi } from './wallet'
@@ -244,6 +244,33 @@ ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, \
 ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       })
     }
+
+    async sendTx(logLinePrefix: string, txRequest: TransactionRequest): Promise<TransactionReceipt> {
+      try {
+        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+        console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
+        // console.log(`swap() TX response:`)
+        // console.dir(txResponse)
+
+        const txReceipt: TransactionReceipt = await txResponse.wait()
+        // console.log(`swap() TX receipt:`)
+        // console.dir(txReceipt)
+
+        this.logGasUsed(logLinePrefix, txReceipt)
+
+        return txReceipt
+      }
+      catch (e: unknown) {
+        if (e instanceof Error) {
+          console.log(`${logLinePrefix} Error: ${e.message}`)
+        }
+        else {
+          console.log(`${logLinePrefix} Error: ${e}`)
+        }
+
+        process.exit(1)
+      }
+    }
   
     async removeLiquidity() {
       if (!this.position || !this.tokenId) {
@@ -301,13 +328,15 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
         gasPrice: CHAIN_CONFIG.gasPrice,
         data: calldata
       }
+
+      await this.sendTx(`removeLiquidity()`, txRequest)
   
-      const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-      console.log(`removeLiquidity() TX hash: ${txResponse.hash}`)
+      // const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+      // console.log(`removeLiquidity() TX hash: ${txResponse.hash}`)
       // console.log(`removeLiquidity() TX response:`)
       // console.dir(txResponse)
 
-      const txReceipt: TransactionReceipt = await txResponse.wait()
+      // const txReceipt: TransactionReceipt = await txResponse.wait()
       // console.log(`removeLiquidity() TX receipt:`)
       // console.dir(txReceipt)
 
@@ -316,7 +345,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       this.position = undefined
       deletePosition(this.rangeWidthTicks)
 
-      this.logGasUsed(`removeLiquidity()`, txReceipt)
+      // this.logGasUsed(`removeLiquidity()`, txReceipt)
     }
   
     async swap() {
@@ -456,28 +485,30 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       //   loop more causing need for more gas
       //   if it's your pool fix the balance in the pool
       //   right now there is a lot of the USDC and very little weth
-      try {
-        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-        console.log(`swap() TX hash: ${txResponse.hash}`) 
-        // console.log(`swap() TX response:`)
-        // console.dir(txResponse)
+      await this.sendTx(`swap()`, txRequest)
 
-        const txReceipt: TransactionReceipt = await txResponse.wait()
-        // console.log(`swap() TX receipt:`)
-        // console.dir(txReceipt)
+    //   try {
+    //     const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+    //     console.log(`swap() TX hash: ${txResponse.hash}`) 
+    //     // console.log(`swap() TX response:`)
+    //     // console.dir(txResponse)
 
-        this.logGasUsed(`swap()`, txReceipt)
-      }
-      catch (e: unknown) {
-        if (e instanceof Error) {
-          console.log(`swap() Error: ${e.message}`)
-        }
-        else {
-          console.log(`swap(): Error: ${e}`)
-        }
+    //     const txReceipt: TransactionReceipt = await txResponse.wait()
+    //     // console.log(`swap() TX receipt:`)
+    //     // console.dir(txReceipt)
 
-        process.exit(1)
-      }
+    //     this.logGasUsed(`swap()`, txReceipt)
+    //   }
+    //   catch (e: unknown) {
+    //     if (e instanceof Error) {
+    //       console.log(`swap() Error: ${e.message}`)
+    //     }
+    //     else {
+    //       console.log(`swap(): Error: ${e}`)
+    //     }
+
+    //     process.exit(1)
+    //   }
     }
   
     async addLiquidity() {
@@ -612,14 +643,16 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       }
   
       // Send the transaction to the provider.
-      const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-      console.log(`addLiquidity() TX hash: ${txResponse.hash}`)
+      // const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+      // console.log(`addLiquidity() TX hash: ${txResponse.hash}`)
       // console.log(`addLiquidity() TX response:`)
       // console.dir(txResponse)
 
-      const txReceipt: TransactionReceipt = await txResponse.wait()
+      // const txReceipt: TransactionReceipt = await txResponse.wait()
       // console.log(`addLiquidity() TX receipt:`)
       // console.dir(txReceipt)
+
+      const txReceipt: TransactionReceipt = await this.sendTx(`addLiquidity()`, txRequest)
 
       this.tokenId = extractTokenId(txReceipt)
       this.position = position
@@ -634,7 +667,7 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
         console.error(`addLiquidity() No token ID from logs. We won't be able to remove this liquidity.`)
       }
 
-      this.logGasUsed(`addLiquidity()`, txReceipt)
+      // this.logGasUsed(`addLiquidity()`, txReceipt)
     }
 
     async swapAndAddLiquidity() {
@@ -848,14 +881,16 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
         //   loop more causing need for more gas
         //   if it's your pool fix the balance in the pool
         //   right now there is a lot of the USDC and very little weth
-        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-        console.log(`swapAndAddLiquidity() TX hash: ${txResponse.hash}`)
+        // const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+        // console.log(`swapAndAddLiquidity() TX hash: ${txResponse.hash}`)
         // console.log(`swapAndAddLiquidity() TX response:`)
         // console.dir(txResponse)
 
-        const txReceipt: TransactionReceipt = await txResponse.wait()
+        // const txReceipt: TransactionReceipt = await txResponse.wait()
         // console.log(`swapAndAddLiquidity() TX receipt:`)
         // console.dir(txReceipt)
+
+        const txReceipt: TransactionReceipt = await this.sendTx(`addLiquidity()`, txRequest)
 
         // The token ID is a small positive integer.
         this.tokenId = extractTokenId(txReceipt)
