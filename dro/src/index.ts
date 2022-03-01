@@ -241,7 +241,7 @@ async function main() {
   }
 
   try {
-    // We must have the price in the range order pool before we first set the range.
+    // We must have the price in the range order pool before we can establish a range.
     await updateTick()
 
     for (const width of rangeWidths) {

@@ -3,12 +3,13 @@ import { ethers } from 'ethers'
 import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
 import { abi as QuoterABI } from '@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'
 import { abi as NonfungiblePositionManagerABI } from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
-import { tickToPrice, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount } from '@uniswap/v3-sdk'
+import { tickToPrice, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount, toHex, Multicall } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
-import { Token } from '@uniswap/sdk-core'
+import { BigintIsh, CurrencyAmount, Token } from '@uniswap/sdk-core'
 import { wallet } from './wallet'
 import moment from 'moment'
+import JSBI from 'jsbi'
 
 // Read our .env file
 config()
@@ -206,6 +207,50 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
 
 export function positionWebUrl(tokenId: number): string {
     return `https://app.uniswap.org/#/pool/${tokenId}`
+}
+
+// Simplified fork of Uniswap's NonfungiblePositionManager.removeCallParameters(), which has given
+// us grief in the past (liquidity in call params higher than position liquidity). We always want
+// remove 100% of our liquidity.
+//   https://github.com/Uniswap/v3-sdk/blob/main/src/nonfungiblePositionManager.ts#L341
+export function removeCallParameters(position: Position,
+    tokenId: number,
+    deadline: BigintIsh,
+    recipient: string): string {
+    const calldatas: string[] = []
+
+    const deadlineHex = toHex(deadline)
+    const tokenIdHex = toHex(tokenId)
+
+    // Verbatim from NonfungiblePositionManager
+    const MaxUint128 = toHex(JSBI.subtract(JSBI.exponentiate(JSBI.BigInt(2), JSBI.BigInt(128)), JSBI.BigInt(1)))
+
+    // Remove liquidity function call.
+    calldatas.push(
+      NonfungiblePositionManager.INTERFACE.encodeFunctionData('decreaseLiquidity', [
+        {
+          tokenId,
+          liquidity: toHex(position.liquidity),
+          amount0Min: toHex(0),
+          amount1Min: toHex(0),
+          deadline
+        }
+      ])
+    )
+
+    // Collect function call.
+    calldatas.push(
+      NonfungiblePositionManager.INTERFACE.encodeFunctionData('collect', [
+        {
+          tokenId,
+          recipient: recipient,
+          amount0Max: MaxUint128,
+          amount1Max: MaxUint128
+        }
+      ])
+    )
+
+    return Multicall.encodeMulticall(calldatas)
 }
 
 export async function createPoolOnTestnet() {

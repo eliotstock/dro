@@ -8,7 +8,7 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, readableJsbi } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import { forwardTestInit, forwardTestRerange } from './forward-test'
 import JSBI from 'jsbi'
@@ -247,7 +247,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
         return
       }
 
-      // Uncomment then ru once to delete a position that's been closed but is stuck in the
+      // Uncomment then run once to delete a position that's been closed but is stuck in the
       // database.
       // await deletePosition(this.rangeWidthTicks)
       // if (this.tokenId !== undefined) throw `done`
@@ -256,29 +256,35 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       // expectedCurrencyOwed1 can be zero (CurrencyAmount.fromRawAmount(usdcToken, 0). But if we
       // ever want fees in ETH, which we may do to cover gas costs, then we need to get these
       // using a callStatic on collect() ahead of time.
-      const expectedCurrencyOwed0 = CurrencyAmount.fromRawAmount(usdcToken,
-        this.unclaimedFeesUsdc ?? 0)
-      const expectedCurrencyOwed1 = CurrencyAmount.fromRawAmount(wethToken,
-        this.unclaimedFeesWeth ?? 0)
+      // const expectedCurrencyOwed0 = CurrencyAmount.fromRawAmount(usdcToken,
+      //   this.unclaimedFeesUsdc ?? 0)
+      // const expectedCurrencyOwed1 = CurrencyAmount.fromRawAmount(wethToken,
+      //   this.unclaimedFeesWeth ?? 0)
   
-      const collectOptions: CollectOptions = {
-        tokenId: this.tokenId,
-        expectedCurrencyOwed0: expectedCurrencyOwed0,
-        expectedCurrencyOwed1: expectedCurrencyOwed1,
-        recipient: wallet.address
-      }
+      // const collectOptions: CollectOptions = {
+      //   tokenId: this.tokenId,
+      //   expectedCurrencyOwed0: expectedCurrencyOwed0,
+      //   expectedCurrencyOwed1: expectedCurrencyOwed1,
+      //   recipient: wallet.address
+      // }
   
-      const removeLiquidityOptions: RemoveLiquidityOptions = {
-        tokenId: this.tokenId,
-        liquidityPercentage: new Percent(1), // All of our liquidity
-        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
-        deadline: moment().unix() + DEADLINE_SECONDS,
-        collectOptions: collectOptions
-      }
+      // const removeLiquidityOptions: RemoveLiquidityOptions = {
+      //   tokenId: this.tokenId,
+      //   liquidityPercentage: new Percent(1), // All of our liquidity
+      //   slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+      //   deadline: moment().unix() + DEADLINE_SECONDS,
+      //   collectOptions: collectOptions
+      // }
   
-      // This will throw an error 'ZERO_LIQUIDITY' on an invariant if the position is already closed.
-      const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position,
-        removeLiquidityOptions)
+      // This will throw an error 'ZERO_LIQUIDITY' on an invariant if the position is already
+      // closed.
+      // TODO: Duplicate and simplify removeCallParameters():
+      //   https://github.com/Uniswap/v3-sdk/blob/main/src/nonfungiblePositionManager.ts#L341
+      // const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position,
+      //   removeLiquidityOptions)
+      const deadline = moment().unix() + DEADLINE_SECONDS
+
+      const calldata = removeCallParameters(this.position, this.tokenId, deadline, wallet.address)
   
       const nonce = await wallet.getTransactionCount("latest")
   
