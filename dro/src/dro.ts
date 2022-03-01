@@ -274,7 +274,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
   
     async removeLiquidity() {
       if (!this.position || !this.tokenId) {
-        console.error("Can't remove liquidity. Not in a position yet.")
+        console.error(`[${this.rangeWidthTicks}] Can't remove liquidity. Not in a position yet.`)
         return
       }
 
@@ -329,7 +329,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
         data: calldata
       }
 
-      await this.sendTx(`removeLiquidity()`, txRequest)
+      await this.sendTx(`[${this.rangeWidthTicks}] removeLiquidity()`, txRequest)
   
       // const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
       // console.log(`removeLiquidity() TX hash: ${txResponse.hash}`)
@@ -485,7 +485,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       //   loop more causing need for more gas
       //   if it's your pool fix the balance in the pool
       //   right now there is a lot of the USDC and very little weth
-      await this.sendTx(`swap()`, txRequest)
+      await this.sendTx(`[${this.rangeWidthTicks}] swap()`, txRequest)
 
     //   try {
     //     const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
@@ -513,7 +513,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
   
     async addLiquidity() {
       if (this.position || this.tokenId)
-        throw "Can't add liquidity. Already in a position. Remove liquidity and swap first."
+        throw `[${this.rangeWidthTicks}] Can't add liquidity. Already in a position. Remove liquidity and swap first.`
   
       // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A string is
       // easier.
@@ -583,13 +583,13 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       // Get ahead of the invariant test in v3-sdk's Position constructor:
       // invariant(tickLower >= TickMath.MIN_TICK && tickLower % pool.tickSpacing === 0, 'TICK_LOWER')
       if (this.minTick < TickMath.MIN_TICK) {
-        throw `Lower tick of ${this.minTick} is below TickMath.MIN_TICK (${TickMath.MIN_TICK}). \
-Can't create position.`
+        throw `[${this.rangeWidthTicks}] Lower tick of ${this.minTick} is below TickMath.MIN_TICK \
+(${TickMath.MIN_TICK}). Can't create position.`
       }
 
       if (this.minTick % rangeOrderPool.tickSpacing !== 0) {
-        throw `Lower tick of ${this.minTick} is not aligned with the tick spacing of \
-${rangeOrderPool.tickSpacing}. Can't create position.`
+        throw `[${this.rangeWidthTicks}] Lower tick of ${this.minTick} is not aligned with the tick \
+spacing of ${rangeOrderPool.tickSpacing}. Can't create position.`
       }
 
       // We don't know L, the liquidity, but we do know how much WETH and how much USDC we'd like
@@ -605,10 +605,14 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       })
 
       if (this.wethFirst) {
-        console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount1.toString()} USDC, ${position.mintAmounts.amount0.toString()} WETH`)
+        console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
+USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount1.toString()} USDC, \
+${position.mintAmounts.amount0.toString()} WETH`)
       }
       else {
-        console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount0.toString()} USDC, ${position.mintAmounts.amount1.toString()} WETH`)
+        console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
+USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount0.toString()} USDC, \
+${position.mintAmounts.amount1.toString()} WETH`)
       }
   
       const mintOptions: MintOptions = {
@@ -652,19 +656,21 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       // console.log(`addLiquidity() TX receipt:`)
       // console.dir(txReceipt)
 
-      const txReceipt: TransactionReceipt = await this.sendTx(`addLiquidity()`, txRequest)
+      const txReceipt: TransactionReceipt = await this.sendTx(
+        `[${this.rangeWidthTicks}] addLiquidity()`, txRequest)
 
       this.tokenId = extractTokenId(txReceipt)
       this.position = position
 
       if (this.tokenId) {
         const webUrl = positionWebUrl(this.tokenId)
-        console.log(`addLiquidity() Position URL: ${webUrl}`)
+        console.log(`[${this.rangeWidthTicks}] addLiquidity() Position URL: ${webUrl}`)
 
         insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
       }
       else {
-        console.error(`addLiquidity() No token ID from logs. We won't be able to remove this liquidity.`)
+        console.error(`[${this.rangeWidthTicks}] addLiquidity() No token ID from logs. We won't \
+be able to remove this liquidity.`)
       }
 
       // this.logGasUsed(`addLiquidity()`, txReceipt)
@@ -672,7 +678,8 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
 
     async swapAndAddLiquidity() {
       if (this.position || this.tokenId)
-         throw "Refusing to swap and add liquidity. Still in a position. Remove liquidity first."
+         throw `[${this.rangeWidthTicks}] Refusing to swap and add liquidity. Still in a \
+position. Remove liquidity first.`
 
       // The order of the tokens in the pool varies from chain to chain, annoyingly.
       // Ethereum mainnet: USDC is first
@@ -689,18 +696,23 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
 
         // The wallet gives us BigNumbers for balances, but Uniswap's CurrencyAmount takes a
         // BigintIsh, which is a JSBI, string or number.
-        token0Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
-        token1Balance = CurrencyAmount.fromRawAmount(usdcToken, await (await wallet.usdc()).toString())
+        token0Balance = CurrencyAmount.fromRawAmount(wethToken,
+          await (await wallet.weth()).toString())
+        token1Balance = CurrencyAmount.fromRawAmount(usdcToken,
+          await (await wallet.usdc()).toString())
       }
       else {
         token0 = usdcToken
         token1 = wethToken
 
-        token0Balance = CurrencyAmount.fromRawAmount(usdcToken, await (await wallet.usdc()).toString())
-        token1Balance = CurrencyAmount.fromRawAmount(wethToken, await (await wallet.weth()).toString())
+        token0Balance = CurrencyAmount.fromRawAmount(usdcToken,
+          await (await wallet.usdc()).toString())
+        token1Balance = CurrencyAmount.fromRawAmount(wethToken,
+          await (await wallet.weth()).toString())
       }
 
-      console.log(`[dro.ts] Token 0 balance: ${token0Balance.toFixed(4)}, token 1 balance: ${token1Balance.toFixed(4)}`)
+      console.log(`[dro.ts] Token 0 balance: ${token0Balance.toFixed(4)}, \
+token 1 balance: ${token1Balance.toFixed(4)}`)
 
       console.log(`[dro.ts] output balance quotient: ${token1Balance.quotient}`)
 
@@ -717,11 +729,13 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       console.log(`[dro.ts] sqrtRatioX96 instanceof JSBI: ${sqrtRatioX96 instanceof JSBI}`)
       console.log(`[dro.ts] typeof sqrtRatioX96 ${typeof(sqrtRatioX96)}`)
 
-      // Do NOT pass a string for the sqrtRatioX96 parameter below! JSBI does very little type checking.
+      // Do NOT pass a string for the sqrtRatioX96 parameter below! JSBI does very little type
+      // checking.
       const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
 
       console.log(`[dro.ts] sqrtRatioX96AsJsbi.toString(): ${sqrtRatioX96AsJsbi.toString()}`)
-      console.log(`[dro.ts] sqrtRatioX96AsJsbi instanceof JSBI: ${sqrtRatioX96AsJsbi instanceof JSBI}`)
+      console.log(`[dro.ts] sqrtRatioX96AsJsbi instanceof JSBI: \
+${sqrtRatioX96AsJsbi instanceof JSBI}`)
       console.log(`[dro.ts] typeof sqrtRatioX96AsJsbi ${typeof(sqrtRatioX96AsJsbi)}`)
 
       const liquidity = await rangeOrderPoolContract.liquidity()
@@ -769,7 +783,8 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
 
       console.log(`[dro.ts] deadline: ${deadlineValue}`)
 
-      const router = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
+      const router = new AlphaRouter({chainId: CHAIN_CONFIG.chainId,
+        provider: CHAIN_CONFIG.provider()})
 
       console.log(`[dro.ts] Poistion tickLower: ${p.tickLower}`)
       console.log(`[dro.ts] Poistion tickUpper: ${p.tickUpper}`)
@@ -779,7 +794,8 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
       console.log(`[dro.ts] slippageTolerance.lessThan(ZERO): ${slippageTolerance.lessThan(ZERO)}`)
 
       // From sdk-core:
-      if (slippageTolerance instanceof JSBI || typeof slippageTolerance === 'number' || typeof slippageTolerance === 'string')
+      if (slippageTolerance instanceof JSBI || typeof slippageTolerance === 'number'
+        || typeof slippageTolerance === 'string')
         console.log(`[dro.ts] sdk-core will use new Fraction for tryParseFraction()`)
       else if ('numerator' in slippageTolerance && 'denominator' in slippageTolerance)
         console.log(`[dro.ts] sdk-core will use argument as return value`)
@@ -847,7 +863,9 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
         console.log(`[dro.ts] first trade route:`)
         console.dir(route.trade.routes[0])
 
-        console.log(`[dro.ts] trade input amount: ${route.trade.inputAmount.toFixed(2)} ${route.trade.inputAmount.currency.symbol}, output amount: ${route.trade.outputAmount.toFixed(2)} ${route.trade.outputAmount.currency.symbol}`)
+        console.log(`[dro.ts] trade input amount: ${route.trade.inputAmount.toFixed(2)} \
+${route.trade.inputAmount.currency.symbol}, output amount: ${route.trade.outputAmount.toFixed(2)} \
+${route.trade.outputAmount.currency.symbol}`)
 
         console.log(`[dro.ts] optimalRatio: ${route.optimalRatio.toFixed(4)}`)
 
@@ -903,7 +921,8 @@ ${rangeOrderPool.tickSpacing}. Can't create position.`
           insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
         }
         else {
-          throw `swapAndAddLiquidity() No token ID from logs. We won't be able to remove this liquidity.`
+          throw `[${this.rangeWidthTicks}] swapAndAddLiquidity() No token ID from logs. We won't \
+be able to remove this liquidity.`
         }
       }
       else {
