@@ -42,6 +42,7 @@ export class DRO {
     unclaimedFeesWeth?: BigintIsh
     lastRerangeTimestamp?: string
     locked: boolean = false
+    totalGasCost: number = 0
   
     constructor(
       _rangeWidthTicks: number,
@@ -256,8 +257,6 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
         // console.log(`swap() TX receipt:`)
         // console.dir(txReceipt)
 
-        this.logGasUsed(logLinePrefix, txReceipt)
-
         return txReceipt
       }
       catch (e: unknown) {
@@ -329,7 +328,16 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
         data: calldata
       }
 
-      await this.sendTx(`[${this.rangeWidthTicks}] removeLiquidity()`, txRequest)
+      const txReceipt: TransactionReceipt = await this.sendTx(
+        `[${this.rangeWidthTicks}] removeLiquidity()`, txRequest)
+
+      const gasCost = this.gasCost(`[${this.rangeWidthTicks}] removeLiquidity()`, txReceipt)
+
+      // Removing liquidity is the last tx in the set of three. We're interested in the total gas
+      // cost of the roundtrip position.
+      this.totalGasCost += gasCost
+      console.log(`[${this.rangeWidthTicks}] removeLiquidity() Total gas cost: \
+${this.totalGasCost.toFixed(2)}`)
   
       // const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
       // console.log(`removeLiquidity() TX hash: ${txResponse.hash}`)
@@ -344,6 +352,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       this.tokenId = undefined
       this.position = undefined
       deletePosition(this.rangeWidthTicks)
+      this.totalGasCost = 0
 
       // this.logGasUsed(`removeLiquidity()`, txReceipt)
     }
@@ -485,30 +494,34 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       //   loop more causing need for more gas
       //   if it's your pool fix the balance in the pool
       //   right now there is a lot of the USDC and very little weth
-      await this.sendTx(`[${this.rangeWidthTicks}] swap()`, txRequest)
+      const txReceipt: TransactionReceipt = await this.sendTx(
+        `[${this.rangeWidthTicks}] swap()`, txRequest)
 
-    //   try {
-    //     const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-    //     console.log(`swap() TX hash: ${txResponse.hash}`) 
-    //     // console.log(`swap() TX response:`)
-    //     // console.dir(txResponse)
+      const gasCost = this.gasCost(`[${this.rangeWidthTicks}] swap()`, txReceipt)
+      this.totalGasCost += gasCost
 
-    //     const txReceipt: TransactionReceipt = await txResponse.wait()
-    //     // console.log(`swap() TX receipt:`)
-    //     // console.dir(txReceipt)
+      //   try {
+      //     const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+      //     console.log(`swap() TX hash: ${txResponse.hash}`) 
+      //     // console.log(`swap() TX response:`)
+      //     // console.dir(txResponse)
 
-    //     this.logGasUsed(`swap()`, txReceipt)
-    //   }
-    //   catch (e: unknown) {
-    //     if (e instanceof Error) {
-    //       console.log(`swap() Error: ${e.message}`)
-    //     }
-    //     else {
-    //       console.log(`swap(): Error: ${e}`)
-    //     }
+      //     const txReceipt: TransactionReceipt = await txResponse.wait()
+      //     // console.log(`swap() TX receipt:`)
+      //     // console.dir(txReceipt)
 
-    //     process.exit(1)
-    //   }
+      //     this.logGasUsed(`swap()`, txReceipt)
+      //   }
+      //   catch (e: unknown) {
+      //     if (e instanceof Error) {
+      //       console.log(`swap() Error: ${e.message}`)
+      //     }
+      //     else {
+      //       console.log(`swap(): Error: ${e}`)
+      //     }
+
+      //     process.exit(1)
+      //   }
     }
   
     async addLiquidity() {
@@ -673,7 +686,8 @@ ${position.mintAmounts.amount1.toString()} WETH`)
 be able to remove this liquidity.`)
       }
 
-      // this.logGasUsed(`addLiquidity()`, txReceipt)
+      const gasCost = this.gasCost(`[${this.rangeWidthTicks}] addLiquidity()`, txReceipt)
+      this.totalGasCost += gasCost
     }
 
     async swapAndAddLiquidity() {
@@ -924,6 +938,9 @@ ${route.trade.outputAmount.currency.symbol}`)
           throw `[${this.rangeWidthTicks}] swapAndAddLiquidity() No token ID from logs. We won't \
 be able to remove this liquidity.`
         }
+
+        const gasCost = this.gasCost(`[${this.rangeWidthTicks}] swapAndAddLiquidity()`, txReceipt)
+        this.totalGasCost += gasCost
       }
       else {
         console.log(`[dro.ts] routeToRatioResponse:`)
@@ -935,7 +952,7 @@ be able to remove this liquidity.`
       }
     }
 
-    logGasUsed(logLinePrefix: string, txReceipt: TransactionReceipt) {
+    gasCost(logLinePrefix: string, txReceipt: TransactionReceipt): number {
       // What did we just sepnd on gas? None of these are actually large integers.
 
       // Corresponds to "Gas Used by Transaction" on Etherscan
@@ -955,7 +972,9 @@ be able to remove this liquidity.`
 
       const f: number = usdCostOfTx.mul(100).div(BigNumber.from(10).pow(24)).toNumber() / 100
 
-      console.log(`${logLinePrefix} TX cost: USD ${f.toFixed(2)}`)
+      // console.log(`${logLinePrefix} TX cost: USD ${f.toFixed(2)}`)
+
+      return f
     }
 
     async onPriceChanged() {
