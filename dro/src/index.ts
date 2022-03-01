@@ -11,7 +11,7 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
-// (P1) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
+// (P2) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 40x and 50x server errors from provider, or lost network. Ask in Alchemy Discord.
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs.
 
