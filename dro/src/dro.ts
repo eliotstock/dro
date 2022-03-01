@@ -80,8 +80,9 @@ export class DRO {
           this.position = position
 
           if (JSBI.EQ(JSBI.BigInt(0), this.position.liquidity)) {
-            throw `[${this.rangeWidthTicks}] Existing position has no liquidity. Did we remove \
-liquidity but retain our token ID?`
+            console.error(`[${this.rangeWidthTicks}] Existing position has no liquidity. Did we remove \
+liquidity but retain our token ID?`)
+            process.exit(85)
           }
 
           // Note that we never get our min and max ticks from the Position instance. Leave them as
@@ -94,7 +95,8 @@ liquidity but retain our token ID?`
           console.log(`[${this.rangeWidthTicks}] Using existing position NFT`)
         }
         else {
-          throw `No position for token ID ${this.tokenId}`
+          console.error(`No position for token ID ${this.tokenId}`)
+          process.exit(99)
         }
       }
 
