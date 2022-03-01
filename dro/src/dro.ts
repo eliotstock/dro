@@ -242,15 +242,20 @@ export class DRO {
 
         const price: JSBI = rangeOrderPoolPriceUsdcAsJsbi()
 
+        const tenToTheEighteen = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
+
         // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18 / 10^6
-        const usdVaueOfUnclaimedWeth = JSBI.multiply(this.unclaimedFeesWeth, price)
+        // Gives 187_476_817_506_985_888.0000 from 0.000064 WETH. Should give 0.187.
+        const usdVaueOfUnclaimedWeth = JSBI.divide(JSBI.multiply(this.unclaimedFeesWeth, price),
+          tenToTheEighteen)
+
+        const unclaimedFeesTotalUsdc = JSBI.ADD(this.unclaimedFeesUsdc, usdVaueOfUnclaimedWeth)
   
         // const f: number = JSBI.divide(JSBI.multiply(usdVaueOfUnclaimedWeth, JSBI.BigInt(100)).div(BigNumber.from(10).pow(24)).toNumber() / 100
 
-        console.log(`[${this.rangeWidthTicks}] Unclaimed fees: \
-${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, \
-${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH \
-(the WETH being ${readableJsbi(usdVaueOfUnclaimedWeth, 6, 4)} in USDC terms)`)
+        console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 4)}\
+ (${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
+${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
       })
     }
 
