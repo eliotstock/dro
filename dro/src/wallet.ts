@@ -98,14 +98,14 @@ export class EthUsdcWallet extends ethers.Wallet {
         if (usdValueOfWeth == 0n) usdValueOfWeth = 1n
 
         // Do BigInt operations in the middle and floating point operations on the outside.
-        const r: number = Number(usdcNative * 100n / usdValueOfWeth) / 100
+        const r = Number(usdcNative * 100n / usdValueOfWeth) / 100
 
         return r
     }
 
     async tokenRatioByValue(): Promise<number> {
-        const usdc: BigNumber = await wallet.usdc()
-        const weth: BigNumber = await wallet.weth()
+        const usdc: BigNumber = await this.usdc()
+        const weth: BigNumber = await this.weth()
 
         // This is USDC * 10e6, eg. 3_000_000_000 when the price of ETH is USD 3,000.
         const price: BigNumber = rangeOrderPoolPriceUsdcAsBigNumber()
