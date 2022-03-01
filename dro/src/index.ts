@@ -11,14 +11,15 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
-// (P1) Identify when there's a token ID in the db on starting, but the position is closed.
-// (P1) Log the total unclaimed fees vs. total gas cost at the time of removing liquidity.
 // (P2) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 // (P2) Build out exponential backoff, or at least retries, for 40x and 50x server errors from provider, or lost network. Ask in Alchemy Discord.
 // (P3) Keep track of how much ETH to keep on hand for gas and swap costs.
 
 // Done
 // ----
+// (P1) Fix integer arithmetic on tokenRatioByValue().
+// (P1) Log the total unclaimed fees vs. total gas cost at the time of removing liquidity.
+// (P1) Identify when there's a token ID in the db on starting, but the position is closed.
 // (P1) Create new accounting source to handle logging gas cost in USD given a transaction receipt, plus USD total of unclaimed fees from both asset amounts.
 // (P1) Killing the process and restarting it while in range should not remove liquidity and add it again.
 // (P1) Support killing process, changing range and restarting.
