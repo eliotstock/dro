@@ -103,14 +103,25 @@ export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
     if (!rangeOrderPoolPriceUsdc)
         throw 'Do not call rangeOrderPoolPriceUsdcAsBigNumber() before updateTick()'
 
-    // Ethers.js's BigNumber does not deal with decimals.
+    // We are not dealing with large integers for our USDC amounts, even once raised to 10^6.
     const usdcAsFloat: number = parseFloat(rangeOrderPoolPriceUsdc)
-    const usdcTimesTenToTheMinusSix: number = usdcAsFloat * 1_000_000
+    const usdcTimesTenToTheSix: number = usdcAsFloat * 1_000_000
 
     // console.log(`usdcTimesTenToTheMinusSix: ${usdcTimesTenToTheMinusSix}`)
     // console.log(`usdcTimesTenToTheMinusSix rounded: ${Math.round(usdcTimesTenToTheMinusSix)}`)
 
-    return ethers.BigNumber.from(Math.round(usdcTimesTenToTheMinusSix))
+    return ethers.BigNumber.from(Math.round(usdcTimesTenToTheSix))
+}
+
+export function rangeOrderPoolPriceUsdcAsJsbi(): JSBI {
+    if (!rangeOrderPoolPriceUsdc)
+        throw 'Do not call rangeOrderPoolPriceUsdcAsBigNumber() before updateTick()'
+
+    // We are not dealing with large integers for our USDC amounts, even once raised to 10^6.
+    const usdcAsFloat: number = parseFloat(rangeOrderPoolPriceUsdc)
+    const usdcTimesTenToTheSix: number = usdcAsFloat * 1_000_000
+
+    return JSBI.BigInt(usdcTimesTenToTheSix)
 }
 
 const TOPIC_0_INCREASE_LIQUIDITY = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f'

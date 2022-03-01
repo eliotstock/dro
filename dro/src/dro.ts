@@ -8,7 +8,7 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, readableJsbi } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdc, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, rangeOrderPoolPriceUsdcAsJsbi } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import { forwardTestInit, forwardTestRerange } from './forward-test'
 import JSBI from 'jsbi'
@@ -240,9 +240,17 @@ export class DRO {
           this.unclaimedFeesWeth = JSBI.BigInt(results.amount1)
         }
 
+        const price: JSBI = rangeOrderPoolPriceUsdcAsJsbi()
+
+        // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18 / 10^6
+        const usdVaueOfUnclaimedWeth = JSBI.multiply(this.unclaimedFeesWeth, price)
+  
+        // const f: number = JSBI.divide(JSBI.multiply(usdVaueOfUnclaimedWeth, JSBI.BigInt(100)).div(BigNumber.from(10).pow(24)).toNumber() / 100
+
         console.log(`[${this.rangeWidthTicks}] Unclaimed fees: \
 ${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC, \
-${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
+${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH \
+(the WETH being ${readableJsbi(usdVaueOfUnclaimedWeth, 6, 4)} in USDC terms)`)
       })
     }
 
@@ -331,7 +339,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH`)
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] removeLiquidity()`, txRequest)
 
-      const gasCost = this.gasCost(`[${this.rangeWidthTicks}] removeLiquidity()`, txReceipt)
+      const gasCost = this.gasCost(txReceipt)
 
       // Removing liquidity is the last tx in the set of three. We're interested in the total gas
       // cost of the roundtrip position.
@@ -497,7 +505,7 @@ ${this.totalGasCost.toFixed(2)}`)
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] swap()`, txRequest)
 
-      const gasCost = this.gasCost(`[${this.rangeWidthTicks}] swap()`, txReceipt)
+      const gasCost = this.gasCost(txReceipt)
       this.totalGasCost += gasCost
 
       //   try {
@@ -686,7 +694,7 @@ ${position.mintAmounts.amount1.toString()} WETH`)
 be able to remove this liquidity.`)
       }
 
-      const gasCost = this.gasCost(`[${this.rangeWidthTicks}] addLiquidity()`, txReceipt)
+      const gasCost = this.gasCost(txReceipt)
       this.totalGasCost += gasCost
     }
 
@@ -939,7 +947,7 @@ ${route.trade.outputAmount.currency.symbol}`)
 be able to remove this liquidity.`
         }
 
-        const gasCost = this.gasCost(`[${this.rangeWidthTicks}] swapAndAddLiquidity()`, txReceipt)
+        const gasCost = this.gasCost(txReceipt)
         this.totalGasCost += gasCost
       }
       else {
@@ -952,7 +960,7 @@ be able to remove this liquidity.`
       }
     }
 
-    gasCost(logLinePrefix: string, txReceipt: TransactionReceipt): number {
+    gasCost(txReceipt: TransactionReceipt): number {
       // What did we just sepnd on gas? None of these are actually large integers.
 
       // Corresponds to "Gas Used by Transaction" on Etherscan
