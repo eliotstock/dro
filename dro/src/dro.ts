@@ -73,8 +73,8 @@ export class DRO {
         // Now get the position from Uniswap for the given token ID.
         const position: Position = await positionByTokenId(tokenId, this.wethFirst)
 
-        console.log(`Position:`)
-        console.dir(position)
+        // console.log(`Position:`)
+        // console.dir(position)
 
         if (position) {
           this.position = position
@@ -282,14 +282,15 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
         return txReceipt
       }
       catch (e: unknown) {
+        // One failed transaction should stop the process, for now.
         if (e instanceof Error) {
-          console.log(`${logLinePrefix} Error: ${e.message}`)
+          console.error(`${logLinePrefix} Error: ${e.message}`)
         }
         else {
-          console.log(`${logLinePrefix} Error: ${e}`)
+          console.error(`${logLinePrefix} Error: ${e}`)
         }
 
-        process.exit(1)
+        process.exit(292)
       }
     }
   
