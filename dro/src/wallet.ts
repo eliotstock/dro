@@ -19,7 +19,7 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 
 export let gasPrice: ethers.BigNumber
 
-class EthUsdcWallet extends ethers.Wallet {
+export class EthUsdcWallet extends ethers.Wallet {
 
     usdcContract: ethers.Contract
     wethContract: ethers.Contract
@@ -85,17 +85,8 @@ class EthUsdcWallet extends ethers.Wallet {
         return await this.wethContract.balanceOf(this.address)
     }
 
-    async tokenRatioByValue(): Promise<number> {
-        const usdc: BigNumber = await wallet.usdc()
-        const weth: BigNumber = await wallet.weth()
-
-        // console.log(`usdc: ${usdc}`)
-        // console.log(`weth: ${weth}`) // 86_387_721_003_586_366
-
-        // This is USDC * 1e6, eg. 3_000_000_000 when the price of ETH is USD 3,000.
-        const price: BigNumber = rangeOrderPoolPriceUsdcAsBigNumber()
-        // console.log(`price: ${price}`)
-
+    // Testable, internal implementation.
+    static _tokenRatioByValue(usdc: BigNumber, weth: BigNumber, price: BigNumber): number {
         // If we have 1 WETH and the price is USD 3,000, this is then 3_000_000_000 again. But
         // adjust the scale for the fact that WETH has 18 decimals and USDC has 6.
         // eg. 263_773_675 means USDC 263.77
@@ -108,14 +99,31 @@ class EthUsdcWallet extends ethers.Wallet {
 
         // console.log(`usdcValueOfWeth: ${usdcValueOfWeth}`)
 
-        // What is the ratio of our USDC balance to the USDC value of our WETH balance? Note that we're
-        // using the price in the range order pool, not the swap pool, but the difference will be
-        // small and we only need very low precision here.
-        // Note that because we're comparing two USDC values, there's no need to handle the difference
-        // in precision between WETH (18 decimals) and USDC (6 decimals)
+        // What is the ratio of our USDC balance to the USDC value of our WETH balance? Note that
+        // we're using the price in the range order pool, not the swap pool, but the difference
+        // will be small and we only need very low precision here.
+        // Note that because we're comparing two USDC values, there's no need to handle the
+        // difference in precision between WETH (18 decimals) and USDC (6 decimals)
+
+        // TODO: Fix: BigNumber.div() will never return a decimal, only an integer.
+        //   Balances: USDC 1078.48, WETH 0.3926, ETH 0.0818 (token ratio by value: 0)
+        // This is USD 1159 worth of WETH, so the ratio should be closer to 1.
         let ratio: BigNumber = usdc.div(usdcValueOfWeth)
 
         return ratio.toNumber()
+    }
+
+    async tokenRatioByValue(): Promise<number> {
+        const usdc: BigNumber = await wallet.usdc()
+        const weth: BigNumber = await wallet.weth()
+
+        // This is USDC * 10e6, eg. 3_000_000_000 when the price of ETH is USD 3,000.
+        const price: BigNumber = rangeOrderPoolPriceUsdcAsBigNumber()
+        // console.log(`price: ${price}`)
+
+        // console.log(`usdc: ${usdc}`)
+        // console.log(`weth: ${weth}`) // 86_387_721_003_586_366
+        return EthUsdcWallet._tokenRatioByValue(usdc, weth, price)
     }
 
     async logBalances() {

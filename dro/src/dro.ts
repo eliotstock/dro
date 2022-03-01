@@ -263,7 +263,7 @@ liquidity but retain our token ID?`)
 
       // const f: number = JSBI.divide(JSBI.multiply(usdVaueOfUnclaimedWeth, JSBI.BigInt(100)).div(BigNumber.from(10).pow(24)).toNumber() / 100
 
-      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 4)}\
+      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 4)} USD \
 (${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
 ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
     }
