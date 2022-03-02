@@ -8,7 +8,7 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, readableJsbi } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, rangeOrderPoolPriceUsdcAsJsbi } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, rangeOrderPoolPriceUsdcAsJsbi, price } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -43,8 +43,8 @@ export class DRO {
     wethFirst: boolean = true
     position?: Position
     tokenId?: number
-    unclaimedFeesUsdc: JSBI = JSBI.BigInt(0)
-    unclaimedFeesWeth: JSBI = JSBI.BigInt(0)
+    unclaimedFeesUsdc: bigint = 0n
+    unclaimedFeesWeth: bigint = 0n
     lastRerangeTimestamp?: string
     locked: boolean = false
     totalGasCost: number = 0
@@ -246,31 +246,47 @@ ${positionWebUrl(this.tokenId)}`)
         }
 
         if (this.wethFirst) {
-          this.unclaimedFeesWeth = JSBI.BigInt(results.amount0)
-          this.unclaimedFeesUsdc = JSBI.BigInt(results.amount1)
+          this.unclaimedFeesWeth = BigInt(results.amount0)
+          this.unclaimedFeesUsdc = BigInt(results.amount1)
         }
         else {
-          this.unclaimedFeesUsdc = JSBI.BigInt(results.amount0)
-          this.unclaimedFeesWeth = JSBI.BigInt(results.amount1)
+          this.unclaimedFeesUsdc = BigInt(results.amount0)
+          this.unclaimedFeesWeth = BigInt(results.amount1)
         }
       })
     }
 
     logUnclaimedFees() {
-      const price: JSBI = rangeOrderPoolPriceUsdcAsJsbi()
+      const priceNative = price()
+      console.log(`Price native: ${priceNative}`)
 
-      const tenToTheEighteen = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
+      const usdValueOfUnclaimedWethFees = this.unclaimedFeesWeth * price()
+      console.log(`usdValueOfUnclaimedWethFees: ${usdValueOfUnclaimedWethFees}`)
+
+      const unclaimedFeesTotalUsdc = this.unclaimedFeesUsdc + usdValueOfUnclaimedWethFees
+      console.log(`unclaimedFeesTotalUsdc: ${unclaimedFeesTotalUsdc}`)
+
+      const N_10_TO_THE_6 = BigInt(1_000_000)
+
+      const readable = Number(unclaimedFeesTotalUsdc * 100n / N_10_TO_THE_6) / 100
+      console.log(`readable: ${readable}`)
+
+      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
+
+      // const priceAsJsbi: JSBI = rangeOrderPoolPriceUsdcAsJsbi()
+
+      // const tenToTheEighteen = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
 
       // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18 / 10^6
       // Gives 187_476_817_506_985_888.0000 from 0.000064 WETH. Should give 0.187.
-      const usdVaueOfUnclaimedWeth = JSBI.divide(JSBI.multiply(this.unclaimedFeesWeth, price),
-        tenToTheEighteen)
+      // const usdVaueOfUnclaimedWeth = JSBI.divide(JSBI.multiply(this.unclaimedFeesWeth, priceAsJsbi),
+      //   tenToTheEighteen)
 
-      const unclaimedFeesTotalUsdc = JSBI.ADD(this.unclaimedFeesUsdc, usdVaueOfUnclaimedWeth)
+      // const unclaimedFeesTotalUsdc = JSBI.ADD(this.unclaimedFeesUsdc, usdVaueOfUnclaimedWeth)
 
-      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 2)} USD \
-(${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
-${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
+//       console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 2)} USD \
+// (${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
+// ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
     }
 
     static sleep(seconds: number) {

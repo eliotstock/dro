@@ -1,8 +1,10 @@
+import { tickToPrice } from '@uniswap/v3-sdk'
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
+import { rangeOrderPoolTick, updateTick, usdcToken, wethToken } from '../src/uniswap'
 import { EthUsdcWallet } from '../src/wallet'
 
-describe('Token ratio by value', function () {
+describe('Wallet token ratio by value', function () {
     it('Should be close to 1.0 for some specific values', async function() {
         // Balances: USDC 1078.48, WETH 0.3926
         // This is USD 1159 worth of WETH, so the ratio should be close to 1.
@@ -40,5 +42,26 @@ describe('Token ratio by value', function () {
         const ratio: number = EthUsdcWallet._tokenRatioByValue(usdc, weth, price)
 
         expect(ratio).to.equal(0.5)
+    })
+})
+
+describe('Fun with large integers', function () {
+    it('Should log some stuff', async function() {
+        await updateTick()
+
+        console.log(`Tick: ${rangeOrderPoolTick}`)
+
+        const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+        console.log(`Num as string: ${p.numerator.toString()}`)
+        console.log(`Denom as string: ${p.denominator.toString()}`)
+
+        const num = BigInt(p.numerator.toString())
+        const denom = BigInt(p.denominator.toString())
+        console.log(`Num as native: ${num}`)
+        console.log(`Denom as native: ${denom}`)
+
+        const b = (num * BigInt(1_000_000_000_000_000_000)) / denom
+        // 2_977_093_343
+        console.log(`b: ${b}`)
     })
 })

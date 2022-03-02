@@ -17,6 +17,8 @@ config()
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
 
+const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
+
 export let rangeOrderPoolTick: number
 export let rangeOrderPoolPriceUsdc: string
 
@@ -82,9 +84,25 @@ export function priceFormatted(): string {
 
     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
     // and denominator are both JSBIs.
-    const price = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+    const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
 
-    return price.toFixed(2, {groupSeparator: ','})
+    return p.toFixed(2, {groupSeparator: ','})
+}
+
+// Returns USDC's small units (USDC has six decimals)
+// When the price in the pool is USDC 3,000, this will return 3_000_000_000.
+export function price(): bigint {
+    if (rangeOrderPoolTick === undefined) return 0n
+
+    // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
+    // and denominator are both JSBIs.
+    const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+
+    // The least bad way to get from JSBI to BigInt is via strings for numerator and denominator.
+    const num = BigInt(p.numerator.toString())
+    const denom = BigInt(p.denominator.toString())
+
+    return num * N_10_TO_THE_18 / denom
 }
 
 // Every range order pool we use has WETH as one token and USDC as the other, but the order varies
