@@ -17,6 +17,7 @@ config()
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
 
+// Refactoring: Integer types: Have: BigNumber, need: native BigInt.
 export let gasPrice: ethers.BigNumber
 
 export class EthUsdcWallet extends ethers.Wallet {
@@ -77,15 +78,18 @@ export class EthUsdcWallet extends ethers.Wallet {
         return w
     }
 
+    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
     async usdc(): Promise<BigNumber> {
         return await this.usdcContract.balanceOf(this.address)
     }
 
+    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
     async weth(): Promise<BigNumber> {
         return await this.wethContract.balanceOf(this.address)
     }
 
     // Testable, internal implementation.
+    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
     static _tokenRatioByValue(usdc: BigNumber, weth: BigNumber, price: BigNumber): number {
         // Use native BigInts from here on.
         const usdcNative = usdc.toBigInt()
@@ -103,6 +107,7 @@ export class EthUsdcWallet extends ethers.Wallet {
         return r
     }
 
+    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
     async tokenRatioByValue(): Promise<number> {
         const usdc: BigNumber = await this.usdc()
         const weth: BigNumber = await this.weth()
@@ -197,6 +202,7 @@ export async function updateGasPrice() {
     }
 
     // Legacy gas price.
+    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
     const p = (await CHAIN_CONFIG.provider().getFeeData()).gasPrice
 
     // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)

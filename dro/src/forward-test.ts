@@ -77,13 +77,6 @@ function gasCostEth(): number {
 export function forwardTestInit(width: number) {
     droPositionValuesUsdc.set(width, INITIAL_POSTION_VALUE_USDC)
 
-    // Start with the current ETH value of INITIAL_POSTION_VALUE_USDC
-    // Abandonned, because we don't yet have the current price here.
-    // const usdc = ethers.BigNumber.from(INITIAL_POSTION_VALUE_USDC)
-    // const initialPositionValueEth = usdc.div(rangeOrderPoolPriceUsdcAsBigNumber())
-    // droPositionValuesEth.set(width, initialPositionValueEth.toNumber())
-
-    // console.log(`Initial position value (ETH): ${initialPositionValueEth.toNumber()}`)
     droPositionValuesEth.set(width, INITIAL_POSTION_VALUE_ETH)
 }
 

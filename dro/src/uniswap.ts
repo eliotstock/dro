@@ -99,6 +99,8 @@ export async function tokenOrderIsWethFirst(): Promise<boolean> {
 }
 
 // We store rangeOrderPoolPriceUsdc as a string, but it can be useful to have it as a BigNumber.
+// Refactoring: Integer types: Consider using native BigInt for price and converting on display
+// or arithmetic.
 export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
     if (!rangeOrderPoolPriceUsdc)
         throw 'Do not call rangeOrderPoolPriceUsdcAsBigNumber() before updateTick()'
@@ -113,6 +115,8 @@ export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
     return ethers.BigNumber.from(Math.round(usdcTimesTenToTheSix))
 }
 
+// Refactoring: Integer types: Consider using native BigInt for price and converting on display
+// or arithmetic.
 export function rangeOrderPoolPriceUsdcAsJsbi(): JSBI {
     if (!rangeOrderPoolPriceUsdc)
         throw 'Do not call rangeOrderPoolPriceUsdcAsBigNumber() before updateTick()'
@@ -132,6 +136,7 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
     for (const log of txReceipt.logs) {
         if (log.topics[0] === TOPIC_0_INCREASE_LIQUIDITY && log.topics[1]) {
             const tokenIdHexString = log.topics[1]
+             // Refactoring: Integer types: Have: hex string, need: number
             const tokenId = ethers.BigNumber.from(tokenIdHexString)
 
             // This will throw an error if Uniswap ever has more LP positions than Number.MAX_SAFE_INTEGER.
@@ -302,7 +307,6 @@ export async function createPoolOnTestnet() {
 
     // Eyeball these and make sure they're within our available amounts logged above and that we
     // have enough for gas.
-    // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A String is easier.
 
     // 500 USDC, 6 decimals
     const amountUsdc = '500000000'

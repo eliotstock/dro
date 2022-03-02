@@ -220,6 +220,7 @@ ${positionWebUrl(this.tokenId)}`)
         return
       }
   
+      // Refactoring: Integer types: need: anything.
       const MAX_UINT128 = BigNumber.from(2).pow(128).sub(1)
   
       const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
@@ -229,8 +230,8 @@ ${positionWebUrl(this.tokenId)}`)
       positionManagerContract.callStatic.collect({
         tokenId: tokenIdHexString,
         recipient: wallet.address,
-        amount0Max: MAX_UINT128,
-        amount1Max: MAX_UINT128,
+        amount0Max: MAX_UINT128, // Solidity type: uint128
+        amount1Max: MAX_UINT128, // Solidity type: uint128
       },
       { from: wallet.address })
       .then((results) => {
@@ -261,8 +262,6 @@ ${positionWebUrl(this.tokenId)}`)
         tenToTheEighteen)
 
       const unclaimedFeesTotalUsdc = JSBI.ADD(this.unclaimedFeesUsdc, usdVaueOfUnclaimedWeth)
-
-      // const f: number = JSBI.divide(JSBI.multiply(usdVaueOfUnclaimedWeth, JSBI.BigInt(100)).div(BigNumber.from(10).pow(24)).toNumber() / 100
 
       console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 2)} USD \
 (${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
@@ -509,8 +508,7 @@ ${this.totalGasCost.toFixed(2)}`)
       if (this.position || this.tokenId)
         throw `[${this.rangeWidthTicks}] Can't add liquidity. Already in a position. Remove liquidity and swap first.`
   
-      // Ethers.js uses its own BigNumber but Uniswap expects a JSBI, or a string. A string is
-      // easier.
+      // Refactoring: Integer types: have BigNumber, need JSBI.
       const availableUsdc = (await wallet.usdc()).toString()
       const availableWeth = (await wallet.weth()).toString()
       // console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
@@ -689,8 +687,7 @@ position. Remove liquidity first.`
         token0 = wethToken
         token1 = usdcToken
 
-        // The wallet gives us BigNumbers for balances, but Uniswap's CurrencyAmount takes a
-        // BigintIsh, which is a JSBI, string or number.
+        // Refactoring: Integer types: Have BigNumber, need JSBI.
         token0Balance = CurrencyAmount.fromRawAmount(wethToken,
           await (await wallet.weth()).toString())
         token1Balance = CurrencyAmount.fromRawAmount(usdcToken,
@@ -879,9 +876,9 @@ ${route.trade.outputAmount.currency.symbol}`)
         const txRequest = {
           from: wallet.address,
           to: CHAIN_CONFIG.addrSwapRouter2,
-          value: BigNumber.from(route.methodParameters?.value),
+          // Refactoring: Integer types: Have string, need ethers BigNumberish (BigNumber |bigint)
+          value: BigNumber.from(route.methodParameters?.value), // Probably zero if we deal in WETH.
           nonce: nonce,
-          // gasPrice: BigNumber.from(route.gasPriceWei),
           gasPrice: CHAIN_CONFIG.gasPrice,
           gasLimit: CHAIN_CONFIG.gasLimit,
           data: route.methodParameters?.calldata,
@@ -937,20 +934,26 @@ be able to remove this liquidity.`
       // What did we just sepnd on gas? None of these are actually large integers.
 
       // Corresponds to "Gas Used by Transaction" on Etherscan
+      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
       const gasUsed: BigNumber = txReceipt.gasUsed
       // console.log(`Gas used: ${gasUsed.toNumber()}`)
 
       // txReceipt.cumulativeGasUsed: No idea what this is. Ignore it.
 
       // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei, typically about 0.66 gwei for Arbitrum.
+      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
       const effectiveGasPrice: BigNumber = txReceipt.effectiveGasPrice
       // console.log(`Effective gas price: ${effectiveGasPrice.toNumber()}`)
 
+      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
+      // Consider using native for price and converting on display or arithmetic.
       const price: BigNumber = rangeOrderPoolPriceUsdcAsBigNumber()
 
       // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18 / 10^6
+      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
       const usdCostOfTx: BigNumber = gasUsed.mul(effectiveGasPrice).mul(price)
 
+      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
       const f: number = usdCostOfTx.mul(100).div(BigNumber.from(10).pow(24)).toNumber() / 100
 
       // console.log(`${logLinePrefix} TX cost: USD ${f.toFixed(2)}`)

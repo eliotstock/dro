@@ -19,8 +19,8 @@ export interface ChainConfig {
     addrPoolRangeOrder: string
     addrPoolSwaps: string
     slippageTolerance: Percent
-    gasPrice: BigNumber
-    gasPriceMax: BigNumber
+    gasPrice: BigNumber // Keep these as ethers's prefered type.
+    gasPriceMax: BigNumber // Keep these as ethers's prefered type.
     addrPositionManager: string
     addrQuoter: string
     addrSwapRouter: string
