@@ -263,18 +263,19 @@ ${positionWebUrl(this.tokenId)}`)
       console.log(`unclaimedFeesWeth: ${this.unclaimedFeesWeth}`)
       console.log(`unclaimedFeesUsdc: ${this.unclaimedFeesUsdc}`)
 
-      const usdValueOfUnclaimedWethFees = this.unclaimedFeesWeth * price()
-      console.log(`usdValueOfUnclaimedWethFees: ${usdValueOfUnclaimedWethFees}`)
+      const N_10_TO_THE_6 = BigInt(1_000_000)
+      const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
+
+      const usdValueOfUnclaimedWethFees = this.unclaimedFeesWeth * price() / N_10_TO_THE_18
+      console.log(`usdValueOfUnclaimedWethFees: ${usdValueOfUnclaimedWethFees}`) // 4_400_696_826_537_775_956_696_005
 
       const unclaimedFeesTotalUsdc = this.unclaimedFeesUsdc + usdValueOfUnclaimedWethFees
-      console.log(`unclaimedFeesTotalUsdc: ${unclaimedFeesTotalUsdc}`)
-
-      const N_10_TO_THE_6 = BigInt(1_000_000)
+      console.log(`unclaimedFeesTotalUsdc: ${unclaimedFeesTotalUsdc}`) // 4400696826537775961771689
 
       const readable = Number(unclaimedFeesTotalUsdc * 100n / N_10_TO_THE_6) / 100
-      console.log(`readable: ${readable}`)
+      console.log(`readable: ${readable}`) // 4400696826537776000
 
-      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
+      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`) // 4400696826537776128.00
 
       // const priceAsJsbi: JSBI = rangeOrderPoolPriceUsdcAsJsbi()
 
