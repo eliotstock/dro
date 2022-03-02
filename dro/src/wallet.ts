@@ -4,7 +4,6 @@ import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract
 import { Provider } from "@ethersproject/abstract-provider";
 import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer";
 import { SigningKey } from "@ethersproject/signing-key";
-import { BigNumber } from '@ethersproject/bignumber'
 import { abi as ERC20ABI } from './abi/erc20.json'
 import { abi as WETHABI } from './abi/weth.json'
 import { useConfig, ChainConfig } from './config'
@@ -76,38 +75,30 @@ export class EthUsdcWallet extends ethers.Wallet {
         return w
     }
 
-    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-    async usdc(): Promise<BigNumber> {
-        return await this.usdcContract.balanceOf(this.address)
+    async usdc(): Promise<bigint> {
+        return await this.usdcContract.balanceOf(this.address).toBigInt()
     }
 
-    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-    async weth(): Promise<BigNumber> {
-        return await this.wethContract.balanceOf(this.address)
+    async weth(): Promise<bigint> {
+        return await this.wethContract.balanceOf(this.address).toBigInt()
     }
 
     // Testable, internal implementation.
-    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-    static _tokenRatioByValue(usdc: BigNumber, weth: BigNumber, price: bigint): number {
-        // Use native BigInts from here on.
-        const usdcNative = usdc.toBigInt()
-        const wethNative = weth.toBigInt()
-
-        let usdValueOfWeth = wethNative * price / 1_000_000_000_000_000_000n
+    static _tokenRatioByValue(usdc: bigint, weth: bigint, price: bigint): number {
+        let usdValueOfWeth = weth * price / 1_000_000_000_000_000_000n
 
         // Avoid a division by zero error below. Any very small integer will do here.
         if (usdValueOfWeth == 0n) usdValueOfWeth = 1n
 
         // Do BigInt operations in the middle and floating point operations on the outside.
-        const r = Number(usdcNative * 100n / usdValueOfWeth) / 100
+        const r = Number(usdc * 100n / usdValueOfWeth) / 100
 
         return r
     }
 
-    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
     async tokenRatioByValue(): Promise<number> {
-        const usdc: BigNumber = await this.usdc()
-        const weth: BigNumber = await this.weth()
+        const usdc = await this.usdc()
+        const weth = await this.weth()
 
         // This is USDC * 10e6, eg. 3_000_000_000 when the price of ETH is USD 3,000.
         const p: bigint = price()
@@ -133,13 +124,13 @@ export class EthUsdcWallet extends ethers.Wallet {
         // Formatting to a given number of decimal places is fiddly. We are truncating here, not
         // rounding.
         const usdcBalanceReadable = ethers.utils.formatUnits(
-            usdcBalance.sub(usdcBalance.mod(1e4)), 6)
+            usdcBalance - (usdcBalance % 10000n), 6)
 
         const wethBalanceReadable = ethers.utils.formatEther(
-            wethBalance.sub(wethBalance.mod(1e14)))
+            wethBalance - (wethBalance % 100000000000000n))
 
         const ethBalanceReadable = ethers.utils.formatEther(
-            ethBalance.sub(ethBalance.mod(1e14)))
+            ethBalance.toBigInt() - (ethBalance.toBigInt() % 100000000000000n))
 
         const ratio = await this.tokenRatioByValue()
 

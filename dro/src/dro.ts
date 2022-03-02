@@ -1,5 +1,4 @@
 import { config } from 'dotenv'
-import { BigNumber } from '@ethersproject/bignumber'
 import { FeeAmount, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, Route, SwapOptions, SwapRouter, tickToPrice, Trade } from '@uniswap/v3-sdk'
 import { CurrencyAmount, Percent, TradeType, Currency, Fraction } from '@uniswap/sdk-core'
 import { TickMath } from '@uniswap/v3-sdk'
@@ -452,7 +451,7 @@ ${ratio.toFixed(2)}. We're mostly in USDC now. Swapping half our USDC to WETH.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenUsdc
         tokenOut = CHAIN_CONFIG.addrTokenWeth
-        amountIn = usdc.div(2)
+        amountIn = usdc / 2n
 
         // The order of the tokens here is significant. Input first.
         swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
@@ -469,7 +468,7 @@ ${ratio.toFixed(2)}. We're mostly in WETH now. Swapping half our WETH to USDC.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenWeth
         tokenOut = CHAIN_CONFIG.addrTokenUsdc
-        amountIn = weth.div(2)
+        amountIn = weth / 2n
 
         swapRoute = new Route([poolEthUsdcForSwaps], wethToken, usdcToken)
       }
@@ -492,7 +491,7 @@ ${ratio.toFixed(2)}. We're mostly in WETH now. Swapping half our WETH to USDC.`)
         // Swapping USDC to WETH
         trade = await Trade.createUncheckedTrade({
           route: swapRoute,
-          inputAmount: CurrencyAmount.fromRawAmount(usdcToken, usdc.div(2).toString()),
+          inputAmount: CurrencyAmount.fromRawAmount(usdcToken, (usdc / 2n).toString()),
           outputAmount: CurrencyAmount.fromRawAmount(wethToken, quotedAmountOut.toString()),
           tradeType: TradeType.EXACT_INPUT,
         })
@@ -501,7 +500,7 @@ ${ratio.toFixed(2)}. We're mostly in WETH now. Swapping half our WETH to USDC.`)
         // Swapping WETH to USDC
         trade = await Trade.createUncheckedTrade({
           route: swapRoute,
-          inputAmount: CurrencyAmount.fromRawAmount(wethToken, weth.div(2).toString()),
+          inputAmount: CurrencyAmount.fromRawAmount(wethToken, (weth / 2n).toString()),
           outputAmount: CurrencyAmount.fromRawAmount(usdcToken, quotedAmountOut.toString()),
           tradeType: TradeType.EXACT_INPUT,
         })
@@ -540,12 +539,13 @@ ${ratio.toFixed(2)}. We're mostly in WETH now. Swapping half our WETH to USDC.`)
   
     async addLiquidity() {
       if (this.position || this.tokenId)
-        throw `[${this.rangeWidthTicks}] Can't add liquidity. Already in a position. Remove liquidity and swap first.`
+        throw `[${this.rangeWidthTicks}] Can't add liquidity. Already in a position. Remove \
+liquidity and swap first.`
   
-      // Refactoring: Integer types: have BigNumber, need JSBI.
-      const availableUsdc = (await wallet.usdc()).toString()
-      const availableWeth = (await wallet.weth()).toString()
-      // console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
+      // Go from native bigint to JSBI via string.
+      const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
+      const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
+      console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
 
       const slot = await rangeOrderPoolContract.slot0()
 
@@ -717,24 +717,24 @@ position. Remove liquidity first.`
       let token0Balance
       let token1Balance
 
+      // Go from native bigint to JSBI via string.
+      const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
+      const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
+      console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
+
       if (this.wethFirst) {
         token0 = wethToken
         token1 = usdcToken
 
-        // Refactoring: Integer types: Have BigNumber, need JSBI.
-        token0Balance = CurrencyAmount.fromRawAmount(wethToken,
-          await (await wallet.weth()).toString())
-        token1Balance = CurrencyAmount.fromRawAmount(usdcToken,
-          await (await wallet.usdc()).toString())
+        token0Balance = CurrencyAmount.fromRawAmount(wethToken, availableWeth)
+        token1Balance = CurrencyAmount.fromRawAmount(usdcToken, availableUsdc)
       }
       else {
         token0 = usdcToken
         token1 = wethToken
 
-        token0Balance = CurrencyAmount.fromRawAmount(usdcToken,
-          await (await wallet.usdc()).toString())
-        token1Balance = CurrencyAmount.fromRawAmount(wethToken,
-          await (await wallet.weth()).toString())
+        token0Balance = CurrencyAmount.fromRawAmount(usdcToken, availableUsdc)
+        token1Balance = CurrencyAmount.fromRawAmount(wethToken, availableWeth)
       }
 
       console.log(`[dro.ts] Token 0 balance: ${token0Balance.toFixed(4)}, \
