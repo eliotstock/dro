@@ -216,8 +216,6 @@ export async function updateGasPrice() {
 }
 
 // Return a readable string of a float from a large integer
-// Refactoring: Integer types: Simplify this by using native BigInts internally. Only used in one
-// place anyway.
 // export function readableJsbi(a: JSBI, decimals: number, precision: number): string {
 //     // See: https://stackoverflow.com/questions/54409854/how-to-divide-two-native-javascript-bigints-and-get-a-decimal-result
 //     const tenToTheDecimals = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(decimals))
