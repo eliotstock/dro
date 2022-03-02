@@ -301,14 +301,14 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
         }
         catch (e: unknown) {
           if (e instanceof Error) {
-            console.error(`${logLinePrefix} Error: ${e.message}`)
+            console.error(`${logLinePrefix} Error message: ${e.message}`)
           }
           else {
             console.error(`${logLinePrefix} Error: ${e}`)
           }
 
           if (retries >= BACKOFF_RETRIES_MAX) {
-            console.error(`Maximum retries (${BACKOFF_RETRIES_MAX}) exceeded. Exiting.`)
+            console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Exiting.`)
             process.exit(320)
           }
   
