@@ -260,6 +260,9 @@ ${positionWebUrl(this.tokenId)}`)
       const priceNative = price()
       console.log(`Price native: ${priceNative}`)
 
+      console.log(`unclaimedFeesWeth: ${this.unclaimedFeesWeth}`)
+      console.log(`unclaimedFeesUsdc: ${this.unclaimedFeesUsdc}`)
+
       const usdValueOfUnclaimedWethFees = this.unclaimedFeesWeth * price()
       console.log(`usdValueOfUnclaimedWethFees: ${usdValueOfUnclaimedWethFees}`)
 
