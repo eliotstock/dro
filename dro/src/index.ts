@@ -101,7 +101,7 @@ async function onBlock(...args: Array<any>) {
     let gasPriceReadable = ''
 
     if (!CHAIN_CONFIG.isL2) {
-      gasPriceReadable = `${gasPrice.div(1e9).toNumber()} gwei `
+      gasPriceReadable = `${Number(gasPrice / 1_000_000_000n)} gwei `
     }
 
     console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceReadable}\
