@@ -293,6 +293,12 @@ ${positionWebUrl(this.tokenId)}`)
           return txReceipt
         }
         catch (e: unknown) {
+          // TODO: Log:
+          // * HTTP status code and message
+          // * Alchemy's status code (eg. -32000)
+          // * Alchemy's message
+          // * The retry-after header, although by the time Ethers.js throws an error, this may no
+          //   longer be interesting.
           if (e instanceof Error) {
             console.error(`${logLinePrefix} Error message: ${e.message}`)
           }
@@ -300,16 +306,20 @@ ${positionWebUrl(this.tokenId)}`)
             console.error(`${logLinePrefix} Error: ${e}`)
           }
 
+          // Note that Ethers.js will do its own exponential back-off but only if the provider does
+          // NOT provide a retry-after header. Alchemy does provide this header.
+          // See: https://github.com/ethers-io/ethers.js/issues/1162#issuecomment-1057422329
+
           if (retries >= BACKOFF_RETRIES_MAX) {
-            console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Exiting.`)
-            process.exit(320)
+            console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Exiting process.`)
+            process.exit(305)
           }
   
           // 6^1: delay for 6 seconds
           // 6^2: delay for 36 seconds, etc.
           const delay = BACKOFF_DELAY_BASE_SEC ^ retries
   
-          console.log(`Backing off for ${delay} seconds...`)
+          console.log(`Retry #${retries}. Backing off for ${delay} seconds...`)
           await DRO.sleep(delay)
           console.log(`...Done`)
         }
