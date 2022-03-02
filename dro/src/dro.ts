@@ -8,7 +8,7 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdcAsBigNumber, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -163,13 +163,13 @@ ${positionWebUrl(this.tokenId)}`)
 
       // Don't go under MIN_TICK, which can happen on testnets.
       this.minTick = Math.max(this.minTick, TickMath.MIN_TICK)
-      this.minTick = nearestUsableTick(this.minTick, rangeOrderPoolTickSpacing)
+      this.minTick = nearestUsableTick(this.minTick, RANGE_ORDER_POOL_TICK_SPACING)
   
       this.maxTick = Math.round(rangeOrderPoolTick + (this.rangeWidthTicks / 2))
 
       // Don't go over MAX_TICK, which can happen on testnets.
       this.maxTick = Math.min(this.maxTick, TickMath.MAX_TICK)
-      this.maxTick = nearestUsableTick(this.maxTick, rangeOrderPoolTickSpacing)
+      this.maxTick = nearestUsableTick(this.maxTick, RANGE_ORDER_POOL_TICK_SPACING)
   
       let minUsdc = 'unknown'
       let maxUsdc = 'unknown'

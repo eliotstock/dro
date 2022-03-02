@@ -29,7 +29,7 @@ export const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
 
 // This is what `await rangeOrderPoolContract.tickSpacing()` would return, but we want to avoid
 // the await.
-export const rangeOrderPoolTickSpacing: number = 60 // ticks (bps)
+export const RANGE_ORDER_POOL_TICK_SPACING: number = 60 // ticks (bps)
 
 export const rangeOrderPoolContract = new ethers.Contract(
     CHAIN_CONFIG.addrPoolRangeOrder,
@@ -143,19 +143,6 @@ export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
     return ethers.BigNumber.from(Math.round(usdcTimesTenToTheSix))
 }
 
-// Refactoring: Integer types: Consider using native BigInt for price and converting on display
-// or arithmetic.
-// export function rangeOrderPoolPriceUsdcAsJsbi(): JSBI {
-//     if (!rangeOrderPoolPriceUsdc)
-//         throw 'Do not call rangeOrderPoolPriceUsdcAsBigNumber() before updateTick()'
-
-//     // We are not dealing with large integers for our USDC amounts, even once raised to 10^6.
-//     const usdcAsFloat: number = parseFloat(rangeOrderPoolPriceUsdc)
-//     const usdcTimesTenToTheSix: number = usdcAsFloat * 1_000_000
-
-//     return JSBI.BigInt(usdcTimesTenToTheSix)
-// }
-
 const TOPIC_0_INCREASE_LIQUIDITY = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f'
 
 export function extractTokenId(txReceipt: TransactionReceipt): number | undefined {
@@ -174,24 +161,6 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
 
     return undefined
 }
-
-// The index passed in here increments up from 0. Older positions have lower tokens IDs and
-// indices. Only the most recent token ID should have any liquidity.
-/*
-export async function firstTokenId(): Promise<number | undefined> {
-    try {
-        const tokenId = await positionManagerContract.tokenOfOwnerByIndex(wallet.address, 0)
-
-        return tokenId
-    }
-    catch (error) {
-        // This will be:
-        //   reason: 'EnumerableSet: index out of bounds',
-        //   code: 'CALL_EXCEPTION'
-        return undefined
-    }
-}
-*/
 
 export async function positionByTokenId(tokenId: number, wethFirst: boolean): Promise<Position> {
     const position: Position = await positionManagerContract.positions(tokenId)
@@ -255,7 +224,7 @@ export function positionWebUrl(tokenId: number): string {
 
 // Simplified fork of Uniswap's NonfungiblePositionManager.removeCallParameters(), which has given
 // us grief in the past (liquidity in call params higher than position liquidity). We always want
-// remove 100% of our liquidity.
+// to remove 100% of our liquidity.
 //   https://github.com/Uniswap/v3-sdk/blob/main/src/nonfungiblePositionManager.ts#L341
 export function removeCallParameters(position: Position,
     tokenId: number,
