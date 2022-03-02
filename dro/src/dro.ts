@@ -80,8 +80,8 @@ export class DRO {
           this.position = position
 
           if (JSBI.EQ(JSBI.BigInt(0), this.position.liquidity)) {
-            console.error(`[${this.rangeWidthTicks}] Existing position has no liquidity. Did we remove \
-liquidity but retain our token ID?`)
+            console.error(`[${this.rangeWidthTicks}] Existing position has no liquidity. Did we \
+remove liquidity but retain our token ID?`)
             process.exit(85)
           }
 
@@ -92,7 +92,8 @@ liquidity but retain our token ID?`)
           // and get a re-range to happen based on the new range.
           // this.minTick = position.tickLower
           // this.maxTick = position.tickUpper
-          console.log(`[${this.rangeWidthTicks}] Using existing position NFT`)
+          console.log(`[${this.rangeWidthTicks}] Using existing position NFT: \
+${positionWebUrl(this.tokenId)}`)
         }
         else {
           console.error(`No position for token ID ${this.tokenId}`)
@@ -263,7 +264,7 @@ liquidity but retain our token ID?`)
 
       // const f: number = JSBI.divide(JSBI.multiply(usdVaueOfUnclaimedWeth, JSBI.BigInt(100)).div(BigNumber.from(10).pow(24)).toNumber() / 100
 
-      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 4)} USD \
+      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 2)} USD \
 (${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
 ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
     }
@@ -403,19 +404,6 @@ ${this.totalGasCost.toFixed(2)}`)
       const usdc = await wallet.usdc()
       const weth = await wallet.weth()
 
-      // // TODO: Zero is no use to us here. Fake it on testnets, or fix the pool we're in.
-      // console.log(`Range order pool price: ${rangeOrderPoolPriceUsdc} USDC`)
-
-      // // This is USDC * 10^-6 as an integer (BigNumber).
-      // const u = rangeOrderPoolPriceUsdcAsBigNumber()
-
-      // let usdcValueOfWethBalance = BigNumber.from(u).mul(weth)
-
-      // // Avoid a division by zero error below. Any very small integer will do here.
-      // if (usdcValueOfWethBalance.eq(BigNumber.from(0))) {
-      //   usdcValueOfWethBalance = BigNumber.from(1)
-      // }
-
       // What is the ratio of our USDC balance to the USDC value of our WETH balance?
       const ratio = await wallet.tokenRatioByValue()
 
@@ -510,41 +498,11 @@ ${this.totalGasCost.toFixed(2)}`)
         data: calldata
       }
 
-      // If we run out of gas here on a testnet, note this comment from Uniswap's Discord dev-chat
-      // channel:
-      //   looks like that pool is probably sitting at a bad price
-      //   in v3 it loops though the ticks and liquidity and when it has a bad price it has to
-      //   loop more causing need for more gas
-      //   if it's your pool fix the balance in the pool
-      //   right now there is a lot of the USDC and very little weth
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] swap()`, txRequest)
 
       const gasCost = this.gasCost(txReceipt)
       this.totalGasCost += gasCost
-
-      //   try {
-      //     const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-      //     console.log(`swap() TX hash: ${txResponse.hash}`) 
-      //     // console.log(`swap() TX response:`)
-      //     // console.dir(txResponse)
-
-      //     const txReceipt: TransactionReceipt = await txResponse.wait()
-      //     // console.log(`swap() TX receipt:`)
-      //     // console.dir(txReceipt)
-
-      //     this.logGasUsed(`swap()`, txReceipt)
-      //   }
-      //   catch (e: unknown) {
-      //     if (e instanceof Error) {
-      //       console.log(`swap() Error: ${e.message}`)
-      //     }
-      //     else {
-      //       console.log(`swap(): Error: ${e}`)
-      //     }
-
-      //     process.exit(1)
-      //   }
     }
   
     async addLiquidity() {
