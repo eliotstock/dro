@@ -6,9 +6,9 @@ import { TickMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt, TransactionRequest } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
-import { wallet, gasPrice, readableJsbi } from './wallet'
+import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, rangeOrderPoolPriceUsdcAsJsbi, price } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdcAsBigNumber, rangeOrderPoolTickSpacing, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -257,40 +257,16 @@ ${positionWebUrl(this.tokenId)}`)
     }
 
     logUnclaimedFees() {
-      const priceNative = price()
-      console.log(`Price native: ${priceNative}`)
+      const n10ToThe6 = BigInt(1_000_000)
+      const n10ToThe18 = BigInt(1_000_000_000_000_000_000)
 
-      console.log(`unclaimedFeesWeth: ${this.unclaimedFeesWeth}`)
-      console.log(`unclaimedFeesUsdc: ${this.unclaimedFeesUsdc}`)
-
-      const N_10_TO_THE_6 = BigInt(1_000_000)
-      const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
-
-      const usdValueOfUnclaimedWethFees = this.unclaimedFeesWeth * price() / N_10_TO_THE_18
-      console.log(`usdValueOfUnclaimedWethFees: ${usdValueOfUnclaimedWethFees}`) // 4_400_696_826_537_775_956_696_005
+      const usdValueOfUnclaimedWethFees = this.unclaimedFeesWeth * price() / n10ToThe18
 
       const unclaimedFeesTotalUsdc = this.unclaimedFeesUsdc + usdValueOfUnclaimedWethFees
-      console.log(`unclaimedFeesTotalUsdc: ${unclaimedFeesTotalUsdc}`) // 4400696826537775961771689
 
-      const readable = Number(unclaimedFeesTotalUsdc * 100n / N_10_TO_THE_6) / 100
-      console.log(`readable: ${readable}`) // 4400696826537776000
+      const readable = Number(unclaimedFeesTotalUsdc * 100n / n10ToThe6) / 100
 
-      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`) // 4400696826537776128.00
-
-      // const priceAsJsbi: JSBI = rangeOrderPoolPriceUsdcAsJsbi()
-
-      // const tenToTheEighteen = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
-
-      // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18 / 10^6
-      // Gives 187_476_817_506_985_888.0000 from 0.000064 WETH. Should give 0.187.
-      // const usdVaueOfUnclaimedWeth = JSBI.divide(JSBI.multiply(this.unclaimedFeesWeth, priceAsJsbi),
-      //   tenToTheEighteen)
-
-      // const unclaimedFeesTotalUsdc = JSBI.ADD(this.unclaimedFeesUsdc, usdVaueOfUnclaimedWeth)
-
-//       console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readableJsbi(unclaimedFeesTotalUsdc, 6, 2)} USD \
-// (${readableJsbi(this.unclaimedFeesUsdc, 6, 4)} USDC + \
-// ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
+      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
     }
 
     static sleep(seconds: number) {
