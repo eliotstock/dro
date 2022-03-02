@@ -415,7 +415,8 @@ ${this.totalGasCost.toFixed(2)}`)
       // once we were at the edge of our range. We do have some fees just claimed in the other
       // asset, however.
       if (ratio > 1.5) {
-        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: ${ratio}. We're mostly in USDC now. Swapping half our USDC to WETH.`)
+        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: \
+${ratio.toFixed(2)}. We're mostly in USDC now. Swapping half our USDC to WETH.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenUsdc
         tokenOut = CHAIN_CONFIG.addrTokenWeth
@@ -425,13 +426,14 @@ ${this.totalGasCost.toFixed(2)}`)
         swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
-        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: ${ratio}. We already have fairly even values of USDC and WETH.\
- No need for a swap.`)
+        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: \
+${ratio.toFixed(2)}. We already have fairly even values of USDC and WETH. No need for a swap.`)
 
         return
       }
       else { // ratio <= 0.5
-        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: ${ratio}. We're mostly in WETH now. Swapping half our WETH to USDC.`)
+        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: \
+${ratio.toFixed(2)}. We're mostly in WETH now. Swapping half our WETH to USDC.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenWeth
         tokenOut = CHAIN_CONFIG.addrTokenUsdc
