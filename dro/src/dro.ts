@@ -227,6 +227,8 @@ ${positionWebUrl(this.tokenId)}`)
   
       // Refactoring: Integer types: need: anything.
       const MAX_UINT128 = BigNumber.from(2).pow(128).sub(1)
+      const MAX_UINT128_NATIVE: bigint = (2n ^ 128n) - 1n
+      console.log(`MAX_UINT128 as BigNumber: ${MAX_UINT128}, as native: ${MAX_UINT128_NATIVE}`)
   
       const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
   
@@ -235,8 +237,8 @@ ${positionWebUrl(this.tokenId)}`)
       positionManagerContract.callStatic.collect({
         tokenId: tokenIdHexString,
         recipient: wallet.address,
-        amount0Max: MAX_UINT128, // Solidity type: uint128
-        amount1Max: MAX_UINT128, // Solidity type: uint128
+        amount0Max: MAX_UINT128_NATIVE, // Solidity type: uint128
+        amount1Max: MAX_UINT128_NATIVE, // Solidity type: uint128
       },
       { from: wallet.address })
       .then((results) => {
