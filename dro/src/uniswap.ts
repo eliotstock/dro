@@ -6,7 +6,7 @@ import { abi as NonfungiblePositionManagerABI } from '@uniswap/v3-periphery/arti
 import { tickToPrice, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount, toHex, Multicall } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
-import { BigintIsh, CurrencyAmount, Token } from '@uniswap/sdk-core'
+import { BigintIsh, Token } from '@uniswap/sdk-core'
 import { wallet } from './wallet'
 import moment from 'moment'
 import JSBI from 'jsbi'
@@ -75,6 +75,16 @@ export async function updateTick() {
         // and denominator are both JSBIs.
         rangeOrderPoolPriceUsdc = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick).toFixed(2)
     }
+}
+
+export function priceFormatted(): string {
+    if (rangeOrderPoolTick === undefined) return 'unknown'
+
+    // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
+    // and denominator are both JSBIs.
+    const price = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+
+    return price.toFixed(2, {groupSeparator: ','})
 }
 
 // Every range order pool we use has WETH as one token and USDC as the other, but the order varies

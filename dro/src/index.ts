@@ -1,7 +1,7 @@
 import { config } from 'dotenv'
 import { useConfig, ChainConfig } from './config'
 import { wallet, updateGasPrice, gasPrice } from './wallet'
-import { updateTick, rangeOrderPoolPriceUsdc } from './uniswap'
+import { updateTick, priceFormatted } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
 import { init, dumpTokenIds, dumpRerangeEvents, meanTimeToReranging } from './db'
@@ -78,7 +78,7 @@ const rangeWidths: number[] = process.env.RANGE_WIDTHS?.split(' ').map(Number)
 // Set of DRO instances on which we are forward testing.
 let dros: DRO[] = []
 
-// Single, global USDC price in the range order pool.
+// Price of WETH in USDC terms in the range order pool, formatted to two decimal places.
 let price: string
 
 // When invoked with the -n command line arg, don't execute any transactions.
@@ -96,7 +96,7 @@ async function onBlock(...args: Array<any>) {
   await updateGasPrice()
 
   // Log the timestamp, block number and gas price first. Only log anything when the price changes.
-  if (rangeOrderPoolPriceUsdc != price) {
+  if (priceFormatted() != price) {
     // Only show the gas price on L1.
     let gasPriceReadable = ''
 
@@ -105,14 +105,14 @@ async function onBlock(...args: Array<any>) {
     }
 
     console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceReadable}\
-${rangeOrderPoolPriceUsdc} USDC`)
+${priceFormatted()} USDC`)
 
     for (const dro of dros) {
       await dro.onPriceChanged()
     }
   }
 
-  price = rangeOrderPoolPriceUsdc
+  price = priceFormatted()
 
   // Pass the onBlock() call through to each DRO instance, which will figure out whether it needs
   // to re-range and execute transactions if so.
