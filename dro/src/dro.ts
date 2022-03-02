@@ -307,7 +307,9 @@ ${positionWebUrl(this.tokenId)}`)
 
           // Note that Ethers.js will do its own exponential back-off but only if the provider does
           // NOT provide a retry-after header. Alchemy does provide this header.
-          // See: https://github.com/ethers-io/ethers.js/issues/1162#issuecomment-1057422329
+          // See:
+          //   https://github.com/ethers-io/ethers.js/issues/1162#issuecomment-1057422329
+          //   https://docs.alchemy.com/alchemy/documentation/rate-limits#option-2-retry-after
 
           if (retries >= BACKOFF_RETRIES_MAX) {
             console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Exiting process.`)
