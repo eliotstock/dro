@@ -996,7 +996,7 @@ be able to remove this liquidity.`
       // When in no-op mode, don't execute any transactions but do find new ranges when necessary.
       if (this.noops) {
         if (this.outOfRange()) {
-          if (gasPrice?.gt(CHAIN_CONFIG.gasPriceMax)) {
+          if (gasPrice > CHAIN_CONFIG.gasPriceMax) {
             return
           }
           
@@ -1013,9 +1013,9 @@ be able to remove this liquidity.`
           return
         }
 
-        if (gasPrice?.gt(CHAIN_CONFIG.gasPriceMax)) {
-          console.log(`Gas price of ${gasPrice.div(1e9).toNumber()} is over our max of \
-${CHAIN_CONFIG.gasPriceMax.div(1e9).toNumber()} gwei. Not re-ranging yet.`)
+        if (gasPrice > CHAIN_CONFIG.gasPriceMax) {
+          console.log(`Gas price of ${Number(gasPrice / 1_000_000_000n)} is over our max of \
+${Number(CHAIN_CONFIG.gasPriceMax / 1_000_000_000n)} gwei. Not re-ranging yet.`)
           return
         }
 

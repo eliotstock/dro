@@ -16,8 +16,7 @@ config()
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
 
-// Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-export let gasPrice: ethers.BigNumber
+export let gasPrice: bigint
 
 export class EthUsdcWallet extends ethers.Wallet {
 
@@ -200,7 +199,6 @@ export async function updateGasPrice() {
     }
 
     // Legacy gas price.
-    // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
     const p = (await CHAIN_CONFIG.provider().getFeeData()).gasPrice
 
     // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
@@ -214,7 +212,7 @@ export async function updateGasPrice() {
 
     // console.log(`  Gas price in gwei: ${gasPriceInGwei}`)
 
-    gasPrice = p
+    gasPrice = p.toBigInt()
 }
 
 // Return a readable string of a float from a large integer

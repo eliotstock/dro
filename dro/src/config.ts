@@ -19,8 +19,8 @@ export interface ChainConfig {
     addrPoolRangeOrder: string
     addrPoolSwaps: string
     slippageTolerance: Percent
-    gasPrice: BigNumber // Keep these as ethers's prefered type.
-    gasPriceMax: BigNumber // Keep these as ethers's prefered type.
+    gasPrice: bigint
+    gasPriceMax: bigint
     addrPositionManager: string
     addrQuoter: string
     addrSwapRouter: string
@@ -65,7 +65,7 @@ const ETHEREUM_MAINNET: ChainConfig = {
 
     // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
     // specify here. Typical range: 30 - 200 gwei.
-    gasPrice: ethers.utils.parseUnits("100", "gwei"),
+    gasPrice: ethers.utils.parseUnits("100", "gwei").toBigInt(),
 
     // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
     gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
@@ -73,7 +73,7 @@ const ETHEREUM_MAINNET: ChainConfig = {
     // Above what gas price, in gwei, are we unwilling to re-range?
     // At 100, we could be waiting a day or two
     // Try 110 for now.
-    gasPriceMax: ethers.utils.parseUnits("200", "gwei"),
+    gasPriceMax: ethers.utils.parseUnits("200", "gwei").toBigInt(),
 
     addrPositionManager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
 
@@ -115,7 +115,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     slippageTolerance: new Percent(10, 1_000), // 1.0%
 
-    gasPrice: ethers.utils.parseUnits("2", "gwei"),
+    gasPrice: ethers.utils.parseUnits("2", "gwei").toBigInt(),
 
     // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
     // For the combined "swap and add liquidity" transaction, this could be twice that.
@@ -123,7 +123,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     // Above what gas price, in gwei, are we unwilling to re-range?
     // Gas on Arbitrum is never so high that we'd want to wait to re-range, in practice.
-    gasPriceMax: ethers.utils.parseUnits("20", "gwei"),
+    gasPriceMax: ethers.utils.parseUnits("20", "gwei").toBigInt(),
 
     // TODO(P1): Confirm these are all at the same address as on Ethereum Mainnet.
     addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
@@ -166,13 +166,13 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
     // specify here. Typical range: 30 - 200 gwei.
-    gasPrice: ethers.utils.parseUnits("100", "gwei"), // Sensible: 100
+    gasPrice: ethers.utils.parseUnits("100", "gwei").toBigInt(), // Sensible: 100
 
     // Go crazy high on testnets, where we need to create the pool and also we don't care about cost.
     gasLimit: ethers.utils.hexlify(10_000_000),
 
     // Above what gas price, in gwei, are we unwilling to re-range?
-    gasPriceMax: ethers.utils.parseUnits("6", "gwei"), // 2 gwei is a typical gas price for Kovan.
+    gasPriceMax: ethers.utils.parseUnits("6", "gwei").toBigInt(), // 2 gwei is a typical gas price for Kovan.
 
     addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
 
