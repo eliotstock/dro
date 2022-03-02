@@ -20,7 +20,6 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
 
 export let rangeOrderPoolTick: number
-// export let rangeOrderPoolPriceUsdc: string
 
 // On all transactions, set the deadline to 3 minutes from now
 export const DEADLINE_SECONDS = 180
@@ -71,12 +70,6 @@ export async function updateTick() {
     const slot = await rangeOrderPoolContract.slot0()
 
     rangeOrderPoolTick = slot[1]
-
-    // if (rangeOrderPoolTick) {
-    //     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
-    //     // and denominator are both JSBIs.
-    //     rangeOrderPoolPriceUsdc = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick).toFixed(2)
-    // }
 }
 
 // Returns USDC's small units (USDC has six decimals)

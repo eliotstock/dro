@@ -6,7 +6,7 @@ import { TickMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt, TransactionRequest } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
-import { wallet, gasPrice } from './wallet'
+import { wallet, gasPrice, gasPriceFormatted } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
@@ -1011,8 +1011,8 @@ be able to remove this liquidity.`
         }
 
         if (gasPrice > CHAIN_CONFIG.gasPriceMax) {
-          console.log(`Gas price of ${Number(gasPrice / 1_000_000_000n)} is over our max of \
-${Number(CHAIN_CONFIG.gasPriceMax / 1_000_000_000n)} gwei. Not re-ranging yet.`)
+          console.log(`Gas price of ${gasPriceFormatted()} is over our max of \
+${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
           return
         }
 

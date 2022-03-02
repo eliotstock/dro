@@ -1,7 +1,6 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { Percent } from '@uniswap/sdk-core'
-import { BigNumber } from '@ethersproject/bignumber'
 import { JsonRpcProvider } from '@ethersproject/providers'
 
 // Read our .env file
@@ -21,6 +20,7 @@ export interface ChainConfig {
     slippageTolerance: Percent
     gasPrice: bigint
     gasPriceMax: bigint
+    gasPriceMaxFormatted(): string
     addrPositionManager: string
     addrQuoter: string
     addrSwapRouter: string
@@ -75,6 +75,10 @@ const ETHEREUM_MAINNET: ChainConfig = {
     // Try 110 for now.
     gasPriceMax: ethers.utils.parseUnits("200", "gwei").toBigInt(),
 
+    gasPriceMaxFormatted() {
+        return `${Number(this.gasPriceMax / 1_000_000_000n)} gwei`
+    },
+
     addrPositionManager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
 
     addrQuoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
@@ -125,6 +129,10 @@ const ARBITRUM_MAINNET: ChainConfig = {
     // Gas on Arbitrum is never so high that we'd want to wait to re-range, in practice.
     gasPriceMax: ethers.utils.parseUnits("20", "gwei").toBigInt(),
 
+    gasPriceMaxFormatted() {
+        return `${Number(this.gasPriceMax / 1_000_000_000n)} gwei`
+    },
+
     // TODO(P1): Confirm these are all at the same address as on Ethereum Mainnet.
     addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
 
@@ -173,6 +181,10 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     // Above what gas price, in gwei, are we unwilling to re-range?
     gasPriceMax: ethers.utils.parseUnits("6", "gwei").toBigInt(), // 2 gwei is a typical gas price for Kovan.
+
+    gasPriceMaxFormatted() {
+        return `${Number(this.gasPriceMax / 1_000_000_000n)} gwei`
+    },
 
     addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
 
