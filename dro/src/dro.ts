@@ -8,7 +8,7 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, rangeOrderPoolPriceUsdcAsBigNumber, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -868,6 +868,8 @@ ${sqrtRatioX96AsJsbi instanceof JSBI}`)
         console.log(`[dro.ts] methodParameters:`)
         console.dir(route.methodParameters)
 
+        if (route.methodParameters === undefined) throw `No method parameters`
+
         console.log(`[dro.ts] number of swaps:`)
         console.dir(route.trade.swaps.length)
 
@@ -894,6 +896,10 @@ ${route.trade.outputAmount.currency.symbol}`)
 
         const nonce = await wallet.getTransactionCount("latest")
 
+        // Value is probably zero anyway, if we deal in WETH.
+        const value = BigInt(route.methodParameters.value)
+        console.log(`swapAndAddLiquidity() value: ${value}`)
+
         // Not providing the gasLimit will throw UNPREDICTABLE_GAS_LIMIT.
         // Using gasLimit of 1_000_000 will throw "not enough funds for gas", even with 0.04 ETH in the account.
         // Same for 500_000.
@@ -901,8 +907,7 @@ ${route.trade.outputAmount.currency.symbol}`)
         const txRequest = {
           from: wallet.address,
           to: CHAIN_CONFIG.addrSwapRouter2,
-          // Refactoring: Integer types: Have string, need ethers BigNumberish (BigNumber |bigint)
-          value: BigNumber.from(route.methodParameters?.value), // Probably zero if we deal in WETH.
+          value: value,
           nonce: nonce,
           gasPrice: CHAIN_CONFIG.gasPrice,
           gasLimit: CHAIN_CONFIG.gasLimit,
@@ -959,29 +964,23 @@ be able to remove this liquidity.`
       // What did we just sepnd on gas? None of these are actually large integers.
 
       // Corresponds to "Gas Used by Transaction" on Etherscan
-      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-      const gasUsed: BigNumber = txReceipt.gasUsed
-      // console.log(`Gas used: ${gasUsed.toNumber()}`)
+      const gasUsed = txReceipt.gasUsed.toBigInt()
+      console.log(`Gas used: ${gasUsed}`)
 
       // txReceipt.cumulativeGasUsed: No idea what this is. Ignore it.
 
       // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei, typically about 0.66 gwei for Arbitrum.
-      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-      const effectiveGasPrice: BigNumber = txReceipt.effectiveGasPrice
-      // console.log(`Effective gas price: ${effectiveGasPrice.toNumber()}`)
+      const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
+      console.log(`Effective gas price: ${effectiveGasPrice}`)
 
-      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-      // Consider using native for price and converting on display or arithmetic.
-      const price: BigNumber = rangeOrderPoolPriceUsdcAsBigNumber()
+      const p: bigint = price()
 
       // USD cost of tx = gasUsed * effectiveGasPrice * price of Ether in USDC / 10^18 / 10^6
-      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-      const usdCostOfTx: BigNumber = gasUsed.mul(effectiveGasPrice).mul(price)
+      const usdCostOfTx = gasUsed * effectiveGasPrice * p
 
-      // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-      const f: number = usdCostOfTx.mul(100).div(BigNumber.from(10).pow(24)).toNumber() / 100
+      const f: number = Number(usdCostOfTx * 100n / 1_000_000_000_000_000_000_000_000n) / 100
 
-      // console.log(`${logLinePrefix} TX cost: USD ${f.toFixed(2)}`)
+      console.log(`TX cost: USD ${f.toFixed(2)}`)
 
       return f
     }

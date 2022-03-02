@@ -8,8 +8,7 @@ import { BigNumber } from '@ethersproject/bignumber'
 import { abi as ERC20ABI } from './abi/erc20.json'
 import { abi as WETHABI } from './abi/weth.json'
 import { useConfig, ChainConfig } from './config'
-import { rangeOrderPoolPriceUsdcAsBigNumber } from './uniswap'
-import JSBI from 'jsbi'
+import { price } from './uniswap'
 
 // Read our .env file
 config()
@@ -90,13 +89,12 @@ export class EthUsdcWallet extends ethers.Wallet {
 
     // Testable, internal implementation.
     // Refactoring: Integer types: Have: BigNumber, need: native BigInt.
-    static _tokenRatioByValue(usdc: BigNumber, weth: BigNumber, price: BigNumber): number {
+    static _tokenRatioByValue(usdc: BigNumber, weth: BigNumber, price: bigint): number {
         // Use native BigInts from here on.
         const usdcNative = usdc.toBigInt()
         const wethNative = weth.toBigInt()
-        const priceNative = price.toBigInt()
 
-        let usdValueOfWeth = wethNative * priceNative / 1_000_000_000_000_000_000n
+        let usdValueOfWeth = wethNative * price / 1_000_000_000_000_000_000n
 
         // Avoid a division by zero error below. Any very small integer will do here.
         if (usdValueOfWeth == 0n) usdValueOfWeth = 1n
@@ -113,12 +111,12 @@ export class EthUsdcWallet extends ethers.Wallet {
         const weth: BigNumber = await this.weth()
 
         // This is USDC * 10e6, eg. 3_000_000_000 when the price of ETH is USD 3,000.
-        const price: BigNumber = rangeOrderPoolPriceUsdcAsBigNumber()
-        // console.log(`price: ${price}`)
+        const p: bigint = price()
+        // console.log(`price: ${p}`)
 
         // console.log(`usdc: ${usdc}`)
         // console.log(`weth: ${weth}`) // 86_387_721_003_586_366
-        return EthUsdcWallet._tokenRatioByValue(usdc, weth, price)
+        return EthUsdcWallet._tokenRatioByValue(usdc, weth, p)
     }
 
     async logBalances() {

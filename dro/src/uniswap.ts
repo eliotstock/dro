@@ -20,7 +20,7 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
 
 export let rangeOrderPoolTick: number
-export let rangeOrderPoolPriceUsdc: string
+// export let rangeOrderPoolPriceUsdc: string
 
 // On all transactions, set the deadline to 3 minutes from now
 export const DEADLINE_SECONDS = 180
@@ -72,21 +72,11 @@ export async function updateTick() {
 
     rangeOrderPoolTick = slot[1]
 
-    if (rangeOrderPoolTick) {
-        // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
-        // and denominator are both JSBIs.
-        rangeOrderPoolPriceUsdc = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick).toFixed(2)
-    }
-}
-
-export function priceFormatted(): string {
-    if (rangeOrderPoolTick === undefined) return 'unknown'
-
-    // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
-    // and denominator are both JSBIs.
-    const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
-
-    return p.toFixed(2, {groupSeparator: ','})
+    // if (rangeOrderPoolTick) {
+    //     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
+    //     // and denominator are both JSBIs.
+    //     rangeOrderPoolPriceUsdc = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick).toFixed(2)
+    // }
 }
 
 // Returns USDC's small units (USDC has six decimals)
@@ -103,6 +93,16 @@ export function price(): bigint {
     const denom = BigInt(p.denominator.toString())
 
     return num * N_10_TO_THE_18 / denom
+}
+
+export function priceFormatted(): string {
+    if (rangeOrderPoolTick === undefined) return 'unknown'
+
+    // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
+    // and denominator are both JSBIs.
+    const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+
+    return p.toFixed(2, {groupSeparator: ','})
 }
 
 // Every range order pool we use has WETH as one token and USDC as the other, but the order varies
@@ -126,23 +126,6 @@ export async function tokenOrderIsWethFirst(): Promise<boolean> {
     }
 }
 
-// We store rangeOrderPoolPriceUsdc as a string, but it can be useful to have it as a BigNumber.
-// Refactoring: Integer types: Consider using native BigInt for price and converting on display
-// or arithmetic.
-export function rangeOrderPoolPriceUsdcAsBigNumber(): ethers.BigNumber {
-    if (!rangeOrderPoolPriceUsdc)
-        throw 'Do not call rangeOrderPoolPriceUsdcAsBigNumber() before updateTick()'
-
-    // We are not dealing with large integers for our USDC amounts, even once raised to 10^6.
-    const usdcAsFloat: number = parseFloat(rangeOrderPoolPriceUsdc)
-    const usdcTimesTenToTheSix: number = usdcAsFloat * 1_000_000
-
-    // console.log(`usdcTimesTenToTheMinusSix: ${usdcTimesTenToTheMinusSix}`)
-    // console.log(`usdcTimesTenToTheMinusSix rounded: ${Math.round(usdcTimesTenToTheMinusSix)}`)
-
-    return ethers.BigNumber.from(Math.round(usdcTimesTenToTheSix))
-}
-
 const TOPIC_0_INCREASE_LIQUIDITY = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f'
 
 export function extractTokenId(txReceipt: TransactionReceipt): number | undefined {
@@ -151,7 +134,6 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
     for (const log of txReceipt.logs) {
         if (log.topics[0] === TOPIC_0_INCREASE_LIQUIDITY && log.topics[1]) {
             const tokenIdHexString = log.topics[1]
-             // Refactoring: Integer types: Have: hex string, need: number
             const tokenId = ethers.BigNumber.from(tokenIdHexString)
 
             // This will throw an error if Uniswap ever has more LP positions than Number.MAX_SAFE_INTEGER.
