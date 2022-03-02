@@ -13,6 +13,7 @@ import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus }
 import { forwardTestInit, forwardTestRerange } from './forward-test'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
+import { syncBuiltinESMExports } from 'module'
 
 const OUT_DIR = './out'
 
@@ -21,6 +22,12 @@ config()
 
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
+
+// Do exponential backoff on HTTP error responses from the provider.
+// TODO: Use 6 once tested
+const BACKOFF_RETRIES_MAX = 2
+
+const BACKOFF_DELAY_BASE_SEC = 6
 
 export enum Direction {
   Up = 'up',
@@ -268,30 +275,52 @@ ${positionWebUrl(this.tokenId)}`)
 ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
     }
 
+    static sleep(seconds: number) {
+      return new Promise((resolve) => {
+        setTimeout(resolve, seconds * 1000);
+      })
+    }
+
     async sendTx(logLinePrefix: string, txRequest: TransactionRequest): Promise<TransactionReceipt> {
-      try {
-        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-        console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
-        // console.log(`swap() TX response:`)
-        // console.dir(txResponse)
+      let retries = 0
 
-        const txReceipt: TransactionReceipt = await txResponse.wait()
-        // console.log(`swap() TX receipt:`)
-        // console.dir(txReceipt)
+      do {
+        retries++
 
-        return txReceipt
-      }
-      catch (e: unknown) {
-        // One failed transaction should stop the process, for now.
-        if (e instanceof Error) {
-          console.error(`${logLinePrefix} Error: ${e.message}`)
+        try {
+          const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+          console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
+          // console.log(`swap() TX response:`)
+          // console.dir(txResponse)
+  
+          const txReceipt: TransactionReceipt = await txResponse.wait()
+          // console.log(`swap() TX receipt:`)
+          // console.dir(txReceipt)
+  
+          return txReceipt
         }
-        else {
-          console.error(`${logLinePrefix} Error: ${e}`)
-        }
+        catch (e: unknown) {
+          if (e instanceof Error) {
+            console.error(`${logLinePrefix} Error: ${e.message}`)
+          }
+          else {
+            console.error(`${logLinePrefix} Error: ${e}`)
+          }
 
-        process.exit(292)
-      }
+          if (retries >= BACKOFF_RETRIES_MAX) {
+            console.error(`Maximum retries (${BACKOFF_RETRIES_MAX}) exceeded. Exiting.`)
+            process.exit(320)
+          }
+  
+          // 6^1: delay for 6 seconds
+          // 6^2: delay for 36 seconds, etc.
+          const delay = BACKOFF_DELAY_BASE_SEC ^ retries
+  
+          console.log(`Backing off for ${delay} seconds...`)
+          await DRO.sleep(delay)
+          console.log(`...Done`)
+        }
+      } while (true)
     }
   
     async removeLiquidity() {
