@@ -289,7 +289,7 @@ ${readableJsbi(this.unclaimedFeesWeth, 18, 6)} WETH)`)
 
         try {
           const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-          console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
+          // console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
           // console.log(`swap() TX response:`)
           // console.dir(txResponse)
   
@@ -627,16 +627,16 @@ spacing of ${rangeOrderPool.tickSpacing}. Can't create position.`
         useFullPrecision: false
       })
 
-      if (this.wethFirst) {
-        console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
-USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount1.toString()} USDC, \
-${position.mintAmounts.amount0.toString()} WETH`)
-      }
-      else {
-        console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
-USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount0.toString()} USDC, \
-${position.mintAmounts.amount1.toString()} WETH`)
-      }
+//       if (this.wethFirst) {
+//         console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
+// USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount1.toString()} USDC, \
+// ${position.mintAmounts.amount0.toString()} WETH`)
+//       }
+//       else {
+//         console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
+// USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount0.toString()} USDC, \
+// ${position.mintAmounts.amount1.toString()} WETH`)
+//       }
   
       const mintOptions: MintOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
