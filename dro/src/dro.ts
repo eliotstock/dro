@@ -227,7 +227,7 @@ ${positionWebUrl(this.tokenId)}`)
   
       // Refactoring: Integer types: need: anything.
       const MAX_UINT128 = BigNumber.from(2).pow(128).sub(1)
-      const MAX_UINT128_NATIVE: bigint = (2n ^ 128n) - 1n
+      const MAX_UINT128_NATIVE = 340282366920938463463374607431768211455n // 2^128 - 1
       console.log(`MAX_UINT128 as BigNumber: ${MAX_UINT128}, as native: ${MAX_UINT128_NATIVE}`)
   
       const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
