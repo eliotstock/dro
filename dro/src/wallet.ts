@@ -185,9 +185,9 @@ export const wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
 export async function updateGasPrice() {
     // These API calls are costly. Avoid them on L2 where we don't care so much about gas.
     // TODO: At least, they were too costly on Infura. Try them again on Alchemy?
-    if (CHAIN_CONFIG.isL2) {
-        return
-    }
+    // if (CHAIN_CONFIG.isL2) {
+    //     return
+    // }
 
     // Legacy gas price.
     const p = (await CHAIN_CONFIG.provider().getFeeData()).gasPrice
