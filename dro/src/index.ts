@@ -11,8 +11,8 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
+// (P2) When the ETH balance falls below a static threshold, unwrap some WETH to ETH to put it back over by a safe margin.
 // (P2) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
-// (P3) Keep track of how much ETH to keep on hand for gas and swap costs.
 
 // Done
 // ----
