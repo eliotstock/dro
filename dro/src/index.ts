@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 import { useConfig, ChainConfig } from './config'
-import { wallet, updateGasPrice, gasPrice, gasPriceFormatted } from './wallet'
+import { wallet, updateGasPrice, gasPriceFormatted } from './wallet'
 import { updateTick, priceFormatted } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
@@ -97,15 +97,7 @@ async function onBlock(...args: Array<any>) {
 
   // Log the timestamp, block number and gas price first. Only log anything when the price changes.
   if (priceFormatted() != price) {
-    // Only show the gas price on L1.
-    let gasPriceReadable = ''
-
-    // if (!CHAIN_CONFIG.isL2) {
-      // This includes the units (gwei)
-      gasPriceReadable = `${gasPriceFormatted()} `
-    // }
-
-    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceReadable}\
+    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceFormatted()} \
 ${priceFormatted()} USDC`)
 
     for (const dro of dros) {

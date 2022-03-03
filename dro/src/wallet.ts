@@ -211,19 +211,9 @@ export function gasPriceFormatted(): string {
         return 'unknown'
     }
 
-    const readable = `${Number(gasPrice / 1_000_000_000n).toFixed(2)} gwei`
-
-    return readable
+    // Do BigInt operations in the middle and floating point operations on the outside.
+    // L2 networks can do with one decimal of precision here, so use 10n.
+    const g = Number(gasPrice * 10n / 1_000_000_000n) / 10
+    
+    return `${g.toFixed(1)} gwei`
 }
-
-// Return a readable string of a float from a large integer
-// export function readableJsbi(a: JSBI, decimals: number, precision: number): string {
-//     // See: https://stackoverflow.com/questions/54409854/how-to-divide-two-native-javascript-bigints-and-get-a-decimal-result
-//     const tenToTheDecimals = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(decimals))
-//     const tenToThePrecision = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(precision))
-//     const tenToThePrecisionAsNumber = JSBI.toNumber(tenToThePrecision)
-
-//     const f: number = JSBI.toNumber(JSBI.divide(JSBI.multiply(a, tenToThePrecision), tenToTheDecimals)) / tenToThePrecisionAsNumber
-
-//     return `${f.toFixed(precision)}`
-// }
