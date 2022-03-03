@@ -76,11 +76,11 @@ export class EthUsdcWallet extends ethers.Wallet {
     }
 
     async usdc(): Promise<bigint> {
-        return await this.usdcContract.balanceOf(this.address).toBigInt()
+        return (await this.usdcContract.balanceOf(this.address)).toBigInt()
     }
 
     async weth(): Promise<bigint> {
-        return await this.wethContract.balanceOf(this.address).toBigInt()
+        return (await this.wethContract.balanceOf(this.address)).toBigInt()
     }
 
     // Testable, internal implementation.
