@@ -993,13 +993,13 @@ be able to remove this liquidity.`
 
       // Corresponds to "Gas Used by Transaction" on Etherscan
       const gasUsed = txReceipt.gasUsed.toBigInt()
-      console.log(`Gas used: ${gasUsed}`)
+      // console.log(`Gas used: ${gasUsed}`)
 
       // txReceipt.cumulativeGasUsed: No idea what this is. Ignore it.
 
       // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei, typically about 0.66 gwei for Arbitrum.
       const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
-      console.log(`Effective gas price: ${effectiveGasPrice}`)
+      // console.log(`Effective gas price: ${effectiveGasPrice}`)
 
       const p: bigint = price()
 
@@ -1008,7 +1008,7 @@ be able to remove this liquidity.`
 
       const f: number = Number(usdCostOfTx * 100n / 1_000_000_000_000_000_000_000_000n) / 100
 
-      console.log(`TX cost: USD ${f.toFixed(2)}`)
+      // console.log(`TX cost: USD ${f.toFixed(2)}`)
 
       return f
     }
