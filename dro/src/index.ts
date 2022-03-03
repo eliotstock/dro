@@ -95,7 +95,8 @@ async function onBlock(...args: Array<any>) {
 
   await updateGasPrice()
 
-  // Log the timestamp, block number and gas price first. Only log anything when the price changes.
+  // Log the timestamp, block number and gas price (if we're checking it) first. Only log anything
+  // when the price changes.
   if (priceFormatted() != price) {
     console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceFormatted()} \
 ${priceFormatted()} USDC`)
@@ -147,6 +148,10 @@ async function main() {
     await updateTick()
     
     await wallet.logBalances()
+
+    // TODO: Remove once tested once:
+    // await wallet.unwrapWeth(10_000_000_000_000_000n) // 0.01 WETH
+    // await wallet.logBalances()
 
     return
   }
