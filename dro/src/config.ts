@@ -26,6 +26,7 @@ export interface ChainConfig {
     addrSwapRouter: string
     addrSwapRouter2: string
     gasLimit: string
+    ethBalanceMin: bigint
 }
 
 // Infura: Free quota is 100K requests per day, which is more than one a second.
@@ -85,7 +86,11 @@ const ETHEREUM_MAINNET: ChainConfig = {
 
     addrSwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
 
-    addrSwapRouter2: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+    addrSwapRouter2: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+
+    // The most I've ever paid in gas for a set of three re-ranging transactions on L1 is
+    // 0.168 ETH. 0.2 is a safe margin over that.
+    ethBalanceMin: ethers.utils.parseUnits("0.2", "eth").toBigInt()
 }
 
 // Block explorer: https://arbiscan.io/.
@@ -143,6 +148,10 @@ const ARBITRUM_MAINNET: ChainConfig = {
     addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter,
 
     addrSwapRouter2: ETHEREUM_MAINNET.addrSwapRouter2,
+
+    // The most I've ever paid in gas for a set of three re-ranging transactions on Arbitrum is
+    // 0.010 ETH. 0.015 is a safe margin over that.
+    ethBalanceMin: ethers.utils.parseUnits("0.015", "eth").toBigInt()
 }
 
 const ETHEREUM_KOVAN: ChainConfig = {
@@ -194,7 +203,9 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter,
 
-    addrSwapRouter2: ETHEREUM_MAINNET.addrSwapRouter2
+    addrSwapRouter2: ETHEREUM_MAINNET.addrSwapRouter2,
+
+    ethBalanceMin: ETHEREUM_MAINNET.ethBalanceMin
 }
 
 // Set the CHAIN env var to one of these keys.
