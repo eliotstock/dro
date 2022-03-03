@@ -119,6 +119,8 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     slippageTolerance: new Percent(10, 1_000), // 1.0%
 
+    // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
+    // specify here. Typical range: 0.5 - 20 gwei.
     gasPrice: ethers.utils.parseUnits("2", "gwei").toBigInt(),
 
     // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
@@ -126,7 +128,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
     gasLimit: ethers.utils.hexlify(2_000_000), // TX created, but fails: 2_000_000.
 
     // Above what gas price, in gwei, are we unwilling to re-range?
-    // Gas on Arbitrum is never so high that we'd want to wait to re-range, in practice.
+    // Gas on Arbitrum is very rarely so high that we'd want to wait to re-range, in practice.
     gasPriceMax: ethers.utils.parseUnits("20", "gwei").toBigInt(),
 
     gasPriceMaxFormatted() {
