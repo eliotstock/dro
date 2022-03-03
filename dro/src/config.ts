@@ -90,7 +90,7 @@ const ETHEREUM_MAINNET: ChainConfig = {
 
     // The most I've ever paid in gas for a set of three re-ranging transactions on L1 is
     // 0.168 ETH. 0.2 is a safe margin over that.
-    ethBalanceMin: ethers.utils.parseUnits("0.2", "eth").toBigInt()
+    ethBalanceMin: ethers.utils.parseUnits("0.2", "ether").toBigInt()
 }
 
 // Block explorer: https://arbiscan.io/.
@@ -151,7 +151,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     // The most I've ever paid in gas for a set of three re-ranging transactions on Arbitrum is
     // 0.010 ETH. 0.015 is a safe margin over that.
-    ethBalanceMin: ethers.utils.parseUnits("0.015", "eth").toBigInt()
+    ethBalanceMin: ethers.utils.parseUnits("0.015", "ether").toBigInt()
 }
 
 const ETHEREUM_KOVAN: ChainConfig = {
