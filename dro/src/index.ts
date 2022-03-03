@@ -100,10 +100,10 @@ async function onBlock(...args: Array<any>) {
     // Only show the gas price on L1.
     let gasPriceReadable = ''
 
-    if (!CHAIN_CONFIG.isL2) {
+    // if (!CHAIN_CONFIG.isL2) {
       // This includes the units (gwei)
       gasPriceReadable = `${gasPriceFormatted()} `
-    }
+    // }
 
     console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceReadable}\
 ${priceFormatted()} USDC`)
