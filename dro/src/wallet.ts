@@ -211,9 +211,11 @@ export function gasPriceFormatted(): string {
         return 'unknown'
     }
 
+    console.log(`Gas price as bigint: ${gasPrice} wei`)
+
     // Do BigInt operations in the middle and floating point operations on the outside.
-    // L2 networks can do with one decimal of precision here, so use 10n.
-    const g = Number(gasPrice * 10n / 1_000_000_000n) / 10
+    // L2 networks can do with one decimal of precision here.
+    const g = Number(gasPrice * 10n / 1_000_000_000n) / 100
     
     return `${g.toFixed(1)} gwei`
 }
