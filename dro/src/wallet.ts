@@ -211,7 +211,7 @@ export function gasPriceFormatted(): string {
         return 'unknown'
     }
 
-    const readable = `${Number(gasPrice / 1_000_000_000n)} gwei`
+    const readable = `${Number(gasPrice / 1_000_000_000n).toFixed(2)} gwei`
 
     return readable
 }
