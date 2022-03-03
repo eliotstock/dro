@@ -1,5 +1,5 @@
 import { config } from 'dotenv'
-import { ethers } from 'ethers'
+import { BigNumber, ethers } from 'ethers'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { Provider } from "@ethersproject/abstract-provider";
 import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer";
@@ -33,7 +33,7 @@ export class EthUsdcWallet extends ethers.Wallet {
         this.wethContract = _wethContract
     }
 
-    static createFromEnv(chainConfig: any): EthUsdcWallet {
+    static createFromConfig(chainConfig: any): EthUsdcWallet {
         // Check .env file and create Ethers.js wallet from mnemonic in it.
         const mnemonic = process.env.DRO_ACCOUNT_MNEMONIC
 
@@ -75,6 +75,10 @@ export class EthUsdcWallet extends ethers.Wallet {
         return w
     }
 
+    async eth(): Promise<bigint> {
+        return (await this.getBalance("latest")).toBigInt()
+    }
+
     async usdc(): Promise<bigint> {
         return (await this.usdcContract.balanceOf(this.address)).toBigInt()
     }
@@ -114,7 +118,7 @@ export class EthUsdcWallet extends ethers.Wallet {
             await Promise.all([
                 this.usdc(),
                 this.weth(),
-                await this.getBalance("latest"),
+                this.eth(),
             ])
 
         // USDC has 6 decimals. We should really get this from the contract but it's another call and
@@ -130,7 +134,7 @@ export class EthUsdcWallet extends ethers.Wallet {
             wethBalance - (wethBalance % 100000000000000n))
 
         const ethBalanceReadable = ethers.utils.formatEther(
-            ethBalance.toBigInt() - (ethBalance.toBigInt() % 100000000000000n))
+            ethBalance - (ethBalance % 100000000000000n))
 
         const ratio = await this.tokenRatioByValue()
 
@@ -154,18 +158,55 @@ ETH ${ethBalanceReadable} (token ratio by value: ${ratio})`)
         // console.dir(txReceiptWeth)
     }
 
-    async wrapEth(ethAmount: string) {
-        console.log(`Wrapping ${ethAmount} ETH to WETH`)
+    async wrapEth(amount: string) {
+        console.log(`Wrapping ${amount} ETH to WETH`)
 
         const nonce = await this.getTransactionCount("latest")
 
+        // No calldata required, just the value.
         const txRequest = {
             from: this.address,
             to: this.wethContract.address,
-            value: ethers.utils.parseEther(ethAmount),
+            value: ethers.utils.parseEther(amount),
             nonce: nonce,
             gasLimit: CHAIN_CONFIG.gasLimit,
             gasPrice: CHAIN_CONFIG.gasPrice,
+        }
+
+        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+        // console.log(`TX response`)
+        // console.dir(txResponse)
+
+        const txReceipt: TransactionReceipt = await txResponse.wait()
+        // console.log(`TX receipt`)
+        // console.dir(txReceipt)
+    }
+
+    async unwrapWeth(amount: bigint) {
+        const wethAmountReadable = ethers.utils.formatEther(
+            amount - (amount % 100000000000000n))
+
+        console.log(`Unwrapping ${wethAmountReadable} WETH to ETH`)
+
+        const nonce = await this.getTransactionCount("latest")
+
+        // Native bigints do not work for passing to encodeFunctionData().
+        const a = ethers.utils.parseUnits(amount.toString(), 'wei')
+        console.log(`amountAsString: ${a}`) // 10_000_000_000_000_000 for 0.01 WETH input.
+
+        const wethInterface = new ethers.utils.Interface(WETHABI)
+        const calldata = wethInterface.encodeFunctionData('withdraw', [a])
+        console.log(`calldata: ${calldata}`)
+
+        // No value required, just the calldata.
+        const txRequest = {
+            from: this.address,
+            to: this.wethContract.address,
+            value: 0,
+            nonce: nonce,
+            gasLimit: CHAIN_CONFIG.gasLimit,
+            gasPrice: CHAIN_CONFIG.gasPrice,
+            data: calldata
         }
 
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
@@ -178,16 +219,20 @@ ETH ${ethBalanceReadable} (token ratio by value: ${ratio})`)
     }
 }
 
-export const wallet = EthUsdcWallet.createFromEnv(CHAIN_CONFIG)
+export const wallet = EthUsdcWallet.createFromConfig(CHAIN_CONFIG)
 
 // We use the legacy gas price as a reference, just like everybody else seems to be doing. The new
 // EIP-1559 maxFeePerGas seems to come in at about twice the value.
 export async function updateGasPrice() {
     // These API calls are costly. Avoid them on L2 where we don't care so much about gas.
-    // TODO: At least, they were too costly on Infura. Try them again on Alchemy?
-    // if (CHAIN_CONFIG.isL2) {
-    //     return
-    // }
+    // On Alchemy under the free tier, this causes:
+    //   HTTP 429
+    //   Your app has exceeded its compute units per second capacity. If you have retries enabled,
+    //   you can safely ignore this message. If not, check out
+    //   https://docs.alchemyapi.io/guides/rate-limits
+    if (CHAIN_CONFIG.isL2) {
+        return
+    }
 
     // Legacy gas price.
     const p = (await CHAIN_CONFIG.provider().getFeeData()).gasPrice
