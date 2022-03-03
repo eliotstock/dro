@@ -412,6 +412,23 @@ ${this.totalGasCost.toFixed(2)}`)
 
       // this.logGasUsed(`removeLiquidity()`, txReceipt)
     }
+
+    async topUpEth() {
+      if (this.position || this.tokenId)
+         throw "Refusing to top up eth. Still in a position. Remove liquidity first."
+
+      const ethBalance = await wallet.eth()
+
+      if (ethBalance >= CHAIN_CONFIG.ethBalanceMin) {
+        return
+      }
+
+      const deficit = CHAIN_CONFIG.ethBalanceMin - ethBalance
+
+      console.log(`Running low on ETH. Unwrapping some WETH to top up.`)
+
+      await wallet.unwrapWeth(deficit)
+    }
   
     async swap() {
       if (this.position || this.tokenId)
@@ -1052,8 +1069,13 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // Find our new range around the current price.
         this.updateRange()
 
-        // Swap half our assets to the other asset so that we have equal value of assets.
+        // Swap half our one asset to the other asset so that we have equal value of assets.
         await this.swap()
+
+        // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
+        // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
+        // a non zero amount of WETH. Unwrap some to ETH now if we need to.
+        await this.topUpEth()
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()
