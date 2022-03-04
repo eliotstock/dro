@@ -273,6 +273,8 @@ ${positionWebUrl(this.tokenId)}`)
       })
     }
 
+    // TODO: Extract this back-off and error handling stuff from this source so that the wallet
+    // source can use it as well, sepcpfically wallet.unwrapWeth().
     async sendTx(logLinePrefix: string, txRequest: TransactionRequest): Promise<TransactionReceipt> {
       let retries = 0
 
@@ -337,41 +339,6 @@ ${positionWebUrl(this.tokenId)}`)
         return
       }
 
-      // Uncomment then run once to delete a position that's been closed but is stuck in the
-      // database.
-      // await deletePosition(this.rangeWidthTicks)
-      // if (this.tokenId !== undefined) throw `done`
-  
-      // If we're only ever collecting fees in WETH and USDC, then the expectedCurrencyOwed0 and
-      // expectedCurrencyOwed1 can be zero (CurrencyAmount.fromRawAmount(usdcToken, 0). But if we
-      // ever want fees in ETH, which we may do to cover gas costs, then we need to get these
-      // using a callStatic on collect() ahead of time.
-      // const expectedCurrencyOwed0 = CurrencyAmount.fromRawAmount(usdcToken,
-      //   this.unclaimedFeesUsdc ?? 0)
-      // const expectedCurrencyOwed1 = CurrencyAmount.fromRawAmount(wethToken,
-      //   this.unclaimedFeesWeth ?? 0)
-  
-      // const collectOptions: CollectOptions = {
-      //   tokenId: this.tokenId,
-      //   expectedCurrencyOwed0: expectedCurrencyOwed0,
-      //   expectedCurrencyOwed1: expectedCurrencyOwed1,
-      //   recipient: wallet.address
-      // }
-  
-      // const removeLiquidityOptions: RemoveLiquidityOptions = {
-      //   tokenId: this.tokenId,
-      //   liquidityPercentage: new Percent(1), // All of our liquidity
-      //   slippageTolerance: CHAIN_CONFIG.slippageTolerance,
-      //   deadline: moment().unix() + DEADLINE_SECONDS,
-      //   collectOptions: collectOptions
-      // }
-  
-      // This will throw an error 'ZERO_LIQUIDITY' on an invariant if the position is already
-      // closed.
-      // TODO: Duplicate and simplify removeCallParameters():
-      //   https://github.com/Uniswap/v3-sdk/blob/main/src/nonfungiblePositionManager.ts#L341
-      // const {calldata, value} = NonfungiblePositionManager.removeCallParameters(this.position,
-      //   removeLiquidityOptions)
       const deadline = moment().unix() + DEADLINE_SECONDS
 
       const calldata = removeCallParameters(this.position, this.tokenId, deadline, wallet.address)
@@ -419,7 +386,7 @@ ${this.totalGasCost.toFixed(2)}`)
 
     async topUpEth() {
       if (this.position || this.tokenId)
-         throw "Refusing to top up eth. Still in a position. Remove liquidity first."
+         throw "Refusing to top up ETH. Still in a position. Remove liquidity first."
 
       const ethBalance = await wallet.eth()
 

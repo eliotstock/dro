@@ -151,9 +151,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     // The most I've ever paid in gas for a set of three re-ranging transactions on Arbitrum is
     // 0.010 ETH. 0.015 is a safe margin over that.
-    // ethBalanceMin: ethers.utils.parseUnits("0.015", "ether").toBigInt()
-    // TODO: Remove once topupEth() executes for testingL
-    ethBalanceMin: ethers.utils.parseUnits("0.07", "ether").toBigInt()
+    ethBalanceMin: ethers.utils.parseUnits("0.015", "ether").toBigInt()
 }
 
 const ETHEREUM_KOVAN: ChainConfig = {

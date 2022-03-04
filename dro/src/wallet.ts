@@ -192,11 +192,11 @@ ETH ${ethBalanceReadable} (token ratio by value: ${ratio})`)
 
         // Native bigints do not work for passing to encodeFunctionData().
         const a = ethers.utils.parseUnits(amount.toString(), 'wei')
-        console.log(`amountAsString: ${a}`) // 10_000_000_000_000_000 for 0.01 WETH input.
+        // console.log(`amountAsString: ${a}`) // 10_000_000_000_000_000 for 0.01 WETH input.
 
         const wethInterface = new ethers.utils.Interface(WETHABI)
         const calldata = wethInterface.encodeFunctionData('withdraw', [a])
-        console.log(`calldata: ${calldata}`)
+        // console.log(`calldata: ${calldata}`)
 
         // No value required, just the calldata.
         const txRequest = {
@@ -210,12 +210,12 @@ ETH ${ethBalanceReadable} (token ratio by value: ${ratio})`)
         }
 
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-        console.log(`TX response`)
-        console.dir(txResponse)
+        // console.log(`TX response`)
+        // console.dir(txResponse)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
-        console.log(`TX receipt`)
-        console.dir(txReceipt)
+        // console.log(`TX receipt`)
+        // console.dir(txReceipt)
     }
 }
 
