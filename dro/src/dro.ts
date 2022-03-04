@@ -264,6 +264,8 @@ ${positionWebUrl(this.tokenId)}`)
 
       const readable = Number(unclaimedFeesTotalUsdc * 100n / n10ToThe6) / 100
 
+      // TODO: Fix: This will show zero the first invocation after a restart. checkUnclaimedFees()
+      // has been called immediately prior. Was the position or token ID undefined at the time?
       console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
     }
 
