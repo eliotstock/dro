@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs'
 
 // TODO
 // ----
+// (P1) Now using Github issues for bugs: https://github.com/biketracker/dro/issues
 // (P2) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
 
 // Done

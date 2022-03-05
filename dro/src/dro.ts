@@ -365,15 +365,6 @@ ${positionWebUrl(this.tokenId)}`)
       this.totalGasCost += gasCost
       console.log(`[${this.rangeWidthTicks}] removeLiquidity() Total gas cost: \
 ${this.totalGasCost.toFixed(2)}`)
-  
-      // const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-      // console.log(`removeLiquidity() TX hash: ${txResponse.hash}`)
-      // console.log(`removeLiquidity() TX response:`)
-      // console.dir(txResponse)
-
-      // const txReceipt: TransactionReceipt = await txResponse.wait()
-      // console.log(`removeLiquidity() TX receipt:`)
-      // console.dir(txReceipt)
 
       // Forget our old token ID and position details so that we can move on.
       this.tokenId = undefined
@@ -661,16 +652,6 @@ spacing of ${rangeOrderPool.tickSpacing}. Can't create position.`
         gasPrice: CHAIN_CONFIG.gasPrice,
         data: calldata
       }
-  
-      // Send the transaction to the provider.
-      // const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-      // console.log(`addLiquidity() TX hash: ${txResponse.hash}`)
-      // console.log(`addLiquidity() TX response:`)
-      // console.dir(txResponse)
-
-      // const txReceipt: TransactionReceipt = await txResponse.wait()
-      // console.log(`addLiquidity() TX receipt:`)
-      // console.dir(txReceipt)
 
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] addLiquidity()`, txRequest)
