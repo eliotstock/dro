@@ -12,9 +12,9 @@ RUN npm install && \
 COPY src ./src
 
 # Set the user, we don't want this running as root
-RUN groupadd -g 999 appuser && \
-    useradd -r -u 999 -g appuser appuser
-USER appuser
+RUN groupadd -g 901 dro && \
+    useradd -r -u 901 -g dro dro
+USER dro
 
 # Entrypoint
 ENTRYPOINT [ "npm", "run" ]
