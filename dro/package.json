@@ -4,13 +4,14 @@
   "description": "Dynamic range order",
   "main": "build/main/index.js",
   "scripts": {
-    "dev": "nodemon",
     "test": "mocha -r ts-node/register 'test/*.ts'",
     "prod": "ts-node ./src/index.ts >>./out/dro.log 2>&1",
+    "prod-console": "ts-node ./src/index.ts 2>&1",
     "n": "ts-node ./src/index.ts --n >>./out/dro.log 2>&1",
     "r": "ts-node ./src/index.ts --r >>./out/dro.log 2>&1",
     "log": "tail -f -n 1000 ./out/dro.log",
     "balances": "ts-node ./src/index.ts --balances",
+    "approve": "ts-node ./src/index.ts --approve",
     "sql": "sqlite3 ./out/database.db",
     "monitor": "ts-node ./src/index.ts --monitor >>./out/swap_events.csv 2>&1"
   },
