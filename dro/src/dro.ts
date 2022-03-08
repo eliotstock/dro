@@ -274,7 +274,7 @@ ${positionWebUrl(this.tokenId)}`)
     }
 
     // TODO: Extract this back-off and error handling stuff from this source so that the wallet
-    // source can use it as well, sepcpfically wallet.unwrapWeth().
+    // source can use it as well, specifically wallet.unwrapWeth().
     async sendTx(logLinePrefix: string, txRequest: TransactionRequest): Promise<TransactionReceipt> {
       let retries = 0
 
