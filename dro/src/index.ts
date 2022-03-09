@@ -266,7 +266,6 @@ async function main() {
 }
   
 main().catch((error) => {
-  // TODO: Catch HTTP timeout errors and continue. Losing the network should not kill the process.
   console.error(error)
   process.exitCode = 1
 })
