@@ -16,6 +16,7 @@ function sleep(seconds: number) {
 // Once the dro process has been running for a while, our back-off has been successful.
 function onProcessTimerElapsed() {
     console.log(`dro process still running after ${TIMER_SEC} sec. Resetting retry count.`)
+
     retries = 0
 }
 
@@ -49,8 +50,8 @@ async function main() {
         }
         catch (e: unknown) {
             if (e instanceof Error) {
-                // This error is supposed to have a code property according to the docs, but
-                // doesn't:
+                // This error is supposed to have a code property according to the Node.js docs,
+                // but doesn't:
                 // interface Error {
                 //   name: string;
                 //   message: string;
@@ -79,7 +80,6 @@ async function main() {
         console.log(`Retry #${retries}. Backing off for ${delay} seconds...`)
         await sleep(delay)
         console.log(`...done`)
-
     } while (true)
 }
 
