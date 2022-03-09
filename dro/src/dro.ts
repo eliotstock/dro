@@ -358,6 +358,9 @@ ${positionWebUrl(this.tokenId)}`)
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] removeLiquidity()`, txRequest)
 
+      // Delete our position from the database as soon after this transaction as possible.
+      deletePosition(this.rangeWidthTicks)
+
       const gasCost = this.gasCost(txReceipt)
 
       // Removing liquidity is the last tx in the set of three. We're interested in the total gas
@@ -369,7 +372,6 @@ ${this.totalGasCost.toFixed(2)}`)
       // Forget our old token ID and position details so that we can move on.
       this.tokenId = undefined
       this.position = undefined
-      deletePosition(this.rangeWidthTicks)
       this.totalGasCost = 0
 
       // this.logGasUsed(`removeLiquidity()`, txReceipt)
