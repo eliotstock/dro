@@ -415,6 +415,11 @@ ${this.totalGasCost.toFixed(2)}`)
       const usdc = await wallet.usdc()
       const weth = await wallet.weth()
 
+      if (usdc == 0n && weth == 0n) {
+        console.log(`This account has no USDC or WETH. Fatal. HFSP.`)
+        process.exit(420)
+      }
+
       // What is the ratio of our USDC balance to the USDC value of our WETH balance?
       const ratio = await wallet.tokenRatioByValue()
 
