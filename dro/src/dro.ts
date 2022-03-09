@@ -20,10 +20,6 @@ config()
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
 
-// Do exponential backoff on HTTP error responses from the provider.
-const BACKOFF_RETRIES_MAX = 6
-const BACKOFF_DELAY_BASE_SEC = 6
-
 export enum Direction {
   Up = 'up',
   Down = 'down'
@@ -267,70 +263,48 @@ ${jsbiFormatted(this.position.liquidity)}`)
       console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
     }
 
-    static sleep(seconds: number) {
-      return new Promise((resolve) => {
-        setTimeout(resolve, seconds * 1000);
-      })
-    }
-
-    // TODO: Extract this back-off and error handling stuff from this source so that the wallet
-    // source can use it as well, specifically wallet.unwrapWeth().
+      // Note that we consciously do no error handing or retries here. These are now handled by the
+      // process manager, a sibling node module to this one.
+      // Also note that Ethers.js will do its own exponential back-off but only if the provider does
+      // NOT provide a retry-after header. Alchemy does provide this header. And yet we continue to
+      // see HTTP errors, which means we must be maxing out on retries.
+      // See:
+      //   https://github.com/ethers-io/ethers.js/issues/1162#issuecomment-1057422329
+      //   https://docs.alchemy.com/alchemy/documentation/rate-limits#option-2-retry-after
     async sendTx(logLinePrefix: string, txRequest: TransactionRequest): Promise<TransactionReceipt> {
-      let retries = 0
+      try {
+        const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
+        // console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
+        // console.log(`swap() TX response:`)
+        // console.dir(txResponse)
 
-      do {
-        retries++
+        const txReceipt: TransactionReceipt = await txResponse.wait()
+        // console.log(`swap() TX receipt:`)
+        // console.dir(txReceipt)
 
-        try {
-          const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-          // console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
-          // console.log(`swap() TX response:`)
-          // console.dir(txResponse)
-  
-          const txReceipt: TransactionReceipt = await txResponse.wait()
-          // console.log(`swap() TX receipt:`)
-          // console.dir(txReceipt)
-  
-          return txReceipt
+        return txReceipt
+      }
+      catch (e: unknown) {
+        // TODO: Log:
+        // * HTTP status code and message
+        // * Alchemy's status code (eg. -32000)
+        // * Alchemy's message
+        // * The retry-after header, although by the time Ethers.js throws an error, this may no
+        //   longer be interesting.
+        // All by parsing this:
+        /*
+        transaction failed (transactionHash="0xbf7915424097da63e4b6c3d519b2a7d345a9434fb86ab706445a4bfdf12d6d73", transaction={"nonce":123,"gasPrice":{"type":"BigNumber","hex":"0x77359400"},"gasLimit":{"type":"BigNumber","hex":"0x1e8480"},"to":"0xC36442b4a4522E871399CD717aBDD847Ab11FE88","value":{"type":"BigNumber","hex":"0x00"},"data":"0xac9650d8000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000000a40c49ccbe0000000000000000000000000000000000000000000000000000000000008c6a00000000000000000000000000000000000000000000000000064d8703d22c40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062216506000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000084fc6f78650000000000000000000000000000000000000000000000000000000000008c6a0000000000000000000000001ee071ec8ad0768256ab32c8ba61d99a39ef84a400000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000","chainId":42161,"v":84358,"r":"0x7d2b35a590f1811857551b61120d47c0b7f705a5b3caf1fdb111caa03f70e454","s":"0x677a64cb024d7f98b9afc8be1ba40151b12eaa6bc4d814319b8a913f83801a84","from":"0x1EE071ec8aD0768256Ab32c8bA61d99A39ef84a4","hash":"0xbf7915424097da63e4b6c3d519b2a7d345a9434fb86ab706445a4bfdf12d6d73","type":null,"confirmations":0}, receipt={"to":"0xC36442b4a4522E871399CD717aBDD847Ab11FE88","from":"0x1EE071ec8aD0768256Ab32c8bA61d99A39ef84a4","contractAddress":null,"transactionIndex":0,"gasUsed":{"type":"BigNumber","hex":"0x0bee1e"},"logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","blockHash":"0x5dbe98f5e7f826ceacbef1def7604e5ba0f9ab55b72b90adeaa1453228a11e56","transactionHash":"0xbf7915424097da63e4b6c3d519b2a7d345a9434fb86ab706445a4bfdf12d6d73","logs":[],"blockNumber":7381953,"confirmations":1,"cumulativeGasUsed":{"type":"BigNumber","hex":"0x069e"},"effectiveGasPrice":{"type":"BigNumber","hex":"0x1e60ac09"},"status":0,"type":0,"byzantium":true}, code=CALL_EXCEPTION, version=providers/5.4.5)
+        */
+        if (e instanceof Error) {
+          console.error(`${logLinePrefix} Error message: ${e.message}`)
         }
-        catch (e: unknown) {
-          // TODO: Log:
-          // * HTTP status code and message
-          // * Alchemy's status code (eg. -32000)
-          // * Alchemy's message
-          // * The retry-after header, although by the time Ethers.js throws an error, this may no
-          //   longer be interesting.
-          // All by parsing this:
-          /*
-          transaction failed (transactionHash="0xbf7915424097da63e4b6c3d519b2a7d345a9434fb86ab706445a4bfdf12d6d73", transaction={"nonce":123,"gasPrice":{"type":"BigNumber","hex":"0x77359400"},"gasLimit":{"type":"BigNumber","hex":"0x1e8480"},"to":"0xC36442b4a4522E871399CD717aBDD847Ab11FE88","value":{"type":"BigNumber","hex":"0x00"},"data":"0xac9650d8000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000000a40c49ccbe0000000000000000000000000000000000000000000000000000000000008c6a00000000000000000000000000000000000000000000000000064d8703d22c40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062216506000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000084fc6f78650000000000000000000000000000000000000000000000000000000000008c6a0000000000000000000000001ee071ec8ad0768256ab32c8ba61d99a39ef84a400000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000","chainId":42161,"v":84358,"r":"0x7d2b35a590f1811857551b61120d47c0b7f705a5b3caf1fdb111caa03f70e454","s":"0x677a64cb024d7f98b9afc8be1ba40151b12eaa6bc4d814319b8a913f83801a84","from":"0x1EE071ec8aD0768256Ab32c8bA61d99A39ef84a4","hash":"0xbf7915424097da63e4b6c3d519b2a7d345a9434fb86ab706445a4bfdf12d6d73","type":null,"confirmations":0}, receipt={"to":"0xC36442b4a4522E871399CD717aBDD847Ab11FE88","from":"0x1EE071ec8aD0768256Ab32c8bA61d99A39ef84a4","contractAddress":null,"transactionIndex":0,"gasUsed":{"type":"BigNumber","hex":"0x0bee1e"},"logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","blockHash":"0x5dbe98f5e7f826ceacbef1def7604e5ba0f9ab55b72b90adeaa1453228a11e56","transactionHash":"0xbf7915424097da63e4b6c3d519b2a7d345a9434fb86ab706445a4bfdf12d6d73","logs":[],"blockNumber":7381953,"confirmations":1,"cumulativeGasUsed":{"type":"BigNumber","hex":"0x069e"},"effectiveGasPrice":{"type":"BigNumber","hex":"0x1e60ac09"},"status":0,"type":0,"byzantium":true}, code=CALL_EXCEPTION, version=providers/5.4.5)
-          */
-          if (e instanceof Error) {
-            console.error(`${logLinePrefix} Error message: ${e.message}`)
-          }
-          else {
-            console.error(`${logLinePrefix} Error: ${e}`)
-          }
-
-          // Note that Ethers.js will do its own exponential back-off but only if the provider does
-          // NOT provide a retry-after header. Alchemy does provide this header.
-          // See:
-          //   https://github.com/ethers-io/ethers.js/issues/1162#issuecomment-1057422329
-          //   https://docs.alchemy.com/alchemy/documentation/rate-limits#option-2-retry-after
-
-          if (retries > BACKOFF_RETRIES_MAX) {
-            console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Exiting process.`)
-            process.exit(305)
-          }
-  
-          // 6^1: delay for 6 seconds
-          // 6^2: delay for 36 seconds, etc.
-          const delay = Math.pow(BACKOFF_DELAY_BASE_SEC, retries)
-  
-          console.log(`Retry #${retries}. Backing off for ${delay} seconds...`)
-          await DRO.sleep(delay)
-          console.log(`...Done`)
+        else {
+          console.error(`${logLinePrefix} Error: ${e}`)
         }
-      } while (true)
+
+        console.log(`Ending dro process.`)
+        throw e
+      }
     }
   
     async removeLiquidity() {
