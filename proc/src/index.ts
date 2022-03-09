@@ -19,12 +19,32 @@ async function main() {
     do {
         retries++
 
-        // We do not define the command line for the actual dro process here - that's a script in
-        // the package.json for the dro module next door.
-        // execSync() will block while the child process is running.
-        cp.execSync('npm run prod', {'cwd': '../dro'})
+        try {
+            // We do not define the command line for the actual dro process here - that's a script
+            // in the package.json for the dro module next door.
+            // execSync() will block while the child process is running and return a string or
+            // buffer of the stdout, which we don't need.
+            cp.execSync('npm run prod', {'cwd': '../dro'})
+        }
+        catch (e: unknown) {
+            if (e instanceof Error) {
+                // This error is supposed to have a code property according to the docs, but
+                // doesn't:
+                // interface Error {
+                //   name: string;
+                //   message: string;
+                //   stack?: string;
+                // }
+                console.log(`dro process died with Javascript Error instance: ${JSON.stringify(e)}`)
+            }
+            else {
+                console.log(`dro process died with error: ${JSON.stringify(e)}`)
+            }
+        }
 
-        console.log('dro process died')
+        // Note that execution will also reach here if the dro process exits normally (with code 0)
+        // but it never does. Its non-error behaviour is to run forever, at least with the command
+        // line above.
 
         if (retries > BACKOFF_RETRIES_MAX) {
             console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Fatal.`)
