@@ -21,8 +21,8 @@ async function main() {
 
         // We do not define the command line for the actual dro process here - that's a script in
         // the package.json for the dro module next door.
-        // TODO: Later: npm run prod.
-        cp.execSync('npm run n', {'cwd': '../dro'})
+        // execSync() will block while the child process is running.
+        cp.execSync('npm run prod', {'cwd': '../dro'})
 
         console.log('dro process died')
 
