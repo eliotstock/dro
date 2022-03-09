@@ -21,8 +21,9 @@ function onProcessTimerElapsed() {
 
 // Do something some time after the dro process has been running.
 function restartProcessTimer() {
-    if (timeoutId) clearTimeout(timeoutId)
-    
+    // Passing an invalid ID to clearTimeout() silently does nothing; no exception is thrown.
+    clearTimeout(timeoutId)
+
     timeoutId = setTimeout(onProcessTimerElapsed, TIMER_SEC * 1_000)
 }
 
@@ -37,14 +38,14 @@ async function main() {
         retries++
 
         try {
+            // After some time of the process running successfully, reset our retry count.
+            restartProcessTimer()
+
             // We do not define the command line for the actual dro process here - that's a script
             // in the package.json for the dro module next door.
             // execSync() will block while the child process is running and return a string or
-            // buffer of the stdout, which we don't need.
+            // buffer of the stdout when it exits, which we don't need.
             cp.execSync('npm run prod', {'cwd': '../dro'})
-
-            // After some time of the process running successfully, reset our retry count.
-            restartProcessTimer()
         }
         catch (e: unknown) {
             if (e instanceof Error) {
