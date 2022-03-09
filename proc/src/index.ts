@@ -1,6 +1,6 @@
 import * as cp from 'child_process'
 
-const BACKOFF_RETRIES_MAX = 6
+const BACKOFF_RETRIES_MAX = 7
 const BACKOFF_DELAY_BASE_SEC = 6
 
 function sleep(seconds: number) {
@@ -12,7 +12,7 @@ function sleep(seconds: number) {
 // Do exponential backoff on HTTP error responses from the provider, or indeed anything that can
 // kill the dro process.
 async function main() {
-    console.log(`Running the dro process with back-off`)
+    console.log(`Running the dro process with retries and back-off`)
 
     let retries = 0
 
