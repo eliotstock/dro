@@ -5,7 +5,9 @@ WORKDIR /app
 
 # Install app dependencies
 COPY *.json ./
-RUN npm install && \
+RUN apt update && \
+    apt install -y sqlite && \
+    npm install && \
     npm install ts-node
 
 # Bundle app source
