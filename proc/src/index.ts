@@ -2,11 +2,28 @@ import * as cp from 'child_process'
 
 const BACKOFF_RETRIES_MAX = 7
 const BACKOFF_DELAY_BASE_SEC = 6
+const TIMER_SEC = 120
+
+let retries = 0
+let timeoutId: NodeJS.Timeout
 
 function sleep(seconds: number) {
     return new Promise((resolve) => {
-        setTimeout(resolve, seconds * 1000);
+        setTimeout(resolve, seconds * 1_000);
     })
+}
+
+// Once the dro process has been running for a while, our back-off has been successful.
+function onProcessTimerElapsed() {
+    console.log(`dro process still running after ${TIMER_SEC} sec. Resetting retry count.`)
+    retries = 0
+}
+
+// Do something some time after the dro process has been running.
+function restartProcessTimer() {
+    if (timeoutId) clearTimeout(timeoutId)
+    
+    timeoutId = setTimeout(onProcessTimerElapsed, TIMER_SEC * 1_000)
 }
 
 // Do exponential backoff on HTTP error responses from the provider, or indeed anything that can
@@ -14,7 +31,7 @@ function sleep(seconds: number) {
 async function main() {
     console.log(`Running the dro process with retries and back-off`)
 
-    let retries = 0
+    retries = 0
 
     do {
         retries++
@@ -25,6 +42,9 @@ async function main() {
             // execSync() will block while the child process is running and return a string or
             // buffer of the stdout, which we don't need.
             cp.execSync('npm run prod', {'cwd': '../dro'})
+
+            // After some time of the process running successfully, reset our retry count.
+            restartProcessTimer()
         }
         catch (e: unknown) {
             if (e instanceof Error) {

@@ -264,7 +264,7 @@ ${jsbiFormatted(this.position.liquidity)}`)
     }
 
       // Note that we consciously do no error handing or retries here. These are now handled by the
-      // process manager, a sibling node module to this one.
+      // process manager, a sibling Node.js module to this one.
       // Also note that Ethers.js will do its own exponential back-off but only if the provider does
       // NOT provide a retry-after header. Alchemy does provide this header. And yet we continue to
       // see HTTP errors, which means we must be maxing out on retries.
@@ -275,11 +275,9 @@ ${jsbiFormatted(this.position.liquidity)}`)
       try {
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
         // console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
-        // console.log(`swap() TX response:`)
         // console.dir(txResponse)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
-        // console.log(`swap() TX receipt:`)
         // console.dir(txReceipt)
 
         return txReceipt
