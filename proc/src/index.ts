@@ -1,4 +1,5 @@
 import * as cp from 'child_process'
+import moment, { Duration } from 'moment'
 
 // We do not define the command line for the actual dro process here - that's a script in the
 // package.json for the dro module next door.
@@ -7,19 +8,29 @@ import * as cp from 'child_process'
 const DRO_PROCESS = 'npm run prod'
 const DRO_DIR = '../dro'
 
-const BACKOFF_RETRIES_MAX = 7
-const BACKOFF_DELAY_BASE_SEC = 6
+const BACKOFF_DURATIONS = [
+    moment.duration(20, 'seconds'), // ie. next block, at least on L1
+    moment.duration(1, 'minute'),
+    moment.duration(2, 'minutes'),
+    moment.duration(5, 'minutes'),
+    moment.duration(10, 'minutes'),
+    moment.duration(30, 'minutes'),
+    moment.duration(1, 'hour'),
+    moment.duration(2, 'hours'),
+    moment.duration(4, 'hours'),
+]
 
 // How long does the dro process need to run before we consider it a successful run?
-const TIMER_SEC = 120
+const SUCCESS_DURATION = moment.duration(2, 'minutes')
 
 let retries: number
 let stopwatchMillis: number
 
 // This use of setTimeout() will work even if we block the Node.js event loop with cp.execSync().
-function wait(seconds: number) {
+function wait(delay: moment.Duration) {
     return new Promise((resolve) => {
-        setTimeout(resolve, seconds * 1_000);
+        const millis = delay.asMilliseconds()
+        setTimeout(resolve, millis);
     })
 }
 
@@ -27,14 +38,14 @@ function startStopwatch() {
     stopwatchMillis = new Date().getTime()
 }
 
-function readStopwatch(): number {
+function readStopwatch(): moment.Duration {
     const millis = (new Date().getTime()) - stopwatchMillis
 
-    return millis / 1_000
+    return moment.duration(millis, 'milliseconds')
 }
 
-// Do exponential backoff on HTTP error responses from the provider, or indeed anything that can
-// kill the dro process.
+// Do some backoff on HTTP error responses from the provider, or indeed anything that can kill the
+// dro process.
 async function main() {
     retries = 0
 
@@ -70,27 +81,22 @@ async function main() {
 
         const elapsed = readStopwatch()
 
-        if (elapsed > TIMER_SEC) {
-            console.log(`Process ran for ${elapsed} seconds: success. Resetting our retry count.`)
+        // Whether the last run suceeded or failed, we still need to retry now.
+        if (elapsed > SUCCESS_DURATION) {
+            console.log(`Process ran for ${elapsed.humanize()}: success. Resetting our retry count.`)
 
             retries = 1
         }
         else {
-            console.log(`Process ran for ${elapsed} seconds: failed.`)
+            console.log(`Process ran for ${elapsed.humanize()}: failed.`)
         }
 
-        if (retries > BACKOFF_RETRIES_MAX) {
-            console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Fatal.`)
-            process.exit(1)
-        }
+        // We never give up completely, we just keep retrying at the longest duration.
+        const cappedRetries = Math.min(retries, BACKOFF_DURATIONS.length)
 
-        // Whether the last run suceeded or failed, we still need to retry now.
+        const delay = BACKOFF_DURATIONS[cappedRetries - 1]
 
-        // 6^1: delay for 6 seconds
-        // 6^2: delay for 36 seconds, etc.
-        const delay = Math.pow(BACKOFF_DELAY_BASE_SEC, retries)
-
-        console.log(`Retry #${retries}. Backing off for ${delay} seconds...`)
+        console.log(`Retry #${retries}. Backing off for ${delay.humanize()}...`)
         await wait(delay)
         console.log(`...done`)
     } while (true)
