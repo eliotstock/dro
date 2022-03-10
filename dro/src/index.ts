@@ -89,6 +89,7 @@ let noops: boolean = false
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
   // This is a single API call to get the price in the range order pool.
+  // JSON RPC API call: eth_call().
   await updateTick()
 
   await updateGasPrice()
