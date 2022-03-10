@@ -4,7 +4,7 @@ const BACKOFF_RETRIES_MAX = 7
 const BACKOFF_DELAY_BASE_SEC = 6
 const TIMER_SEC = 120
 
-let retries = 0
+let retries
 let timeoutId: NodeJS.Timeout
 
 function sleep(seconds: number) {
@@ -22,17 +22,21 @@ function onProcessTimerElapsed() {
 
 // Do something some time after the dro process has been running.
 function restartProcessTimer() {
+    console.log(`Clearing any previous process timer`)
+
     // Passing an invalid ID to clearTimeout() silently does nothing; no exception is thrown.
     clearTimeout(timeoutId)
 
+    console.log(`Starting new process timer`)
+
     timeoutId = setTimeout(onProcessTimerElapsed, TIMER_SEC * 1_000)
+
+    console.log(`Done`)
 }
 
 // Do exponential backoff on HTTP error responses from the provider, or indeed anything that can
 // kill the dro process.
 async function main() {
-    console.log(`Running the dro process with retries and back-off`)
-
     retries = 0
 
     do {
@@ -41,6 +45,8 @@ async function main() {
         try {
             // After some time of the process running successfully, reset our retry count.
             restartProcessTimer()
+
+            console.log(`Starting new dro process`)
 
             // We do not define the command line for the actual dro process here - that's a script
             // in the package.json for the dro module next door.
