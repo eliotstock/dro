@@ -32,7 +32,6 @@ export enum Direction {
 export class DRO {
     readonly rangeWidthTicks: number
     readonly noops: boolean
-    readonly removeOnly: boolean
 
     minTick: number = 0
     maxTick: number = 0
@@ -48,11 +47,9 @@ export class DRO {
   
     constructor(
       _rangeWidthTicks: number,
-      _noops: boolean,
-      _removeOnly: boolean) {
+      _noops: boolean) {
       this.rangeWidthTicks = _rangeWidthTicks
       this.noops = _noops
-      this.removeOnly = _removeOnly
     }
 
     async init() {
@@ -1019,11 +1016,6 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         await this.removeLiquidity()
 
         await wallet.logBalances()
-
-        if (this.removeOnly) {
-          console.log(`Done`)
-          process.exit()
-        }
 
         // Find our new range around the current price.
         this.updateRange()

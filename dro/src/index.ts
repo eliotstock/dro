@@ -85,9 +85,6 @@ let price: string
 // When invoked with the -n command line arg, don't execute any transactions.
 let noops: boolean = false
 
-// When invoked with the -r command line arg, just remove liquidity and exit.
-let removeOnly: boolean = false
-
 // Ethers.js listener:
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
@@ -136,12 +133,6 @@ async function main() {
   if (argv.n) {
     noops = true
     console.log(`Running in no-op mode. No transactions will be executed.`)
-  }
-
-  // `--r` means remove liquidity and exit.
-  if (argv.r) {
-    removeOnly = true
-    console.log(`Removing liquidity only.`)
   }
 
   // `--balances` means just log our available balances.
@@ -242,12 +233,33 @@ async function main() {
     return
   }
 
+  // `--r` means remove liquidity from all dros and exit.
+  if (argv.r) {
+    console.log(`Removing liquidity only.`)
+
+    await updateTick()
+
+    for (const width of rangeWidths) {
+      const dro: DRO = new DRO(width, false)
+      await dro.init()
+
+      if (dro.inPosition()) {
+        await dro.removeLiquidity()
+      }
+      else {
+        console.log(`dro with width ${width} wasn't in position. No liquidity to remove.`)
+      }
+    }
+
+    return
+  }
+
   try {
     // We must have the price in the range order pool before we can establish a range.
     await updateTick()
 
     for (const width of rangeWidths) {
-      const dro: DRO = new DRO(width, noops, removeOnly)
+      const dro: DRO = new DRO(width, noops)
       await dro.init()
 
       // Now that we know the price in the pool, we can set the range based on it.
