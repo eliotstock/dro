@@ -2,93 +2,55 @@ import * as cp from 'child_process'
 
 // We do not define the command line for the actual dro process here - that's a script in the
 // package.json for the dro module next door.
-// const DRO_PROCESS = 'npm run prod'
-const DRO_PROCESS = 'echo "I am the process" && sleep 5'
+// To test, use unix `sleep` which takes a number of seconds and returns.
+// const DRO_PROCESS = 'sleep 5'
+const DRO_PROCESS = 'npm run prod'
 const DRO_DIR = '../dro'
 
 const BACKOFF_RETRIES_MAX = 7
 const BACKOFF_DELAY_BASE_SEC = 6
-const TIMER_SEC = 30
+
+// How long does the dro process need to run before we consider it a successful run?
+const TIMER_SEC = 120
 
 let retries: number
-let timeoutId: NodeJS.Timeout
-let running: boolean
+let stopwatchMillis: number
 
-function sleep(seconds: number) {
+// This use of setTimeout() will work even if we block the Node.js event loop with cp.execSync().
+function wait(seconds: number) {
     return new Promise((resolve) => {
         setTimeout(resolve, seconds * 1_000);
     })
 }
 
-// Once the dro process has been running for a while, our back-off has been successful.
-function onProcessTimerElapsed() {
-    console.log(`dro process still running after ${TIMER_SEC} sec. Resetting retry count.`)
-
-    retries = 0
+function startStopwatch() {
+    stopwatchMillis = new Date().getTime()
 }
 
-// Do something some time after the dro process has been running.
-function restartProcessTimer() {
-    console.log(`Clearing any previous process timer`)
+function readStopwatch(): number {
+    const millis = (new Date().getTime()) - stopwatchMillis
 
-    // Passing an invalid ID to clearTimeout() silently does nothing; no exception is thrown.
-    clearTimeout(timeoutId)
-
-    console.log(`Starting new process timer`)
-
-    timeoutId = setTimeout(onProcessTimerElapsed, TIMER_SEC * 1_000)
-
-    console.log(`Done`)
-}
-
-// Note that execution will also reach here if the dro process exits normally (with code 0) but it
-// never does. Its non-error behaviour is to run forever, at least with the command line above.
-async function onProcessEnded(error: cp.ExecException | null, stdout: string | Buffer, stderr: string | Buffer) {
-    if (error) {
-        console.log(`dro process died with status ${error.code}, stderr: ${stderr}`)
-    }
-    else {
-        console.log(`dro process ended with stdout: ${stdout}, stderr: ${stderr}`)
-    }
-
-    running = false
-
-    if (retries > BACKOFF_RETRIES_MAX) {
-        console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Fatal.`)
-        process.exit(1)
-    }
-
-    // 6^1: delay for 6 seconds
-    // 6^2: delay for 36 seconds, etc.
-    const delay = Math.pow(BACKOFF_DELAY_BASE_SEC, retries)
-
-    console.log(`Retry #${retries}. Backing off for ${delay} seconds...`)
-    await sleep(delay)
-    console.log(`...done`)
+    return millis / 1_000
 }
 
 // Do exponential backoff on HTTP error responses from the provider, or indeed anything that can
 // kill the dro process.
 async function main() {
-    running = false
     retries = 0
 
     do {
-        // TODO: Does this allow the event loop to run?
-        if (running) continue
-
         retries++
 
         try {
             // After some time of the process running successfully, reset our retry count.
-            restartProcessTimer()
+            startStopwatch()
 
             console.log(`Starting new dro process`)
 
-            // exec() will not block while the child process is running. The Node.js event loop
-            // will be allowed to run.
-            const process = cp.exec(DRO_PROCESS, {'cwd': DRO_DIR}, onProcessEnded)
-            running = true
+            // execSync() will block here. The Node.js event loop will NOT be allowed to run.
+            // This is very bad form for a Javascript app, but in this case we have no other
+            // work to be done.
+            cp.execSync(DRO_PROCESS, {'cwd': DRO_DIR})
         }
         catch (e: unknown) {
             if (e instanceof Error) {
@@ -99,14 +61,38 @@ async function main() {
                 //   message: string;
                 //   stack?: string;
                 // }
-                console.log(`dro process failed to start with Javascript Error instance: ${JSON.stringify(e)}`)
+                console.log(`Process died with Javascript Error instance: ${JSON.stringify(e)}`)
             }
             else {
-                console.log(`dro process failed to start with error: ${JSON.stringify(e)}`)
+                console.log(`Process died with error: ${JSON.stringify(e)}`)
             }
         }
 
+        const elapsed = readStopwatch()
 
+        if (elapsed > TIMER_SEC) {
+            console.log(`Process ran for ${elapsed} seconds: success. Resetting our retry count.`)
+
+            retries = 1
+        }
+        else {
+            console.log(`Process ran for ${elapsed} seconds: failed.`)
+        }
+
+        if (retries > BACKOFF_RETRIES_MAX) {
+            console.error(`Maximum retries of ${BACKOFF_RETRIES_MAX} exceeded. Fatal.`)
+            process.exit(1)
+        }
+
+        // Whether the last run suceeded or failed, we still need to retry now.
+
+        // 6^1: delay for 6 seconds
+        // 6^2: delay for 36 seconds, etc.
+        const delay = Math.pow(BACKOFF_DELAY_BASE_SEC, retries)
+
+        console.log(`Retry #${retries}. Backing off for ${delay} seconds...`)
+        await wait(delay)
+        console.log(`...done`)
     } while (true)
 }
 
