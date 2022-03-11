@@ -1,5 +1,5 @@
 import { config } from 'dotenv'
-import { BigNumber, ethers } from 'ethers'
+import { ethers } from 'ethers'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { Provider } from "@ethersproject/abstract-provider";
 import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer";
@@ -8,6 +8,7 @@ import { abi as ERC20ABI } from './abi/erc20.json'
 import { abi as WETHABI } from './abi/weth.json'
 import { useConfig, ChainConfig } from './config'
 import { price } from './uniswap'
+import JSBI from 'jsbi'
 
 // Read our .env file
 config()
@@ -263,4 +264,9 @@ export function gasPriceFormatted(): string {
     const g = Number(gasPrice * 10n / 1_000_000_000n) / 10
     
     return `${g.toFixed(1)} gwei`
+}
+
+export function jsbiFormatted(n: JSBI): string {
+    const native = BigInt(n.toString())
+    return native.toLocaleString()
 }

@@ -5,7 +5,7 @@ import { TickMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt, TransactionRequest } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
-import { wallet, gasPrice, gasPriceFormatted } from './wallet'
+import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
 import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
@@ -95,7 +95,7 @@ remove liquidity but retain our token ID?`)
 ${positionWebUrl(this.tokenId)}`)
 
           console.log(`[${this.rangeWidthTicks}] Liquidity: \
-${this.position.liquidity.toString()}`)
+${jsbiFormatted(this.position.liquidity)}`)
         }
         else {
           console.error(`No position for token ID ${this.tokenId}`)
