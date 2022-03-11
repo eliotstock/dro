@@ -89,6 +89,7 @@ let noops: boolean = false
 // export type Listener = (...args: Array<any>) => void
 async function onBlock(...args: Array<any>) {
   // This is a single API call to get the price in the range order pool.
+  // JSON RPC API call: eth_call().
   await updateTick()
 
   await updateGasPrice()
@@ -114,7 +115,7 @@ ${priceFormatted()} USDC`)
 }
 
 async function main() {
-  console.log(`Using ${CHAIN_CONFIG.name}`)
+  console.log(`Chain: ${CHAIN_CONFIG.name}`)
 
   // Process command line args using yargs. Pass these to `ts-node ./src/index.ts`
   const argv = yargs(process.argv.slice(2)).options({
@@ -254,31 +255,28 @@ async function main() {
     return
   }
 
-  try {
-    // We must have the price in the range order pool before we can establish a range.
-    await updateTick()
+  // The absence of a try/catch block below is deliberate. The execution of main() already has one.
+  // For this startup stuff, on any error it's better to die early and let the process manager
+  // restart us with some back-off. 
 
-    for (const width of rangeWidths) {
-      const dro: DRO = new DRO(width, noops)
-      await dro.init()
+  // We must have the price in the range order pool before we can establish a range.
+  await updateTick()
 
-      // Now that we know the price in the pool, we can set the range based on it.
-      dro.updateRange()
+  for (const width of rangeWidths) {
+    const dro: DRO = new DRO(width, noops)
+    await dro.init()
 
-      dros.push(dro)
-    }
-  }
-  catch(e) {
-    // Probably network error thrown by a Uniswap tx call.
-    console.error(e)
+    // Now that we know the price in the pool, we can set the range based on it.
+    dro.updateRange()
+
+    dros.push(dro)
   }
 
   // Get a callback to onBlock() on every new block.
   CHAIN_CONFIG.provider().on('block', onBlock)
 }
   
-main().catch((error) => {
-  // TODO: Catch HTTP timeout errors and continue. Losing the network should not kill the process.
-  console.error(error)
+main().catch((e) => {
+  console.error(e)
   process.exitCode = 1
 })
