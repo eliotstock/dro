@@ -9,51 +9,6 @@ import { createPoolOnTestnet } from './uniswap'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
 
-// TODO
-// ----
-// (P1) Now using Github issues for bugs: https://github.com/biketracker/dro/issues
-// (P2) Use the new Uniswap SDK feature for swapping and adding liquidity in one transaction: https://docs.uniswap.org/sdk/guides/liquidity/swap-and-add
-
-// Done
-// ----
-// (P1) Fix integer arithmetic on tokenRatioByValue().
-// (P1) Log the total unclaimed fees vs. total gas cost at the time of removing liquidity.
-// (P1) Identify when there's a token ID in the db on starting, but the position is closed.
-// (P1) Create new accounting source to handle logging gas cost in USD given a transaction receipt, plus USD total of unclaimed fees from both asset amounts.
-// (P1) Killing the process and restarting it while in range should not remove liquidity and add it again.
-// (P1) Support killing process, changing range and restarting.
-// (P1) Log unclaimed fees on every price change in the pool.
-// (P1) Forward test many range widths
-// (P1) Give Alchemy a spin and see a) whether we fall within the free tier b) if we get fewer errors than on Infura.
-// (P1) Get the 'remove liquidity' tx working
-// (P1) Get the swap tx working, when re-ranging down (in: WETH, out: USDC)
-// (P1) Get the swap tx working, when re-ranging up (in: USDC, out: WETH)
-// (P1) Get the 'add liquidity' tx working, including capturing the Token ID
-// (P1) Swap some WETH to USDC so the DRO account has some on Kovan.
-// (P1) Get hold of some WETH for the DRO account
-// (P1) Know what our current balance of ETH, WETH and USDC is, right after removing liquidity
-// (P1) Fix the range width arithmetic
-// (P1) Show the new range min and max in terms of USDC rather than ticks
-// (P1) Get the current price in the pool synchronously and in terms of the quote currency
-// (P1) Know when we're out of range, indirectly, based on the current price in the pool and the current min/max, which we'll store for now
-// (P1) Timestamps in logging
-// (P1) Fix down/up re-ranging indicator on Arbitrum
-// (P2) When the ETH balance falls below a static threshold, unwrap some WETH to ETH to put it back over by a safe margin.
-// (P2) Build out exponential backoff, or at least retries, for 40x and 50x server errors from provider, or lost network. Ask in Alchemy Discord.
-// (P2) More swap testing
-// (P2) While we're waiting for any transaction, don't begin re-ranging again
-// (P2) Know the current price of gas
-// (P2) Don't re-range when the current price of gas is over a constant threshold
-// (P2) Execute everything on every new block by subscribing to "block""
-// (P2) Mint a new liquidity position (but fail because no balances in account) centred on the current price, providing half ETH and half USDC
-// (P2) Execute a swap for a known amount of WETH (half our account balance, less some savings for execution)
-// (P3) Know when we're out of range directly from the existing liquidity position and stop tracking min and max ticks locally
-// (P3) Understand whether executing on every block is going to spend the free quota at Infura
-// (P3) Switch to a local geth node if we're going to run out of Infura quota
-// (P3) Have this script execute transactions using the local account, using an Ethers.js Signer
-// (P3) Know how to create a new account locally and secure the private key (or destroy it if the mnemonic is secure), eg. enter mnemonic on process start every time
-// (P3) Build the URL of the position, based on the serial number, and log it
-
 // Read our .env file
 config()
 
