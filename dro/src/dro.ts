@@ -129,16 +129,16 @@ ${jsbiFormatted(this.position.liquidity)}`)
         // Arbitrum mainnet
         //   WETH is token 0, USDC is token 1
         //   Minimum USDC value per ETH corresponds to the minimum tick value
-        minUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2)
-        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2)
+        minUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2, {groupSeparator: ','})
+        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2, {groupSeparator: ','})
       }
       else {
         // Ethereum mainnet:
         //   USDC is token 0, WETH is token 1
         //   Minimum USDC value per ETH corresponds to the maximum tick value
         //   Counterintuitively, WETH is still the first token we pass to tickToPrice()
-        minUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2)
-        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2)
+        minUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2, {groupSeparator: ','})
+        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2, {groupSeparator: ','})
       }
 
       console.log(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
@@ -410,8 +410,8 @@ ${this.totalGasCost.toFixed(2)}`)
       // once we were at the edge of our range. We do have some fees just claimed in the other
       // asset, however.
       if (ratio > 1.5) {
-        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: \
-${ratio.toFixed(2)}. We're mostly in USDC now. Swapping half our USDC to WETH.`)
+        console.log(`[${this.rangeWidthTicks}] swap() We're mostly in USDC now. Swapping half our \
+USDC to WETH.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenUsdc
         tokenOut = CHAIN_CONFIG.addrTokenWeth
@@ -421,14 +421,14 @@ ${ratio.toFixed(2)}. We're mostly in USDC now. Swapping half our USDC to WETH.`)
         swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
-        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: \
-${ratio.toFixed(2)}. We already have fairly even values of USDC and WETH. No need for a swap.`)
+        console.log(`[${this.rangeWidthTicks}] swap() We already have fairly even values of USDC \
+and WETH. No need for a swap.`)
 
         return
       }
       else { // ratio <= 0.5
-        console.log(`[${this.rangeWidthTicks}] swap() We have USDC and WETH in the ratio: \
-${ratio.toFixed(2)}. We're mostly in WETH now. Swapping half our WETH to USDC.`)
+        console.log(`[${this.rangeWidthTicks}] swap() We're mostly in WETH now. Swapping half our \
+WETH to USDC.`)
 
         tokenIn = CHAIN_CONFIG.addrTokenWeth
         tokenOut = CHAIN_CONFIG.addrTokenUsdc

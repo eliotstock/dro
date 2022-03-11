@@ -137,10 +137,10 @@ export class EthUsdcWallet extends ethers.Wallet {
         const ethBalanceReadable = ethers.utils.formatEther(
             ethBalance - (ethBalance % 100000000000000n))
 
-        const ratio = await this.tokenRatioByValue()
+        // const ratio = await this.tokenRatioByValue()
 
         console.log(`Balances: USDC ${usdcBalanceReadable}, WETH ${wethBalanceReadable}, \
-ETH ${ethBalanceReadable} (token ratio by value: ${ratio})`)
+ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
     }
 
     async approveAll(address: string) {
