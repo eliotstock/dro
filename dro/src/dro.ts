@@ -336,6 +336,19 @@ ${positionWebUrl(this.tokenId)}`)
         return
       }
 
+      // Take note of how the liquidity in the position has changed since we opened the position
+      // (or restarted the dro process). Calling decreaseLiquidity() with a liquidity parameter
+      // that is not equal to the liquidity currently in the position can cause the TX to fail.
+      const liquidityBefore = this.position.liquidity
+
+      this.position = await positionByTokenId(this.tokenId, this.wethFirst)
+
+      const liquidityAfter = this.position.liquidity
+
+      console.log(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
+${liquidityBefore.toString()} at opening of position/restarting and is now \
+${liquidityAfter.toString()}`)
+
       const deadline = moment().unix() + DEADLINE_SECONDS
 
       const calldata = removeCallParameters(this.position, this.tokenId, deadline, wallet.address)
@@ -676,6 +689,9 @@ be able to remove this liquidity.`)
 
       const gasCost = this.gasCost(txReceipt)
       this.totalGasCost += gasCost
+
+      console.log(`[${this.rangeWidthTicks}] addLiquidity() Starting liquidity: \
+${this.position.liquidity.toString()}`)
     }
 
     async swapAndAddLiquidity() {
@@ -695,7 +711,8 @@ position. Remove liquidity first.`
       // Go from native bigint to JSBI via string.
       const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
       const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
-      console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
+      console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc} USDC, \
+${availableWeth} WETH`)
 
       if (this.wethFirst) {
         token0 = wethToken
