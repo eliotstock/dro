@@ -221,9 +221,6 @@ async function main() {
     const dro: DRO = new DRO(width, noops)
     await dro.init()
 
-    // Now that we know the price in the pool, we can set the range based on it.
-    dro.setNewRange()
-
     dros.push(dro)
   }
 
