@@ -509,7 +509,8 @@ liquidity and swap first.`
       // Go from native bigint to JSBI via string.
       const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
       const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
-      console.log(`addLiquidity() Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH`)
+      console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: \
+${availableUsdc} USDC, ${availableWeth} WETH`)
 
       const slot = await rangeOrderPoolContract.slot0()
 
