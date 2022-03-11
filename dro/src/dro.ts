@@ -93,6 +93,9 @@ remove liquidity but retain our token ID?`)
           // this.maxTick = position.tickUpper
           console.log(`[${this.rangeWidthTicks}] Using existing position NFT: \
 ${positionWebUrl(this.tokenId)}`)
+
+          console.log(`[${this.rangeWidthTicks}] Liquidity: \
+${this.position.liquidity.toString()}`)
         }
         else {
           console.error(`No position for token ID ${this.tokenId}`)
