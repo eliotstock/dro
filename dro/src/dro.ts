@@ -662,7 +662,7 @@ be able to remove this liquidity.`)
       this.totalGasCost += gasCost
 
       console.log(`[${this.rangeWidthTicks}] addLiquidity() Starting liquidity: \
-${jsbiFormatted(this.position.liquidity}`)
+${jsbiFormatted(this.position.liquidity)}`)
     }
 
     async swapAndAddLiquidity() {
