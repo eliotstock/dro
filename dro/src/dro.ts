@@ -7,7 +7,7 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -29,9 +29,8 @@ export class DRO {
     readonly rangeWidthTicks: number
     readonly noops: boolean
 
-    minTick: number = 0
-    maxTick: number = 0
-    entryTick: number = 0
+    tickLower: number = 0
+    tickUpper: number = 0
     wethFirst: boolean = true
     position?: Position
     tokenId?: number
@@ -73,6 +72,11 @@ export class DRO {
 
         if (position) {
           this.position = position
+          this.tickLower = position.tickLower
+          this.tickUpper = position.tickUpper
+
+          // Note that at this point, tickLower and tickUpper are based on the existing position
+          // whereas rangeWidthTicks is from the .env file. The two may not agree!
 
           if (JSBI.EQ(JSBI.BigInt(0), this.position.liquidity)) {
             console.error(`[${this.rangeWidthTicks}] Existing position has no liquidity. Did we \
@@ -81,17 +85,19 @@ remove liquidity but retain our token ID?`)
           }
 
           // Note that we never get our min and max ticks from the Position instance. Leave them as
-          // zero here, meaning outOfRange() will return true on the first call and updateRange()
+          // zero here, meaning outOfRange() will return true on the first call and setNewRange()
           // will set them based on the range width in the .env file.
           // This enables us to kill the process, change the range width in the .env file, restart
           // and get a re-range to happen based on the new range.
-          // this.minTick = position.tickLower
-          // this.maxTick = position.tickUpper
+          // this.tickLower = position.tickLower
+          // this.tickUpper = position.tickUpper
           console.log(`[${this.rangeWidthTicks}] Using existing position NFT: \
 ${positionWebUrl(this.tokenId)}`)
 
           console.log(`[${this.rangeWidthTicks}] Liquidity: \
 ${jsbiFormatted(this.position.liquidity)}`)
+
+          this.logRangeInUsdcTerms()
         }
         else {
           console.error(`No position for token ID ${this.tokenId}`)
@@ -104,29 +110,62 @@ ${jsbiFormatted(this.position.liquidity)}`)
     }
   
     outOfRange() {
-      // When newly constructed, this.minTick == this.maxTick == 0 and we return true here.
+      // When newly constructed, this.tickLower == this.tickUpper == 0 and we return true here.
       return rangeOrderPoolTick &&
-        (rangeOrderPoolTick < this.minTick || rangeOrderPoolTick > this.maxTick)
+        (rangeOrderPoolTick < this.tickLower || rangeOrderPoolTick > this.tickUpper)
     }
 
     inPosition(): boolean {
       return this.position !== undefined
     }
+
+    logRangeInUsdcTerms() {
+      let minUsdc
+      let maxUsdc
+
+      // tickToPrice() implementation:
+      //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
+      if (this.wethFirst) {
+        // Arbitrum mainnet
+        //   WETH is token 0, USDC is token 1
+        //   Minimum USDC value per ETH corresponds to the minimum tick value
+        minUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2)
+        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2)
+      }
+      else {
+        // Ethereum mainnet:
+        //   USDC is token 0, WETH is token 1
+        //   Minimum USDC value per ETH corresponds to the maximum tick value
+        //   Counterintuitively, WETH is still the first token we pass to tickToPrice()
+        minUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2)
+        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2)
+      }
+
+      console.log(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
+    }
   
-    updateRange() {
+    setNewRange() {
       if (rangeOrderPoolTick == undefined) throw 'No tick yet.'
 
-      const noRangeYet: boolean = (this.minTick == 0)
+      const [lower, upper] = rangeAround(rangeOrderPoolTick, this.rangeWidthTicks)
+      this.tickLower = lower
+      this.tickUpper = upper
+
+      this.logRangeInUsdcTerms()
+    }
+
+    trackRerangeEvent() {
+      const notInitialRange: boolean = (this.tickLower != 0)
 
       let direction: Direction
       
       if (this.wethFirst) {
         // Pool on Arbitrum mainnet: A lower tick value means a lower price in USDC.
-        direction = rangeOrderPoolTick < this.minTick ? Direction.Down : Direction.Up
+        direction = rangeOrderPoolTick < this.tickLower ? Direction.Down : Direction.Up
       }
       else {
         // Pool on Ethereum mainnet: A lower tick value means a higher price in USDC.
-        direction = rangeOrderPoolTick < this.minTick ? Direction.Up : Direction.Down
+        direction = rangeOrderPoolTick < this.tickLower ? Direction.Up : Direction.Down
       }
 
       let timeInRange: Duration
@@ -150,57 +189,13 @@ ${jsbiFormatted(this.position.liquidity)}`)
 
       this.lastRerangeTimestamp = moment().toISOString()
 
-      // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
-      // returned here can be quite different to rangeWidthTicks.
-      this.minTick = Math.round(rangeOrderPoolTick - (this.rangeWidthTicks / 2))
-
-      // Don't go under MIN_TICK, which can happen on testnets.
-      this.minTick = Math.max(this.minTick, TickMath.MIN_TICK)
-      this.minTick = nearestUsableTick(this.minTick, RANGE_ORDER_POOL_TICK_SPACING)
-  
-      this.maxTick = Math.round(rangeOrderPoolTick + (this.rangeWidthTicks / 2))
-
-      // Don't go over MAX_TICK, which can happen on testnets.
-      this.maxTick = Math.min(this.maxTick, TickMath.MAX_TICK)
-      this.maxTick = nearestUsableTick(this.maxTick, RANGE_ORDER_POOL_TICK_SPACING)
-  
-      let minUsdc = 'unknown'
-      let maxUsdc = 'unknown'
-
-      // tickToPrice() implementation:
-      //   https://github.com/Uniswap/v3-sdk/blob/6c4242f51a51929b0cd4f4e786ba8a7c8fe68443/src/utils/priceTickConversions.ts#L14
-      if (this.wethFirst) {
-        // Arbitrum mainnet
-        //   WETH is token 0, USDC is token 1
-        //   Minimum USDC value per ETH corresponds to the minimum tick value
-        minUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
-        maxUsdc = tickToPrice(wethToken, usdcToken, this.maxTick).toFixed(2)
-      }
-      else {
-        // Ethereum mainnet:
-        //   USDC is token 0, WETH is token 1
-        //   Minimum USDC value per ETH corresponds to the maximum tick value
-        //   Counterintuitively, WETH is still the first token we pass to tickToPrice()
-        minUsdc = tickToPrice(wethToken, usdcToken, this.maxTick).toFixed(2)
-        maxUsdc = tickToPrice(wethToken, usdcToken, this.minTick).toFixed(2)
-      }
-
-      this.entryTick = rangeOrderPoolTick
-
-      if (noRangeYet) {
-        console.log(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
-      }
-      else {
+      if (notInitialRange) {
         // Insert a row in the database for analytics, except when we're just starting up and there's
         // no range yet.
         insertRerangeEvent(this.rangeWidthTicks, moment().toISOString(), direction)
 
-        console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRangeReadable} to ${minUsdc} <-> ${maxUsdc}`)
+        console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRangeReadable}`)
       }
-
-      // if (forwardTestLogLine.length > 0) {
-      //   console.log(forwardTestLogLine)
-      // }
     }
   
     // Checking unclaimed fees is a nice-to-have for the logs but essential if we want to actually
@@ -569,21 +564,21 @@ liquidity and swap first.`
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
       if (CHAIN_CONFIG.isTestnet) {
-        // Rather than require minTick and maxTick to be valid, replace them with valid values on
+        // Rather than require tickLower and tickUpper to be valid, replace them with valid values on
         // testnets. These were observed on a manually created position, therefore they're valid.
-        this.minTick = 191580
-        this.maxTick = 195840
+        this.tickLower = 191580
+        this.tickUpper = 195840
       }
   
       // Get ahead of the invariant test in v3-sdk's Position constructor:
       // invariant(tickLower >= TickMath.MIN_TICK && tickLower % pool.tickSpacing === 0, 'TICK_LOWER')
-      if (this.minTick < TickMath.MIN_TICK) {
-        throw `[${this.rangeWidthTicks}] Lower tick of ${this.minTick} is below TickMath.MIN_TICK \
+      if (this.tickLower < TickMath.MIN_TICK) {
+        throw `[${this.rangeWidthTicks}] Lower tick of ${this.tickLower} is below TickMath.MIN_TICK \
 (${TickMath.MIN_TICK}). Can't create position.`
       }
 
-      if (this.minTick % rangeOrderPool.tickSpacing !== 0) {
-        throw `[${this.rangeWidthTicks}] Lower tick of ${this.minTick} is not aligned with the tick \
+      if (this.tickLower % rangeOrderPool.tickSpacing !== 0) {
+        throw `[${this.rangeWidthTicks}] Lower tick of ${this.tickLower} is not aligned with the tick \
 spacing of ${rangeOrderPool.tickSpacing}. Can't create position.`
       }
 
@@ -592,8 +587,8 @@ spacing of ${rangeOrderPool.tickSpacing}. Can't create position.`
       // figure out the liquidity then uses that in the Position constructor.
       let position = Position.fromAmounts({
         pool: rangeOrderPool,
-        tickLower: this.minTick,
-        tickUpper: this.maxTick,
+        tickLower: this.tickLower,
+        tickUpper: this.tickUpper,
         amount0: amount0,
         amount1: amount1,
         useFullPrecision: false
@@ -743,10 +738,10 @@ ${sqrtRatioX96AsJsbi instanceof JSBI}`)
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
       if (CHAIN_CONFIG.isTestnet) {
-        // Rather than require minTick and maxTick to be valid, replace them with valid values on
+        // Rather than require tickLower and tickUpper to be valid, replace them with valid values on
         // testnets. These were observed on a manually created position, therefore they're valid.
-        this.minTick = 191580
-        this.maxTick = 195840
+        this.tickLower = 191580
+        this.tickUpper = 195840
       }
 
       // From the SDK docs: "The position liquidity can be set to 1, since liquidity is still
@@ -763,8 +758,8 @@ ${sqrtRatioX96AsJsbi instanceof JSBI}`)
       */
       const p = new Position({
         pool: rangeOrderPool,
-        tickLower: this.minTick,
-        tickUpper: this.maxTick,
+        tickLower: this.tickLower,
+        tickUpper: this.tickUpper,
         liquidity: 1
       })
 
@@ -970,7 +965,7 @@ be able to remove this liquidity.`
             return
           }
           
-          this.updateRange()
+          this.setNewRange()
         }
 
         return
@@ -1006,7 +1001,10 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         await wallet.logBalances()
 
         // Find our new range around the current price.
-        this.updateRange()
+        this.setNewRange()
+
+        // Put a row in our analytics table and log the re-ranging.
+        this.trackRerangeEvent()
 
         // Swap half our one asset to the other asset so that we have equal value of assets.
         await this.swap()

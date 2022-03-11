@@ -222,7 +222,7 @@ async function main() {
     await dro.init()
 
     // Now that we know the price in the pool, we can set the range based on it.
-    dro.updateRange()
+    dro.setNewRange()
 
     dros.push(dro)
   }

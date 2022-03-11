@@ -3,7 +3,7 @@ import { ethers } from 'ethers'
 import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
 import { abi as QuoterABI } from '@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'
 import { abi as NonfungiblePositionManagerABI } from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
-import { tickToPrice, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount, toHex, Multicall } from '@uniswap/v3-sdk'
+import { tickToPrice, TickMath, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount, toHex, Multicall, nearestUsableTick } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
 import { BigintIsh, Token } from '@uniswap/sdk-core'
@@ -96,6 +96,27 @@ export function priceFormatted(): string {
     const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
 
     return p.toFixed(2, {groupSeparator: ','})
+}
+
+
+// Given the current tick (price) in the pool and a range width in ticks, what are the lower and
+// upper ticks of the range? 
+export function rangeAround(tick: number, width: number): [number, number] {
+    // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
+    // returned here can be quite different to rangeWidthTicks.
+    let tickLower = Math.round(tick - (width / 2))
+
+    // Don't go under MIN_TICK, which can happen on testnets.
+    tickLower = Math.max(tickLower, TickMath.MIN_TICK)
+    tickLower = nearestUsableTick(tickLower, RANGE_ORDER_POOL_TICK_SPACING)
+
+    let tickUpper = Math.round(tick + (width / 2))
+
+    // Don't go over MAX_TICK, which can happen on testnets.
+    tickUpper = Math.min(tickUpper, TickMath.MAX_TICK)
+    tickUpper = nearestUsableTick(tickUpper, RANGE_ORDER_POOL_TICK_SPACING)
+
+    return [tickLower, tickUpper]
 }
 
 // Every range order pool we use has WETH as one token and USDC as the other, but the order varies
