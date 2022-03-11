@@ -349,8 +349,8 @@ ${jsbiFormatted(this.position.liquidity)}`)
       const liquidityAfter = this.position.liquidity
 
       console.log(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
-${liquidityBefore.toString()} at opening of position/restarting and is now \
-${liquidityAfter.toString()}`)
+${jsbiFormatted(liquidityBefore)} at opening of position/restarting and is now \
+${jsbiFormatted(liquidityAfter)}`)
 
       const deadline = moment().unix() + DEADLINE_SECONDS
 
@@ -694,7 +694,7 @@ be able to remove this liquidity.`)
       this.totalGasCost += gasCost
 
       console.log(`[${this.rangeWidthTicks}] addLiquidity() Starting liquidity: \
-${this.position.liquidity.toString()}`)
+${jsbiFormatted(this.position.liquidity}`)
     }
 
     async swapAndAddLiquidity() {
