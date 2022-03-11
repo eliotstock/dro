@@ -9,7 +9,7 @@ const DRO_PROCESS = 'npm run prod'
 const DRO_DIR = '../dro'
 
 const BACKOFF_DURATIONS = [
-    moment.duration(20, 'seconds'), // ie. next block, at least on L1
+    moment.duration(15, 'seconds'), // ie. next block, at least on L1
     moment.duration(1, 'minute'),
     moment.duration(2, 'minutes'),
     moment.duration(5, 'minutes'),
@@ -72,10 +72,10 @@ async function main() {
                 //   message: string;
                 //   stack?: string;
                 // }
-                console.log(`Process died with Javascript Error instance: ${JSON.stringify(e)}`)
+                console.log(`Process died with error message: ${e.message}`)
             }
             else {
-                console.log(`Process died with error: ${JSON.stringify(e)}`)
+                console.log(`Process died`)
             }
         }
 
@@ -88,7 +88,7 @@ async function main() {
             retries = 1
         }
         else {
-            console.log(`Process ran for ${elapsed.humanize()}: failed.`)
+            console.log(`Process ran for ${elapsed.humanize()}: failed`)
         }
 
         // We never give up completely, we just keep retrying at the longest duration.
