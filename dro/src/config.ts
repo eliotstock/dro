@@ -140,7 +140,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
         return `${Number(this.gasPriceMax / 1_000_000_000n)} gwei`
     },
 
-    // TODO(P1): Confirm these are all at the same address as on Ethereum Mainnet.
+    // These are all at the same address as on Ethereum Mainnet.
     addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
 
     addrQuoter: ETHEREUM_MAINNET.addrQuoter,

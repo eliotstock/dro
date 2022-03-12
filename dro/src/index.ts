@@ -97,7 +97,7 @@ async function main() {
     
     await wallet.logBalances()
 
-    // TODO: Remove once tested once:
+    // To unwrap some WETH, uncomment and run once:
     // await wallet.unwrapWeth(10_000_000_000_000_000n) // 0.01 WETH
     // await wallet.logBalances()
 

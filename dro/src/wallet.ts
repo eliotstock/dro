@@ -144,8 +144,9 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
     }
 
     async approveAll(address: string) {
-        // TODO: Add allowance() method to ABI and call it first. That should cost no gas. Only call
-        // approve() when we need to.
+        // A possible improvement here would b to add the allowance() method to the ABI and call it
+        // first. That should cost no gas. We can then only call approve() when we need to.
+        
         // console.log("Approving spending of max USDC")
         const txResponseUsdc: TransactionResponse = await this.usdcContract.approve(address, ethers.constants.MaxUint256)
         // console.dir(txResponseUsdc)
