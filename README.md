@@ -10,9 +10,7 @@
     1. Either USDC or WETH (or both is fine) to the value of at least 1K USD
 1. Put a value for each of these variables in an `.env` file. Only one of the project IDs is required, strictly speaking.
     1. `DRO_ACCOUNT_MNEMONIC`: A seed phrase of 12 words, the first account from which is the one you're going to use
-    1. `INFURA_PROJECT_ID`: If you use Infura
-    1. `ALCHEMY_PROJECT_ID_ETHEREUM_MAINNET`: If you use Alchemy and want to deploy assets on Mainnet
-    1. `ALCHEMY_PROJECT_ID_ARBITRUM_MAINNET`: If you use Alchemy and want to deploy assets on Arbitrum
+    1. `PROVIDER_URL`: Including the Infura project ID or Alchemy API key. Using a local node is fine.
     1. `CHAIN` eg. `CHAIN="ethereumMainnet"`: See `dro/src/config.ts` for valid values.
     1. `RANGE_WIDTHS` eg. `RANGE_WIDTHS="120 240 360 480 600 720 840 960 1800"`: Space separated list of wdiths, in basis points (bps). Start with `"360"`
 1. Approve Uniswap's smart contracts to spend your WETH and USDC.

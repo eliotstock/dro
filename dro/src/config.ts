@@ -11,7 +11,6 @@ export interface ChainConfig {
     chainId: number
     isTestnet: boolean
     isL2: boolean
-    endpoint: string
     provider(): JsonRpcProvider
     addrTokenUsdc: string
     addrTokenWeth: string
@@ -40,13 +39,8 @@ const ETHEREUM_MAINNET: ChainConfig = {
 
     isL2: false,
 
-    // Infura:
-    // endpoint: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-    // Alchemy:
-    endpoint: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_PROJECT_ID_ETHEREUM_MAINNET}`,
-
     provider() {
-        return new ethers.providers.JsonRpcProvider(this.endpoint)
+        return new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL)
     },
 
     addrTokenUsdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -103,13 +97,8 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     isL2: true,
 
-    // Infura:
-    // endpoint: `https://arbitrum-mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-    // Alchemy:
-    endpoint: `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_PROJECT_ID_ARBITRUM_MAINNET}`,
-
     provider() {
-        return new ethers.providers.JsonRpcProvider(this.endpoint)
+        return new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL)
     },
 
     addrTokenUsdc: '0xff970a61a04b1ca14834a43f5de4533ebddb5cc8',
@@ -163,10 +152,8 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     isL2: false,
 
-    endpoint: `https://kovan.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-
     provider() {
-        return new ethers.providers.JsonRpcProvider(this.endpoint)
+        return new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL)
     },
 
     // This is our own USDC test contract. The deployer is the DRO account and has all the supply.
@@ -216,11 +203,9 @@ const CHAIN_CONFIGS = {
 }
 
 export function useConfig(): ChainConfig {
-    if (process.env.INFURA_PROJECT_ID == undefined &&
-        process.env.ALCHEMY_PROJECT_ID_ARBITRUM_MAINNET == undefined &&
-        process.env.ALCHEMY_PROJECT_ID_ETHEREUM_MAINNET == undefined) throw "No project ID in .env file."
+    if (process.env.PROVIDER_URL == undefined) throw 'No PROVIDER_URL in .env file.'
 
-    if (process.env.CHAIN == undefined) throw "No CHAIN in .env file."
+    if (process.env.CHAIN == undefined) throw 'No CHAIN in .env file.'
 
     const chain: string = process.env.CHAIN
 
