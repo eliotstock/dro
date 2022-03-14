@@ -5,7 +5,7 @@ import moment from 'moment'
 const OUT_DIR = './out'
 const SQLITE_DB_FILE = OUT_DIR + '/database.db'
 
-async function openDb () {
+async function openDb() {
     const db: Database = await open({
         filename: SQLITE_DB_FILE,
         driver: sqlite3.Database
@@ -34,6 +34,8 @@ export async function init() {
         width INTEGER PRIMARY KEY, \
         datetime TEXT NOT NULL, \
         token_id INTEGER NULL)')
+
+        db.close()
 }
 
 // Pass dates as ISO8601 strings ("YYYY-MM-DD HH:MM:SS.SSS"). Sqlite does not have a DATETIME
@@ -45,6 +47,7 @@ export async function insertOrReplacePosition(width: number, datetimeUtc: string
 VALUES (?, ?, ?)', width, datetimeUtc, tokenId)
 
     // console.log(`Row ID: ${result}.rowID`)
+    db.close()
 }
 
 export async function deletePosition(width: number) {
@@ -52,8 +55,11 @@ export async function deletePosition(width: number) {
 
     const result = await db.run('DELETE FROM position WHERE width = ?', width)
 
-    // console.log(`Result:`)
-    // console.dir(result)
+    // TODO: This seems to be failing occasionally. Fix.
+    console.log(`Result:`)
+    console.dir(result)
+
+    db.close()
 }
 
 export async function getTokenIdForOpenPosition(): Promise<number | undefined> {
@@ -64,6 +70,8 @@ export async function getTokenIdForOpenPosition(): Promise<number | undefined> {
     if (row === undefined) return undefined
 
     return row.token_id
+
+    db.close()
 }
 
 // Pass dates as ISO8601 strings ("YYYY-MM-DD HH:MM:SS.SSS"). Sqlite does not have a DATETIME
@@ -73,6 +81,8 @@ export async function insertRerangeEvent(width: number, datetimeUtc: string, dir
 
     const result = await db.run('INSERT INTO rerange_event (width, datetime, direction) \
 VALUES (?, ?, ?)', width, datetimeUtc, direction)
+
+    db.close()
 }
 
 export async function dumpTokenIds() {
@@ -87,6 +97,8 @@ export async function dumpTokenIds() {
     
         console.log(`${row.width}, ${row.token_id}`)
       })
+
+    db.close()
 }
 
 export async function dumpRerangeEvents() {
@@ -101,6 +113,8 @@ export async function dumpRerangeEvents() {
     
         console.log(`${row.width}, ${row.datetime}, ${row.direction}`)
       })
+
+    db.close()
 }
 
 export async function meanTimeToReranging(width: number): Promise<string> {
@@ -132,6 +146,8 @@ export async function meanTimeToReranging(width: number): Promise<string> {
 
     const m = mean(timesToRerangingMillis)
     const d = moment.duration(m, 'milliseconds')
+
+    db.close()
 
     return `${d.humanize()} (${(m / 1_000 / 60).toFixed(0)} minutes, from ${rowsCount} values)`
 }

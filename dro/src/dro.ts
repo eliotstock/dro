@@ -79,9 +79,17 @@ export class DRO {
           // whereas rangeWidthTicks is from the .env file. The two may not agree!
 
           if (JSBI.EQ(JSBI.BigInt(0), this.position.liquidity)) {
+            // Logging suggests that removeLiquidity() is executing completely and the position has
+            // been deleted from the db, and yet we continue to see this happen.
             console.error(`[${this.rangeWidthTicks}] Existing position has no liquidity. Did we \
-remove liquidity but retain our token ID?`)
-            process.exit(85)
+remove liquidity but retain our token ID? Deleting it now.`)
+
+            deletePosition(this.rangeWidthTicks)
+            this.tokenId = undefined
+            this.position = undefined
+            this.totalGasCost = 0
+            
+            return
           }
 
           // Note that we never get our min and max ticks from the Position instance. Leave them as
