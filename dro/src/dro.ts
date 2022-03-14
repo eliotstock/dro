@@ -88,7 +88,7 @@ remove liquidity but retain our token ID? Deleting it now.`)
             this.tokenId = undefined
             this.position = undefined
             this.totalGasCost = 0
-            
+
             return
           }
 
@@ -413,6 +413,15 @@ ${this.totalGasCost.toFixed(2)}`)
       let tokenOut
       let amountIn
       let swapRoute
+
+      // TODO: Swapping exactly half of one asset to the other asset is too simplistic here. We
+      // often end up with of the order of 100 USDC still in the account after the add liquidity
+      // tx, which is too much for a position size of the order of 2K USDC total value. We want
+      // most of our capital deployed at all times.
+
+      // Swap less than half when we already hold some of the other asset. This may or may not be
+      // doable without solving a simultaneous equation. There is some maths for it in the Uniswap
+      // smart-order-router repo. Pull that out and write some tests for it to understand it.
 
       // We should be almost entirely in one asset or the other, because we only removed liquidity
       // once we were at the edge of our range. We do have some fees just claimed in the other
