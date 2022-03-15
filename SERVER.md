@@ -26,7 +26,7 @@ Goals: low power, no fan, secure, simple.
     1. Get the interface name from `ip link`. This is probably `eth0`.
     1. Remove the file that `cloud-init` left behind for `netplan`: `sudo rm /etc/netplan/50-cloud-init.yaml`
     1. Paste the below block into a new `netplan` config file: `sudo nano /etc/netplan/01-netcfg.yaml`.
-        1. A subnet mask of 24 means only the last octet (8 buts) in the address changes for each device on the subnet.
+        1. A subnet mask of `/24` means only the last octet (8 bits) in the address changes for each device on the subnet.
         1. The DNS servers here are Google's and Cloudflare's.
         1. We might also consider using 9.9.9.9 in future (Quad9, does filtering of known malware sites).
         1. `.yaml` files use spaces for indentation (either 2 or 4), not tabs.
