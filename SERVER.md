@@ -13,6 +13,41 @@ Goals: low power, no fan, secure, simple.
     1. `exit`
     1. Log in using the new user.
     1. `sudo deluser [username]`
+1. Disable `cloud-init`
+    1. `sudo touch /etc/cloud/cloud-init.disabled`
+    1. `sudo reboot`
+    1. Make sure you can still log in as your new user.
+    1. `sudo dpkg-reconfigure cloud-init` and uncheck everything except `None`.
+    1. `sudo apt-get purge cloud-init`
+    1. `sudo rm -rf /etc/cloud/ && sudo rm -rf /var/lib/cloud/`
+    1. `sudo reboot`
+    1. Again, make sure you can still log in as your new user.
+1. Configure a static IP address.
+    1. Get the interface name from `ip link`. This is probably `eth0`.
+    1. Remove the file that `cloud-init` left behind for `netplan`: `sudo rm /etc/netplan/50-cloud-init.yaml`
+    1. Paste the below block into a new `netplan` config file: `sudo nano /etc/netplan/01-netcfg.yaml`.
+        1. A subnet mask of 24 means only the last octet (8 buts) in the address changes for each device on the subnet.
+        1. The DNS servers here are Google's and Cloudflare's.
+        1. We might also consider using 9.9.9.9 in future (Quad9, does filtering of known malware sites).
+        1. `.yaml` files use spaces for indentation (either 2 or 4), not tabs.
+    1. `sudo netplan apply`
+    1. Check the output of `ip a show dev eth0`.
+    1. Now you can set your ssh alias on the client(s).
+
+```
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      dhcp4: no
+      addresses:
+        - 192.168.1.40/24
+      gateway4: 192.168.1.254
+      nameservers:
+          addresses: [8.8.8.8, 1.1.1.1, 1.0.0.1]
+```
+
 1. Change the ssh port from the default
     1. `nano /etc/ssh/sshd_config`
     1. Edit the `Port` line. Pick a random port number and make a note of it.
@@ -31,7 +66,6 @@ Goals: low power, no fan, secure, simple.
     1. `sudo ufw reload`
 1. Change the hostname from the default `ubuntu`. `sudo nano /etc/hostname` and pick a cool hostname.
 1. Plug the ethernet cable in and reboot: `sudo reboot`
-1. `ifconfig` and note down the IPv4 address. Now you can set your ssh alias.
 1. Update packages and get some stuff
     1. `sudo apt update`
     1. `sudo apt upgrade`
@@ -78,6 +112,6 @@ Goals: low power, no fan, secure, simple.
         1. `sudo apt update`
     1. `sudo apt source sqlite`
     1. Follow on above.
-1. Switch the display to portrait mode.
+1. (Optional) Switch the display to portrait mode.
     1. Test this works first: `sudo echo 3 | sudo tee /sys/class/graphics/fbcon/rotate_all`
-    1. TODO: Consider a sysvinit script or similar. The Raspberry Pi bootloader can't be configured to do this.
+    1. Consider a sysvinit script or similar for this. The Raspberry Pi bootloader can't be configured to do this.

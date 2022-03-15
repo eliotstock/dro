@@ -203,9 +203,9 @@ const CHAIN_CONFIGS = {
 }
 
 export function useConfig(): ChainConfig {
-    if (process.env.PROVIDER_URL == undefined) throw 'No PROVIDER_URL in .env file.'
+    if (process.env.PROVIDER_URL == undefined) throw 'No PROVIDER_URL in .env file, or no .env file.'
 
-    if (process.env.CHAIN == undefined) throw 'No CHAIN in .env file.'
+    if (process.env.CHAIN == undefined) throw 'No CHAIN in .env file, or no .env file.'
 
     const chain: string = process.env.CHAIN
 
