@@ -2,6 +2,7 @@
 
 Goals: low power, no fan, secure, simple.
 
+1. (Optional) Update the firmware in your router, factory reset, reconfigure.
 1. Get a Raspberry Pi 400 (keyboard with Raspberry Pi 4 inside) and a monitor.
 1. From the host, image the SD card with Ubuntu Server LTS.
 1. Unplug the ethernet cable before booting. Goal: this server has never been online before it's been hardened a bit.
