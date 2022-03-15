@@ -34,19 +34,19 @@ Goals: low power, no fan, secure, simple.
     1. Check the output of `ip a show dev eth0`.
     1. Now you can set your ssh alias on the client(s).
 
-```
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    eth0:
-      dhcp4: no
-      addresses:
-        - 192.168.1.40/24
-      gateway4: 192.168.1.254
-      nameservers:
-          addresses: [8.8.8.8, 1.1.1.1, 1.0.0.1]
-```
+    ```
+    network:
+    version: 2
+    renderer: networkd
+    ethernets:
+        eth0:
+        dhcp4: no
+        addresses:
+            - 192.168.1.40/24
+        gateway4: 192.168.1.254
+        nameservers:
+            addresses: [8.8.8.8, 1.1.1.1, 1.0.0.1]
+    ```
 
 1. Change the ssh port from the default
     1. `nano /etc/ssh/sshd_config`
