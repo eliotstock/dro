@@ -39,8 +39,8 @@ Goals: low power, no fan, secure, simple.
         eth0:
         dhcp4: no
         addresses:
-            - 192.168.1.40/24
-        gateway4: 192.168.1.254
+            - 192.168.20.40/24
+        gateway4: 192.168.20.254
         nameservers:
             addresses: [8.8.8.8, 1.1.1.1, 1.0.0.1]
     ```
