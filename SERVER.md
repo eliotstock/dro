@@ -4,16 +4,23 @@ Goals: low power, no fan, secure, simple.
 
 1. (Optional) Update the firmware in your router, factory reset, reconfigure.
 1. Get a Raspberry Pi 400 (keyboard with Raspberry Pi 4 inside) and a monitor.
-1. From the host, image the SD card with Ubuntu Server LTS.
+1. (Optional) If re-installing, back up the following from the existing target.
+    1. `~/[repo_dir]/dro/out/dro.log`
+    1. `~/[repo_dir]/dro/out/database.db`
+    1. `~/.ssh/authorized_keys`
+1. From the host, use the Raspberry Pi Imager to write the SD card with Ubuntu Server LTS 64 bit.
 1. Unplug the ethernet cable before booting. Goal: this server has never been online before it's been hardened a bit.
-1. Boot the target. Wait for cloud-init to run before logging in. Default u & p: `ubuntu`/`ubuntu`.
+1. Boot the target. Wait for cloud-init to run before logging in.
+    1. Default u & p: `ubuntu`/`ubuntu`.
+    1. You're required to change your password. Don't worry much about the strength of it too much cause we're going to remove the `ubuntu` user in a tick.
 1. Remember `Ctrl-Alt F1` through `F6` are there for switching to new terminals and multitasking.
 1. Add a new user and remove the default `ubuntu` one.
     1. `sudo adduser [username]`.
     1. Add the new user to the `sudo` group:`sudo usermod -aG sudo [username]`
     1. `exit`
     1. Log in using the new user.
-    1. `sudo deluser [username]`
+    1. `sudo deluser ubuntu`
+    1. `sudo rm -rf /home/ubuntu`
 1. Disable `cloud-init`
     1. `sudo touch /etc/cloud/cloud-init.disabled`
     1. `sudo reboot`
@@ -32,54 +39,62 @@ Goals: low power, no fan, secure, simple.
         1. We might also consider using 9.9.9.9 in future (Quad9, does filtering of known malware sites).
         1. `.yaml` files use spaces for indentation (either 2 or 4), not tabs.
     ```
-    network:
-    version: 2
-    renderer: networkd
-    ethernets:
-        eth0:
-        dhcp4: no
-        addresses:
-            - 192.168.20.40/24
-        gateway4: 192.168.20.254
-        nameservers:
-            addresses: [8.8.8.8, 1.1.1.1, 1.0.0.1]
-    ```
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      dhcp4: no
+      addresses:
+        - 192.168.20.40/24
+      gateway4: 192.168.20.1
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 1.0.0.1]
+```
     1. `sudo netplan apply`
-    1. Check the output of `ip a show dev eth0`.
-    1. Now you can set your ssh alias on the client(s).
+    1. Don't plug the ethernet cable in yet though
 1. Change the ssh port from the default
-    1. `nano /etc/ssh/sshd_config`
-    1. Edit the `Port` line. Pick a random port number and make a note of it.
+    1. `sudo nano /etc/ssh/sshd_config`
+    1. Uncomment the `Port` line. Pick a memorable port number/make a note of it.
     1. Restart `sshd`: `sudo service sshd restart`
     1. Make sure there's an `.ssh` directory in your home directory for later: `mkdir -p ~/.ssh`
     1. When connecting from a client, use the `-p [port]` arg for `ssh`
 1. Configure the firewall
-    1. Config `ufw` is installed: `which ufw`
+    1. Confirm `ufw` is installed: `which ufw`
     1. `sudo ufw default deny incoming`
     1. `sudo ufw default allow outgoing`
-    1. `sudo ufw allow [port]/tcp comment 'ssh'`
+    1. `sudo ufw allow [your ssh port]/tcp comment 'ssh'`
     1. `sudo ufw enable`
     1. Note that `http` and `https` are absent above.
     1. Check which ports are accessible with `sudo ufw status`
     1. Also block pings: `sudo nano /etc/ufw/before.rules`, find the line reading `A ufw-before-input -p icmp --icmp-type echo-request -j ACCEPT` and change `ACCEPT` to `DROP`
     1. `sudo ufw reload`
 1. Change the hostname from the default `ubuntu`. `sudo nano /etc/hostname` and pick a cool hostname.
-1. Plug the ethernet cable in and reboot: `sudo reboot`
+1. Connect to the internet
+    1. Plug the ethernet cable in and reboot: `sudo reboot`
+    1. Check the output of `ip a show dev eth0`.
+    1. Now you can set your ssh alias on the client(s).
 1. Update packages and get some stuff
     1. `sudo apt update`
-    1. `sudo apt upgrade`
+    1. `sudo apt upgrade` (make coffee)
     1. `sudo apt install net-tools emacs git`
 1. Set up ssh keys for all client machines from which you'll want to connect.
-    1. You might like to set an alias in `~/.bashrc` such as `alias <random-name>="ssh -p [port] [username]@[server IP]"`
-    1. Similarly for scp: `alias <random-name>="scp -P [port] $1 [username]@[server IP]:/home/[username]"`
-    1. `ssh-keygen -t rsa -b 4096 -C "[client nickname]"`
-    1. No passphrase.
-    1. Accept the default path. You'll get both `~/.ssh/id_rsa.pub` (public key) and `~/.ssh/id_rsa` (private key).
-    1. Copy the public key to the server: `scp -P [port] ~/.ssh/id_rsa.pub [username]@[server IP]:/home/[username]/.ssh/authorized_keys`
-    1. Verify the file is there on the server.
-    1. Verify you can ssh in to the server and you're not prompted for a password. Use the alias you created earlier.
-    1. Only allow ssh'ing in using a key from now on. `nano /etc/ssh/sshd_config` and set `PasswordAuthentication no`.
+    1. If re-installing, restore the `~/.ssh/authorized_keys` file you backed up earlier, using `scp`.
+        1. Try connecting using `ssh` first
+        1. You'll get an error about the host key changing, including a command to run to forget the old host key. Run it.
+        1. Now do the `scp` copy: `scp -P 1035 ./authorized_keys [username]@[ip]:/home/[username]/.ssh/authorized_keys`
+    1. Otherwise:
+        1. You might like to set an alias in `~/.bashrc` such as `alias <random-name>="ssh -p [port] [username]@[server IP]"`
+        1. Similarly for scp: `alias <random-name>="scp -P [port] $1 [username]@[server IP]:/home/[username]"`
+        1. `ssh-keygen -t rsa -b 4096 -C "[client nickname]"`
+        1. No passphrase.
+        1. Accept the default path. You'll get both `~/.ssh/id_rsa.pub` (public key) and `~/.ssh/id_rsa` (private key).
+        1. Copy the public key to the server: `scp -P [port] ~/.ssh/id_rsa.pub [username]@[server IP]:/home/[username]/.ssh/authorized_keys`
+        1. Verify the file is there on the server.
+        1. Verify you can ssh in to the server and you're not prompted for a password. Use the alias you created earlier.
+    1. Only allow ssh'ing in using a key from now on. `sudo nano /etc/ssh/sshd_config` and set `PasswordAuthentication no`.
     1. `sudo service sshd restart`
+    1. Check you can `ssh` in from the client without entering a password.
 1. Ban any IP address that has multiple failed login attempts using `fail2ban`
     1. `sudo apt install fail2ban`
     1. `sudo cp /etc/fail2ban/fail2ban.conf /etc/fail2ban/fail2ban.local`
@@ -98,8 +113,12 @@ Goals: low power, no fan, secure, simple.
     1. `git config --global user.name "Your Name"`
     1. `git config --global credential.helper cache`
     1. `git config --global credential.helper 'cache --timeout=604800'`
-    1. From inside a repo: `git config pull.rebase false`
-1. Install `nvm`, the Node.js version manager.
+    1. Assuming your Github user auth is configured like mine, copy your personal access token to the clipboard and `ssh` into the host
+    1. Pull this repo: `git clone [this repo's https url] prod`
+    1. (Optional) I like to have `prod` as one repo working directory pointed at Ethereum L1 and `dev` as another pointed at an L2 such as Arbitrum.
+    1. From inside each repo working directory: `git config pull.rebase false`
+1. Set up a Node.js environment
+    1. Install `nvm`, the Node.js version manager.
     1. Copy the `curl` script from https://github.com/nvm-sh/nvm and execute it.
     1. Exit and restart the terminal to get `nvm` onto the path.
     1. `cd` to this repo and `nvm use` then `nvm install [version]`
@@ -107,10 +126,11 @@ Goals: low power, no fan, secure, simple.
     1. Edit your apt sources list (in the .d directory) to add the source servers.
         1. `sudo cp /etc/apt/sources.list /etc/apt/sources.list.d/foo.list`
         1. `sudo nano /etc/apt/sources.list.d/foo.list`
-        1. Uncomment all the sources lines and save
+        1. Comment out all the `deb` lines, uncomment all the `deb-src` lines and save
         1. `sudo apt update`
     1. `sudo apt source sqlite`
-    1. Follow on above.
+    1. (Optional) If re-installing, don't forget to copy up the `database.db` and `dro.log` files to `out`.
+    1. Switch to the `README.md` in this repo to configure and run the dro.
 1. (Optional) Switch the display to portrait mode.
     1. Test this works first: `sudo echo 3 | sudo tee /sys/class/graphics/fbcon/rotate_all`
     1. Consider a sysvinit script or similar for this. The Raspberry Pi bootloader can't be configured to do this.

@@ -16,9 +16,9 @@
 1. Approve Uniswap's smart contracts to spend your WETH and USDC.
     1. `npm run approve`
 1. Run with error handling.
-1. `cd ../proc`
-1. `npm install`
-1. `npm run proc`
+    1. `cd ../proc`
+    1. `npm install`
+    1. `npm run proc`
 
 The `proc` module will run the `dro` module with some retries and back-off. This is what you want in production.
 
@@ -29,3 +29,5 @@ When developing locally, forget `proc` and just run `dro` directly:
 1. `cd dro`
 1. `npm install`
 1. `npm run prod`
+
+The process will crash on the first 4xx or 5xx error repsonse from the provider's RPC URL.
