@@ -9,8 +9,8 @@ RUN groupadd -g 901 dro && \
     useradd -r -u 901 -g dro dro
 
 # Install base dependencies
-RUN apt update && \
-    apt install -y \
+RUN apt-get update -q && \
+    apt-get install -q -y \
         sqlite && \
     npm install \
         ts-node \
