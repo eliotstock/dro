@@ -115,6 +115,8 @@ ${position.pool.token0Price.toFixed(4)} USDC, 1: ${position.pool.token1Price.toF
 ${position.pool.token0Price.toFixed(4)} WETH, 1: ${position.pool.token1Price.toFixed(4)} USDC`)
           }
 
+          console.log(`[${this.rangeWidthTicks}] tickCurrent: ${position.pool.tickCurrent}`)
+
           console.log(`[${this.rangeWidthTicks}] sqrtRatioX96: \
 ${position.pool.sqrtRatioX96.toString()}`)
 
