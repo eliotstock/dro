@@ -19,5 +19,4 @@ jobs:
     - name: Build the dro Docker image
       run: |
         docker build . --tag ghcr.io/msnelling/dro:latest
-        docker run ghcr.io/msnelling/dro:latest
         docker push ghcr.io/msnelling/dro:latest
