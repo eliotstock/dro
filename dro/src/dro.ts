@@ -105,8 +105,15 @@ ${positionWebUrl(this.tokenId)}`)
           console.log(`[${this.rangeWidthTicks}] Liquidity: \
 ${jsbiFormatted(this.position.liquidity)}`)
 
-          console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
-${position.pool.token0Price.toFixed(4)}, 1: ${position.pool.token1Price.toFixed(4)}`)
+          // The price of the WETH token is quoted in USDC and vice versa.
+          if (this.wethFirst) {
+            console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
+${position.pool.token0Price.toFixed(4)} USDC, 1: ${position.pool.token1Price.toFixed(4)} WETH`)
+          }
+          else {
+            console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
+${position.pool.token0Price.toFixed(4)} WETH, 1: ${position.pool.token1Price.toFixed(4)} USDC`)
+          }
 
           this.logRangeInUsdcTerms()
         }
