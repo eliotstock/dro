@@ -120,7 +120,7 @@ export function rangeAround(tick: number, width: number): [number, number] {
 }
 
 // Every range order pool we use has WETH as one token and USDC as the other, but the order varies
-// from mainnet to Arbitrum, annoyingly.
+// from Mainnet to Arbitrum, annoyingly.
 export async function tokenOrderIsWethFirst(): Promise<boolean> {
     const token0 = await rangeOrderPoolContract.token0()
     const token1 = await rangeOrderPoolContract.token1()

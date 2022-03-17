@@ -105,6 +105,9 @@ ${positionWebUrl(this.tokenId)}`)
           console.log(`[${this.rangeWidthTicks}] Liquidity: \
 ${jsbiFormatted(this.position.liquidity)}`)
 
+          console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
+${position.pool.token0Price.toFixed(4)}, 1: ${position.pool.token1Price.toFixed(4)}`)
+
           this.logRangeInUsdcTerms()
         }
         else {
@@ -389,6 +392,10 @@ ${this.totalGasCost.toFixed(2)}`)
       const liquidity = await swapPoolContract.liquidity()
       const slot = await swapPoolContract.slot0()
 
+      // TODO: I've hard-coded the token order here. This is the swap pool, not the range order
+      // pool. From info.uniswap.org, the token order does appear to differ between L1 and
+      // Arbitrum. And yet swap() executes OK on both chains. Strange.
+      // Refactor the token order handling away into uniswap.ts, for both pools.
       const poolEthUsdcForSwaps = new Pool(
         usdcToken,
         wethToken,
@@ -695,8 +702,8 @@ position. Remove liquidity first.`
       // Go from native bigint to JSBI via string.
       const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
       const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
-      console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc} USDC, \
-${availableWeth} WETH`)
+      console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc.toString()} USDC, \
+${availableWeth.toString()} WETH`)
 
       if (this.wethFirst) {
         token0 = wethToken
@@ -755,9 +762,9 @@ ${sqrtRatioX96AsJsbi instanceof JSBI}`)
 
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
+      // Rather than require tickLower and tickUpper to be valid, replace them with valid values on
+      // testnets. These were observed on a manually created position, therefore they're valid.
       if (CHAIN_CONFIG.isTestnet) {
-        // Rather than require tickLower and tickUpper to be valid, replace them with valid values on
-        // testnets. These were observed on a manually created position, therefore they're valid.
         this.tickLower = 191580
         this.tickUpper = 195840
       }
