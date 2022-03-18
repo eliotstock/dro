@@ -115,10 +115,14 @@ ${position.pool.token0Price.toFixed(4)} USDC, 1: ${position.pool.token1Price.toF
 ${position.pool.token0Price.toFixed(4)} WETH, 1: ${position.pool.token1Price.toFixed(4)} USDC`)
           }
 
-          console.log(`[${this.rangeWidthTicks}] tickCurrent: ${position.pool.tickCurrent}`)
+          console.log(`[${this.rangeWidthTicks}] tick (lower, current, upper): \
+(${position.tickLower}, ${position.pool.tickCurrent}, ${position.tickUpper})`)
 
-          console.log(`[${this.rangeWidthTicks}] sqrtRatioX96: \
+          console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from pool directly: \
 ${position.pool.sqrtRatioX96.toString()}`)
+
+          console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from current tick: \
+${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
 
           this.logRangeInUsdcTerms()
         }
