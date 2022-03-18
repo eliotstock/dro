@@ -425,6 +425,18 @@ ${this.totalGasCost.toFixed(2)}`)
       const token0: Token = await swapPoolContract.token0()
       const token1: Token = await swapPoolContract.token1()
 
+      // TODO: Fix runtime error:
+      /*
+        /home/e/dev/dro/node_modules/@uniswap/v3-sdk/src/entities/pool.ts:77
+            ;[this.token0, this.token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA]
+                                                ^
+        TypeError: tokenA.sortsBefore is not a function
+            at new Pool (/home/e/dev/dro/node_modules/@uniswap/v3-sdk/src/entities/pool.ts:77:42)
+            at DRO.logWhatAnOptimalSwapWouldDo (/home/e/dev/dro/src/dro.ts:428:24)
+            at processTicksAndRejections (node:internal/process/task_queues:96:5)
+            at async DRO.onBlock (/home/e/dev/dro/src/dro.ts:1147:9)
+            at async JsonRpcProvider.onBlock (/home/e/dev/dro/src/index.ts:68:5)
+      */
       const swapPool = new Pool(
         token0,
         token1,
@@ -1144,7 +1156,7 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         await this.swap()
 
         // Just logging for now. Later, a new swap() implementation.
-        await this.logWhatAnOptimalSwapWouldDo()
+        // await this.logWhatAnOptimalSwapWouldDo()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
