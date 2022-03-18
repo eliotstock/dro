@@ -1,13 +1,13 @@
 import { config } from 'dotenv'
 import { FeeAmount, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, Route, SwapOptions, SwapRouter, tickToPrice, Trade } from '@uniswap/v3-sdk'
-import { CurrencyAmount, Percent, TradeType, Currency, Fraction } from '@uniswap/sdk-core'
+import { CurrencyAmount, Percent, TradeType, Currency, Fraction, Token } from '@uniswap/sdk-core'
 import { TickMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt, TransactionRequest } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateOptimalRatio } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -104,6 +104,25 @@ ${positionWebUrl(this.tokenId)}`)
 
           console.log(`[${this.rangeWidthTicks}] Liquidity: \
 ${jsbiFormatted(this.position.liquidity)}`)
+
+          // The price of the WETH token is quoted in USDC and vice versa.
+          if (this.wethFirst) {
+            console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
+${position.pool.token0Price.toFixed(4)} USDC, 1: ${position.pool.token1Price.toFixed(4)} WETH`)
+          }
+          else {
+            console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
+${position.pool.token0Price.toFixed(4)} WETH, 1: ${position.pool.token1Price.toFixed(4)} USDC`)
+          }
+
+          console.log(`[${this.rangeWidthTicks}] tick (lower, current, upper): \
+(${position.tickLower}, ${position.pool.tickCurrent}, ${position.tickUpper})`)
+
+          console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from pool directly: \
+${position.pool.sqrtRatioX96.toString()}`)
+
+          console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from current tick: \
+${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
 
           this.logRangeInUsdcTerms()
         }
@@ -377,6 +396,99 @@ ${this.totalGasCost.toFixed(2)}`)
 
       await wallet.unwrapWeth(deficit)
     }
+
+    // Use the liquidity maths in calculateRatioAmountIn() from the smart-order-router to swap
+    // an optimal amount of the input token.
+    async logWhatAnOptimalSwapWouldDo() {
+      if (this.position || this.tokenId)
+         throw "Refusing to swap. Still in a position. Remove liquidity first."
+
+      // TODO: Run all the below await()s in parallel.
+      const usdc = await wallet.usdc()
+      const weth = await wallet.weth()
+
+      if (usdc == 0n && weth == 0n) {
+        console.log(`This account has no USDC or WETH. Fatal. HFSP.`)
+        process.exit(412)
+      }
+
+      // What is the ratio of our USDC balance to the USDC value of our WETH balance?
+      const ratio = await wallet.tokenRatioByValue()
+
+      // The Pool instance depends on the pool liquidity and slot 0 so we need to reconstruct it
+      // every time.
+      const liquidity = await swapPoolContract.liquidity()
+      const slot = await swapPoolContract.slot0()
+      const swapPoolFee = await swapPoolContract.fee()
+
+      // We are agnostic to the order of the tokens in the swap pool here.
+      const token0: Token = await swapPoolContract.token0()
+      const token1: Token = await swapPoolContract.token1()
+
+      const swapPool = new Pool(
+        token0,
+        token1,
+        swapPoolFee, // 0.05%
+        slot[0].toString(), // sqrtRatioX96
+        liquidity.toString(),
+        slot[1] // tickCurrent
+      )
+
+      console.log(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
+
+      const wethFirst = 'WETH' === token0.symbol
+
+      let inputTokenPrice: Fraction
+      let inputBalance
+      let outputBalance
+
+      if (ratio > 1.5) {
+        // We're mostly in USDC now, so:
+        //   The input token is USDC.
+        //   The output token is WETH.
+        //   We want the price of USDC in terms of WETH.
+        if (wethFirst) {
+          inputTokenPrice = swapPool.token1Price
+          inputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())
+          outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
+        }
+        else {
+          inputTokenPrice = swapPool.token0Price
+          inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
+          outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
+        }
+
+        console.log(`[${this.rangeWidthTicks}] Input token is USDC, price: ${inputTokenPrice.toFixed(4)} WETH, input balance: ${inputBalance.toFixed(2)} USDC, output balance: ${outputBalance.toFixed(4)} WETH`)
+      }
+      else if (ratio > 0.5 && ratio <= 1.5) {
+        console.log(`[${this.rangeWidthTicks}] We already have fairly even values of USDC \
+and WETH. No need for a swap.`)
+
+        return
+      }
+      else { // ratio <= 0.5
+        // We're mostly in WETH now, so:
+        //   The input token is WETH.
+        //   The output token is USDC.
+        //   We want the price of WETH in terms of USDC.
+        if (wethFirst) {
+          inputTokenPrice = swapPool.token0Price
+          inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
+          outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())
+        }
+        else {
+          inputTokenPrice = swapPool.token1Price
+          inputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
+          outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
+        }
+
+        console.log(`[${this.rangeWidthTicks}] Input token is WETH, price: ${inputTokenPrice.toFixed(4)} USDC, input balance: ${inputBalance.toFixed(4)} WETH, outputBalance: ${outputBalance.toFixed(2)} USDC`)
+      }
+
+      const optimalRatio: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper, swapPool.tickCurrent)
+
+      console.log(`[${this.rangeWidthTicks}] Optimal ratio: ${optimalRatio.toFixed(8)}`)
+    }
   
     async swap() {
       if (this.position || this.tokenId)
@@ -389,6 +501,10 @@ ${this.totalGasCost.toFixed(2)}`)
       const liquidity = await swapPoolContract.liquidity()
       const slot = await swapPoolContract.slot0()
 
+      // TODO: I've hard-coded the token order here. This is the swap pool, not the range order
+      // pool. From info.uniswap.org, the token order does appear to differ between L1 and
+      // Arbitrum. And yet swap() executes OK on both chains. Strange.
+      // Refactor the token order handling away into uniswap.ts, for both pools.
       const poolEthUsdcForSwaps = new Pool(
         usdcToken,
         wethToken,
@@ -695,8 +811,8 @@ position. Remove liquidity first.`
       // Go from native bigint to JSBI via string.
       const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
       const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
-      console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc} USDC, \
-${availableWeth} WETH`)
+      console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc.toString()} USDC, \
+${availableWeth.toString()} WETH`)
 
       if (this.wethFirst) {
         token0 = wethToken
@@ -755,9 +871,9 @@ ${sqrtRatioX96AsJsbi instanceof JSBI}`)
 
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
+      // Rather than require tickLower and tickUpper to be valid, replace them with valid values on
+      // testnets. These were observed on a manually created position, therefore they're valid.
       if (CHAIN_CONFIG.isTestnet) {
-        // Rather than require tickLower and tickUpper to be valid, replace them with valid values on
-        // testnets. These were observed on a manually created position, therefore they're valid.
         this.tickLower = 191580
         this.tickUpper = 195840
       }
@@ -1026,6 +1142,9 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
 
         // Swap half our one asset to the other asset so that we have equal value of assets.
         await this.swap()
+
+        // Just logging for now. Later, a new swap() implementation.
+        await this.logWhatAnOptimalSwapWouldDo()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have

@@ -3,10 +3,10 @@ import { ethers } from 'ethers'
 import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
 import { abi as QuoterABI } from '@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'
 import { abi as NonfungiblePositionManagerABI } from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
-import { tickToPrice, TickMath, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount, toHex, Multicall, nearestUsableTick } from '@uniswap/v3-sdk'
+import { tickToPrice, TickMath, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount, toHex, Multicall, nearestUsableTick, SqrtPriceMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
-import { BigintIsh, Token } from '@uniswap/sdk-core'
+import { BigintIsh, Fraction, Token } from '@uniswap/sdk-core'
 import { wallet } from './wallet'
 import moment from 'moment'
 import JSBI from 'jsbi'
@@ -120,7 +120,7 @@ export function rangeAround(tick: number, width: number): [number, number] {
 }
 
 // Every range order pool we use has WETH as one token and USDC as the other, but the order varies
-// from mainnet to Arbitrum, annoyingly.
+// from Mainnet to Arbitrum, annoyingly.
 export async function tokenOrderIsWethFirst(): Promise<boolean> {
     const token0 = await rangeOrderPoolContract.token0()
     const token1 = await rangeOrderPoolContract.token1()
@@ -260,6 +260,35 @@ export function removeCallParameters(position: Position,
     )
 
     return Multicall.encodeMulticall(calldatas)
+}
+
+// Simplied fork of Uniswap's calculateOptimalRatio() function in the smart-order-router repo.
+// We are always swapping token0 for token1 wrt "amount0" and "amount1" below.
+//   https://github.com/Uniswap/smart-order-router/blob/3e4b8ba06f78930a7310ca7880df136592c98549/src/routers/alpha-router/alpha-router.ts#L1444
+export function calculateOptimalRatio(tickLower: number, tickUpper: number, tickCurrent: number): Fraction {
+    const lowerSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickLower)
+    const upperSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickUpper)
+
+    const sqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent)
+
+    const precision = JSBI.BigInt('1' + '0'.repeat(18))
+
+    const optimalRatio = new Fraction(
+      SqrtPriceMath.getAmount0Delta(
+        sqrtRatioX96,
+        upperSqrtRatioX96,
+        precision,
+        true
+      ),
+      SqrtPriceMath.getAmount1Delta(
+        sqrtRatioX96,
+        lowerSqrtRatioX96,
+        precision,
+        true
+      )
+    )
+
+    return optimalRatio
 }
 
 export async function createPoolOnTestnet() {
