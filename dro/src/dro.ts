@@ -7,7 +7,7 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateOptimalRatio } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -485,8 +485,9 @@ and WETH. No need for a swap.`)
         console.log(`[${this.rangeWidthTicks}] Input token is WETH, price: ${inputTokenPrice.toFixed(4)} USDC, input balance: ${inputBalance.toFixed(4)} WETH, outputBalance: ${outputBalance.toFixed(2)} USDC`)
       }
 
-      // TODO:
-      // let optimalRatio: Fraction
+      const optimalRatio: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper, swapPool.tickCurrent)
+
+      console.log(`[${this.rangeWidthTicks}] Optimal ratio: ${optimalRatio.toFixed(8)}`)
     }
   
     async swap() {
