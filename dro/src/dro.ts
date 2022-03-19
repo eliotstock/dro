@@ -51,7 +51,7 @@ export class DRO {
       // The order of the tokens in the pool varies from chain to chain, annoyingly.
       // Ethereum mainnet: USDC is first
       // Arbitrum mainnet: WETH is first
-      this.wethFirst = await tokenOrderIsWethFirst()
+      this.wethFirst = await tokenOrderIsWethFirst(rangeOrderPoolContract)
 
       // Get the token ID for our position from the database. This is a small positive integer.
       const tokenId = await getTokenIdForOpenPosition()
@@ -421,22 +421,20 @@ ${this.totalGasCost.toFixed(2)}`)
       const slot = await swapPoolContract.slot0()
       const swapPoolFee = await swapPoolContract.fee()
 
-      // We are agnostic to the order of the tokens in the swap pool here.
-      const token0: Token = await swapPoolContract.token0()
-      const token1: Token = await swapPoolContract.token1()
+      const wethFirstInSwapPool: boolean = await tokenOrderIsWethFirst(swapPoolContract)
 
-      // TODO: Fix runtime error:
-      /*
-        /home/e/dev/dro/node_modules/@uniswap/v3-sdk/src/entities/pool.ts:77
-            ;[this.token0, this.token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA]
-                                                ^
-        TypeError: tokenA.sortsBefore is not a function
-            at new Pool (/home/e/dev/dro/node_modules/@uniswap/v3-sdk/src/entities/pool.ts:77:42)
-            at DRO.logWhatAnOptimalSwapWouldDo (/home/e/dev/dro/src/dro.ts:428:24)
-            at processTicksAndRejections (node:internal/process/task_queues:96:5)
-            at async DRO.onBlock (/home/e/dev/dro/src/dro.ts:1147:9)
-            at async JsonRpcProvider.onBlock (/home/e/dev/dro/src/index.ts:68:5)
-      */
+      let token0: Token
+      let token1: Token
+
+      if (wethFirstInSwapPool) {
+        token0 = wethToken
+        token1 = usdcToken
+      }
+      else {
+        token0 = usdcToken
+        token1 = wethToken
+      }
+
       const swapPool = new Pool(
         token0,
         token1,
@@ -446,9 +444,7 @@ ${this.totalGasCost.toFixed(2)}`)
         slot[1] // tickCurrent
       )
 
-      console.log(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
-
-      const wethFirst = 'WETH' === token0.symbol
+      // console.log(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
 
       let inputTokenPrice: Fraction
       let inputBalance
@@ -459,7 +455,7 @@ ${this.totalGasCost.toFixed(2)}`)
         //   The input token is USDC.
         //   The output token is WETH.
         //   We want the price of USDC in terms of WETH.
-        if (wethFirst) {
+        if (wethFirstInSwapPool) {
           inputTokenPrice = swapPool.token1Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
@@ -483,7 +479,7 @@ and WETH. No need for a swap.`)
         //   The input token is WETH.
         //   The output token is USDC.
         //   We want the price of WETH in terms of USDC.
-        if (wethFirst) {
+        if (wethFirstInSwapPool) {
           inputTokenPrice = swapPool.token0Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())

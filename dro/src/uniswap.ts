@@ -119,11 +119,11 @@ export function rangeAround(tick: number, width: number): [number, number] {
     return [tickLower, tickUpper]
 }
 
-// Every range order pool we use has WETH as one token and USDC as the other, but the order varies
-// from Mainnet to Arbitrum, annoyingly.
-export async function tokenOrderIsWethFirst(): Promise<boolean> {
-    const token0 = await rangeOrderPoolContract.token0()
-    const token1 = await rangeOrderPoolContract.token1()
+// Every pool we use has WETH as one token and USDC as the other, but the order varies from Mainnet
+// to Arbitrum, annoyingly.
+export async function tokenOrderIsWethFirst(poolContract: ethers.Contract): Promise<boolean> {
+    const token0 = await poolContract.token0()
+    const token1 = await poolContract.token1()
 
     if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase() &&
         token1.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase()) {
