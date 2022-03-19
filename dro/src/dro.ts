@@ -1156,7 +1156,7 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         await this.swap()
 
         // Just logging for now. Later, a new swap() implementation.
-        // await this.logWhatAnOptimalSwapWouldDo()
+        await this.logWhatAnOptimalSwapWouldDo()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
