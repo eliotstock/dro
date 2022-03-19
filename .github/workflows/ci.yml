@@ -9,7 +9,10 @@ on:
   pull_request:
     branches:
       - 'main'
-      
+
+env:
+  TEST_TAG: ${{ github.repository_owner }}/dro:test
+
 jobs:
   docker:
     runs-on: ubuntu-latest
