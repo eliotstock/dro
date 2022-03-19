@@ -537,8 +537,8 @@ and WETH. No need for a swap.`)
       // What is the ratio of our USDC balance to the USDC value of our WETH balance?
       const ratio = await wallet.tokenRatioByValue()
 
-      let tokenIn
-      let tokenOut
+      let tokenInAddress
+      let tokenOutAddress
       let amountIn
       let swapRoute
 
@@ -558,8 +558,8 @@ and WETH. No need for a swap.`)
         console.log(`[${this.rangeWidthTicks}] swap() We're mostly in USDC now. Swapping half our \
 USDC to WETH.`)
 
-        tokenIn = CHAIN_CONFIG.addrTokenUsdc
-        tokenOut = CHAIN_CONFIG.addrTokenWeth
+        tokenInAddress = CHAIN_CONFIG.addrTokenUsdc
+        tokenOutAddress = CHAIN_CONFIG.addrTokenWeth
         amountIn = usdc / 2n
 
         // The order of the tokens here is significant. Input first.
@@ -575,8 +575,8 @@ and WETH. No need for a swap.`)
         console.log(`[${this.rangeWidthTicks}] swap() We're mostly in WETH now. Swapping half our \
 WETH to USDC.`)
 
-        tokenIn = CHAIN_CONFIG.addrTokenWeth
-        tokenOut = CHAIN_CONFIG.addrTokenUsdc
+        tokenInAddress = CHAIN_CONFIG.addrTokenWeth
+        tokenOutAddress = CHAIN_CONFIG.addrTokenUsdc
         amountIn = weth / 2n
 
         swapRoute = new Route([poolEthUsdcForSwaps], wethToken, usdcToken)
@@ -587,33 +587,35 @@ WETH to USDC.`)
       // It would be nice to try/catch here, inspect error.body.error.code here and handle -32015
       // but the type of e is always unknown.
       const quotedAmountOut = await quoterContract.callStatic.quoteExactInputSingle(
-        tokenIn,
-        tokenOut,
+        tokenInAddress,
+        tokenOutAddress,
         swapPoolFee, // 0.05%
         amountIn,
         0 // sqrtPriceLimitX96
       )
 
-      let trade: Trade<Currency, Currency, TradeType>
+      let inputToken
+      let outputToken
 
       if (ratio > 1.5) {
-        // Swapping USDC to WETH
-        trade = await Trade.createUncheckedTrade({
-          route: swapRoute,
-          inputAmount: CurrencyAmount.fromRawAmount(usdcToken, (usdc / 2n).toString()),
-          outputAmount: CurrencyAmount.fromRawAmount(wethToken, quotedAmountOut.toString()),
-          tradeType: TradeType.EXACT_INPUT,
-        })
+        inputToken = usdcToken
+        outputToken = wethToken
+
+        console.log(`[${this.rangeWidthTicks}] Swapping ${amountIn.toString()} USDC to ${quotedAmountOut.toString()} WETH`)
       }
       else { // ratio <= 0.5
-        // Swapping WETH to USDC
-        trade = await Trade.createUncheckedTrade({
-          route: swapRoute,
-          inputAmount: CurrencyAmount.fromRawAmount(wethToken, (weth / 2n).toString()),
-          outputAmount: CurrencyAmount.fromRawAmount(usdcToken, quotedAmountOut.toString()),
-          tradeType: TradeType.EXACT_INPUT,
-        })
+        inputToken = wethToken
+        outputToken = usdcToken
+
+        console.log(`[${this.rangeWidthTicks}] Swapping ${amountIn.toString()} WETH to ${quotedAmountOut.toString()} USDC`)
       }
+
+      const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
+        route: swapRoute,
+        inputAmount: CurrencyAmount.fromRawAmount(inputToken, amountIn.toString()),
+        outputAmount: CurrencyAmount.fromRawAmount(outputToken, quotedAmountOut.toString()),
+        tradeType: TradeType.EXACT_INPUT,
+      })
 
       // console.log(`[${this.rangeWidthTicks}] Trade: ${JSON.stringify(trade)}`)
 
