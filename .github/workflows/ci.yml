@@ -23,7 +23,7 @@ jobs:
         with:
           # list of Docker images to use as base name for tags
           images: |
-            ghcr.io/msnelling/dro
+            ghcr.io/${{ github.repository_owner }}/dro
             
           # generate Docker tags based on the following events/attributes
           tags: |
