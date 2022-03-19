@@ -7,6 +7,7 @@ import { tickToPrice, TickMath, Pool, Position, MintOptions, NonfungiblePosition
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
 import { BigintIsh, Fraction, Token } from '@uniswap/sdk-core'
+import { CurrencyAmount } from '@uniswap/smart-order-router'
 import { wallet } from './wallet'
 import moment from 'moment'
 import JSBI from 'jsbi'
@@ -302,6 +303,30 @@ export function calculateOptimalRatio(tickLower: number, tickUpper: number, tick
     )
 
     return optimalRatio
+}
+
+// This is verbatim from https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts
+// but this is not exported by that module. License is GPL v3.
+export function calculateRatioAmountIn(
+  optimalRatio: Fraction,
+  inputTokenPrice: Fraction,
+  inputBalance: CurrencyAmount,
+  outputBalance: CurrencyAmount
+): CurrencyAmount {
+  // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
+  const amountToSwapRaw = new Fraction(inputBalance.quotient)
+    .subtract(optimalRatio.multiply(outputBalance.quotient))
+    .divide(optimalRatio.multiply(inputTokenPrice).add(1));
+
+  if (amountToSwapRaw.lessThan(0)) {
+    // should never happen since we do checks before calling in
+    throw new Error('routeToRatio: insufficient input token amount');
+  }
+
+  return CurrencyAmount.fromRawAmount(
+    inputBalance.currency,
+    amountToSwapRaw.quotient
+  );
 }
 
 export async function createPoolOnTestnet() {
