@@ -430,9 +430,9 @@ ${this.totalGasCost.toFixed(2)}`)
       }
     }
 
-    // Use the liquidity maths in calculateRatioAmountIn() from the smart-order-router to swap
-    // an optimal amount of the input token.
-    async logWhatAnOptimalSwapWouldDo() {
+    // Use the liquidity maths in Uniswap's calculateRatioAmountIn() function in the
+    // smart-order-router repo to swap an optimal amount of the input token.
+    async swapOptimally() {
       if (this.position || this.tokenId)
          throw "Refusing to swap. Still in a position. Remove liquidity first."
 
@@ -499,11 +499,13 @@ ${this.totalGasCost.toFixed(2)}`)
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
         }
 
-        console.log(`[${this.rangeWidthTicks}] Input token is USDC, price: ${inputTokenPrice.toFixed(4)} WETH, input balance: ${inputBalance.toFixed(2)} USDC, output balance: ${outputBalance.toFixed(4)} WETH`)
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is USDC,\
+ price: ${inputTokenPrice.toFixed(4)} WETH, input balance: ${inputBalance.toFixed(2)} USDC, output\
+ balance: ${outputBalance.toFixed(4)} WETH`)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
-        console.log(`[${this.rangeWidthTicks}] We already have fairly even values of USDC \
-and WETH. No need for a swap.`)
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() We already have\
+ fairly even values of USDC and WETH. No need for a swap.`)
 
         return
       }
@@ -523,16 +525,22 @@ and WETH. No need for a swap.`)
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
         }
 
-        console.log(`[${this.rangeWidthTicks}] Input token is WETH, price: ${inputTokenPrice.toFixed(4)} USDC, input balance: ${inputBalance.toFixed(4)} WETH, outputBalance: ${outputBalance.toFixed(2)} USDC`)
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is WETH, price:\
+ ${inputTokenPrice.toFixed(4)} USDC, input balance: ${inputBalance.toFixed(4)} WETH,\
+ outputBalance: ${outputBalance.toFixed(2)} USDC`)
       }
 
-      const optimalRatio: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper, swapPool.tickCurrent)
+      const optimalRatio: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper,
+        swapPool.tickCurrent)
 
-      console.log(`[${this.rangeWidthTicks}] Optimal ratio: ${optimalRatio.toFixed(8)}`)
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio:\
+ ${optimalRatio.toFixed(8)}`)
 
-      const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance, outputBalance)
+      const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
+        outputBalance)
 
-      console.log(`[${this.rangeWidthTicks}] Optimal swap is from ${amountToSwap.toFixed(4)} ${amountToSwap.currency.symbol}`)
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
+ ${amountToSwap.toFixed(4)} ${amountToSwap.currency.symbol}`)
     }
   
     async swap() {
@@ -640,6 +648,8 @@ WETH to USDC.`)
         inputToken = wethToken
         outputToken = usdcToken
 
+        // Logs: Swapping 348_512_207_369_270_407 WETH to 998_562_297 USDC
+        // 0.348 / 998 = 2,868
         console.log(`[${this.rangeWidthTicks}] Swapping ${amountIn.toString()} WETH to ${quotedAmountOut.toString()} USDC`)
       }
 
@@ -1187,11 +1197,12 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // Put a row in our analytics table and log the re-ranging.
         this.trackRerangeEvent()
 
+        // Just logging for now. Later, a new swap() implementation. Do this before we actually
+        // swap anything.
+        await this.swapOptimally()
+
         // Swap half our one asset to the other asset so that we have equal value of assets.
         await this.swap()
-
-        // Just logging for now. Later, a new swap() implementation.
-        await this.logWhatAnOptimalSwapWouldDo()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
