@@ -446,15 +446,22 @@ ${this.totalGasCost.toFixed(2)}`)
 
       // console.log(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
 
+      let inputToken: Token
       let inputTokenPrice: Fraction
       let inputBalance
       let outputBalance
+      let swapRoute
 
       if (ratio > 1.5) {
         // We're mostly in USDC now, so:
         //   The input token is USDC.
         //   The output token is WETH.
         //   We want the price of USDC in terms of WETH.
+        inputToken = usdcToken
+
+        // The order of the tokens here is significant. Input first.
+        swapRoute = new Route([swapPool], usdcToken, wethToken)
+
         if (wethFirstInSwapPool) {
           inputTokenPrice = swapPool.token1Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())
@@ -481,6 +488,11 @@ ${this.totalGasCost.toFixed(2)}`)
         //   The input token is WETH.
         //   The output token is USDC.
         //   We want the price of WETH in terms of USDC.
+        inputToken = wethToken
+
+        // The order of the tokens here is significant. Input first.
+        swapRoute = new Route([swapPool], wethToken, usdcToken)
+
         if (wethFirstInSwapPool) {
           inputTokenPrice = swapPool.token0Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
@@ -507,7 +519,20 @@ ${this.totalGasCost.toFixed(2)}`)
         outputBalance)
 
       console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
- ${amountToSwap.toFixed(4)} ${amountToSwap.currency.symbol}`)
+ ${amountToSwap.toFixed(8)} ${amountToSwap.currency.symbol}`)
+
+      const trade: Trade<Currency, Currency, TradeType> = await Trade.exactIn(swapRoute, amountToSwap)
+
+      console.log(`[${this.rangeWidthTicks}] swapOptimally()() Trade: ${JSON.stringify(trade)}`)
+
+      const options: SwapOptions = {
+        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+        recipient: wallet.address,
+        deadline: moment().unix() + DEADLINE_SECONDS
+      }
+
+      const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
     }
   
     async swap() {
@@ -609,7 +634,8 @@ WETH to USDC.`)
         inputToken = usdcToken
         outputToken = wethToken
 
-        console.log(`[${this.rangeWidthTicks}] Swapping ${amountIn.toString()} USDC to ${quotedAmountOut.toString()} WETH`)
+        console.log(`[${this.rangeWidthTicks}] swap() Swapping ${amountIn.toString()} USDC to\
+ ${quotedAmountOut.toString()} WETH`)
       }
       else { // ratio <= 0.5
         inputToken = wethToken
@@ -617,7 +643,8 @@ WETH to USDC.`)
 
         // Logs: Swapping 348_512_207_369_270_407 WETH to 998_562_297 USDC
         // 0.348 / 998 = 2,868
-        console.log(`[${this.rangeWidthTicks}] Swapping ${amountIn.toString()} WETH to ${quotedAmountOut.toString()} USDC`)
+        console.log(`[${this.rangeWidthTicks}] Swapping ${amountIn.toString()} WETH to\
+ ${quotedAmountOut.toString()} USDC`)
       }
 
       const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
@@ -636,7 +663,7 @@ WETH to USDC.`)
       }
 
       const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-      // console.log(`[${this.rangeWidthTicks}] calldata: `, calldata)
+      console.log(`[${this.rangeWidthTicks}] swap() calldata: `, calldata)
 
       const nonce = await wallet.getTransactionCount("latest")
   
