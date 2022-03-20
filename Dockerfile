@@ -1,4 +1,5 @@
 FROM node:16
+LABEL org.opencontainers.image.source="https://github.com/biketracker/dro"
 
 # Create app directory
 WORKDIR /app
@@ -8,8 +9,8 @@ RUN groupadd -g 901 dro && \
     useradd -r -u 901 -g dro dro
 
 # Install base dependencies
-RUN apt update && \
-    apt install -y \
+RUN apt-get update -q && \
+    apt-get install -q -y \
         sqlite && \
     npm install \
         ts-node \
