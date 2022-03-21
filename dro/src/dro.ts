@@ -480,6 +480,7 @@ ${this.totalGasCost.toFixed(2)}`)
       // console.log(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
 
       let inputToken: Token
+      let outputToken: Token
       let inputTokenPrice: Fraction
       let inputBalance
       let outputBalance
@@ -491,6 +492,7 @@ ${this.totalGasCost.toFixed(2)}`)
         //   The output token is WETH.
         //   We want the price of USDC in terms of WETH.
         inputToken = usdcToken
+        outputToken = wethToken
 
         // The order of the tokens here is significant. Input first.
         swapRoute = new Route([swapPool], usdcToken, wethToken)
@@ -522,6 +524,7 @@ ${this.totalGasCost.toFixed(2)}`)
         //   The output token is USDC.
         //   We want the price of WETH in terms of USDC.
         inputToken = wethToken
+        outputToken = usdcToken
 
         // The order of the tokens here is significant. Input first.
         swapRoute = new Route([swapPool], wethToken, usdcToken)
@@ -554,20 +557,28 @@ ${this.totalGasCost.toFixed(2)}`)
       console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
  ${amountToSwap.toFixed(8)} ${amountToSwap.currency.symbol}`)
 
-      /*
-      Error: No tick data provider was given
-      */
-      // const trade: Trade<Currency, Currency, TradeType> = await Trade.exactIn(swapRoute, amountToSwap)
+      // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
+      // it's not fully implemented in the SDK. It always throws:
+      //   Error: No tick data provider was given
+      // Uniswap dev suggests using createUncheckedTrade() here:
+      //   https://github.com/Uniswap/v3-sdk/issues/52#issuecomment-888549553
 
-      // console.log(`[${this.rangeWidthTicks}] swapOptimally()() Trade: ${JSON.stringify(trade)}`)
+      const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
+        route: swapRoute,
+        inputAmount: amountToSwap,
+        outputAmount: CurrencyAmount.fromRawAmount(outputToken, 0), // Zero here means 'don't care'
+        tradeType: TradeType.EXACT_INPUT,
+      })
 
-      // const options: SwapOptions = {
-      //   slippageTolerance: CHAIN_CONFIG.slippageTolerance,
-      //   recipient: wallet.address,
-      //   deadline: moment().unix() + DEADLINE_SECONDS
-      // }
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
 
-      // const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
+      const options: SwapOptions = {
+        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+        recipient: wallet.address,
+        deadline: moment().unix() + DEADLINE_SECONDS
+      }
+
+      const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
       // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
     }
   
@@ -690,7 +701,7 @@ WETH to USDC.`)
         tradeType: TradeType.EXACT_INPUT,
       })
 
-      // console.log(`[${this.rangeWidthTicks}] Trade: ${JSON.stringify(trade)}`)
+      console.log(`[${this.rangeWidthTicks}] swap(): Trade: ${JSON.stringify(trade)}`)
 
       const options: SwapOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
@@ -699,7 +710,7 @@ WETH to USDC.`)
       }
 
       const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-      console.log(`[${this.rangeWidthTicks}] swap() calldata: `, calldata)
+      // console.log(`[${this.rangeWidthTicks}] swap() calldata: `, calldata)
 
       const nonce = await wallet.getTransactionCount("latest")
   
