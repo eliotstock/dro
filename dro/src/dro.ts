@@ -191,6 +191,7 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
 
       let direction: Direction
       
+      // TODO: This is giving us the wrong direction on Arbitrum. Is it also wrong on L1?
       if (this.wethFirst) {
         // Pool on Arbitrum mainnet: A lower tick value means a lower price in USDC.
         direction = rangeOrderPoolTick < this.tickLower ? Direction.Down : Direction.Up
