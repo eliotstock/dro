@@ -300,7 +300,7 @@ export function calculateRatioAmountIn(
   inputBalance: CurrencyAmount,
   outputBalance: CurrencyAmount
 ): CurrencyAmount {
-  console.log(`calculateRatioAmountIn() inputTokenPrice: ${JSON.stringify(inputTokenPrice)}`)
+  console.log(`calculateRatioAmountIn() inputTokenPrice: ${inputTokenPrice.toFixed(8)}`)
   console.log(`calculateRatioAmountIn() inputBalance.quotient: ${inputBalance.quotient}`)
   console.log(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
 
