@@ -74,18 +74,17 @@ describe('Understanding Uniswap liquidity maths', function() {
         // From a real position:
         //   https://app.uniswap.org/#/pool/204635?chain=mainnet
         // const tickLower = -197_760
-        // const tickUpper = -196_909
         // const tickCurrent = -196_800
+        // const tickUpper = -196_909
 
         // Symetrical - current is half way between lower and upper
         const tickLower = 196_500
-        const tickUpper = 197_500
         const tickCurrent = 197_000
+        const tickUpper = 197_500
 
         // [960] tick (lower, current, upper): (, -196909, )
         // [960] sqrtRatioX96 from pool directly: 4200353374426507795247847
         // [960] sqrtRatioX96 from current tick: 4200188232646938879556701
-        
 
         const upperSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickUpper)
         const lowerSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickLower)

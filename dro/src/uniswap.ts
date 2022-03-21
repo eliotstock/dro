@@ -304,6 +304,13 @@ export function calculateRatioAmountIn(
   console.log(`calculateRatioAmountIn() inputBalance.quotient: ${inputBalance.quotient}`)
   console.log(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
 
+  // TODO: Our optimal ratio looks fine, but the amount to swap can be negative if optimalRatio * outputBalance > inputBalance
+  // Consider:
+  //   Opening a bug on the smart-order-router SDK, with valid inputs
+  //   Rounding the output balance down to zero when it is below some trivial amount
+  //   Not using this function and solving the simultaneous equation
+  //   Solving iteratively by increasing the input amount 1 USDC or 0.0001 ETH at a time using a Position instace.
+
   // 1_998_121_297
   const inputQuotient = new Fraction(inputBalance.quotient)
   console.log(`calculateRatioAmountIn() inputQuotient: ${inputQuotient.toFixed(0)}`)
