@@ -314,13 +314,12 @@ export function calculateRatioAmountIn(
   console.log(`calculateRatioAmountIn() optimalRatio multiplied by input token price: ${JSON.stringify(optimalRatioByInputTokenPrice)}`)
 
   const denominator = optimalRatioByInputTokenPrice.add(1)
-  console.log(`calculateRatioAmountIn() optimalRatio multiplied by input token price plus one: ${JSON.stringify(optimalRatioByInputTokenPricePlusOne)}`)
+  console.log(`calculateRatioAmountIn() denominator: ${JSON.stringify(optimalRatioByInputTokenPrice)}`)
 
   const numerator = inputQuotient.subtract(optimalRatioByOutputBalanceQuotient)
   console.log(`calculateRatioAmountIn() numerator: ${JSON.stringify(numerator)}`)
 
   const amountToSwapRaw2 = numerator.divide(denominator)
-  console.log(`calculateRatioAmountIn() divide() done`)
   console.log(`calculateRatioAmountIn() amountToSwapRaw2: ${JSON.stringify(amountToSwapRaw2)}`)
 
   // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
