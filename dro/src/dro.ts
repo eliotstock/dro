@@ -554,18 +554,21 @@ ${this.totalGasCost.toFixed(2)}`)
       console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
  ${amountToSwap.toFixed(8)} ${amountToSwap.currency.symbol}`)
 
-      const trade: Trade<Currency, Currency, TradeType> = await Trade.exactIn(swapRoute, amountToSwap)
+      /*
+      Error: No tick data provider was given
+      */
+      // const trade: Trade<Currency, Currency, TradeType> = await Trade.exactIn(swapRoute, amountToSwap)
 
-      console.log(`[${this.rangeWidthTicks}] swapOptimally()() Trade: ${JSON.stringify(trade)}`)
+      // console.log(`[${this.rangeWidthTicks}] swapOptimally()() Trade: ${JSON.stringify(trade)}`)
 
-      const options: SwapOptions = {
-        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
-        recipient: wallet.address,
-        deadline: moment().unix() + DEADLINE_SECONDS
-      }
+      // const options: SwapOptions = {
+      //   slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+      //   recipient: wallet.address,
+      //   deadline: moment().unix() + DEADLINE_SECONDS
+      // }
 
-      const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-      console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
+      // const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
+      // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
     }
   
     async swap() {
