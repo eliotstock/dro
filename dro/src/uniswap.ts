@@ -300,20 +300,43 @@ export function calculateRatioAmountIn(
   inputBalance: CurrencyAmount,
   outputBalance: CurrencyAmount
 ): CurrencyAmount {
+  console.log(`calculateRatioAmountIn() inputTokenPrice: ${JSON.stringify(inputTokenPrice)}`)
+  console.log(`calculateRatioAmountIn() inputBalance.quotient: ${inputBalance.quotient}`)
+  console.log(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
+
+  const inputQuotient = new Fraction(inputBalance.quotient)
+  console.log(`calculateRatioAmountIn() inputQuotient: ${JSON.stringify(inputQuotient)}`)
+
+  const optimalRatioByOutputBalanceQuotient = optimalRatio.multiply(outputBalance.quotient)
+  console.log(`calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: ${JSON.stringify(optimalRatioByOutputBalanceQuotient)}`)
+
+  const optimalRatioByInputTokenPrice = optimalRatio.multiply(inputTokenPrice)
+  console.log(`calculateRatioAmountIn() optimalRatio multiplied by input token price: ${JSON.stringify(optimalRatioByInputTokenPrice)}`)
+
+  const denominator = optimalRatioByInputTokenPrice.add(1)
+  console.log(`calculateRatioAmountIn() optimalRatio multiplied by input token price plus one: ${JSON.stringify(optimalRatioByInputTokenPricePlusOne)}`)
+
+  const numerator = inputQuotient.subtract(optimalRatioByOutputBalanceQuotient)
+  console.log(`calculateRatioAmountIn() numerator: ${JSON.stringify(numerator)}`)
+
+  const amountToSwapRaw2 = numerator.divide(denominator)
+  console.log(`calculateRatioAmountIn() divide() done`)
+  console.log(`calculateRatioAmountIn() amountToSwapRaw2: ${JSON.stringify(amountToSwapRaw2)}`)
+
   // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
   const amountToSwapRaw = new Fraction(inputBalance.quotient)
     .subtract(optimalRatio.multiply(outputBalance.quotient))
-    .divide(optimalRatio.multiply(inputTokenPrice).add(1));
+    .divide(optimalRatio.multiply(inputTokenPrice).add(1))
 
   if (amountToSwapRaw.lessThan(0)) {
     // should never happen since we do checks before calling in
-    throw new Error('routeToRatio: insufficient input token amount');
+    throw new Error('calculateRatioAmountIn(): insufficient input token amount')
   }
 
   return CurrencyAmount.fromRawAmount(
     inputBalance.currency,
     amountToSwapRaw.quotient
-  );
+  )
 }
 
 export async function createPoolOnTestnet() {
