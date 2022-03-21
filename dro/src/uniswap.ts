@@ -305,22 +305,22 @@ export function calculateRatioAmountIn(
   console.log(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
 
   const inputQuotient = new Fraction(inputBalance.quotient)
-  console.log(`calculateRatioAmountIn() inputQuotient: ${JSON.stringify(inputQuotient)}`)
+  console.log(`calculateRatioAmountIn() inputQuotient: ${inputQuotient.toFixed(8)}`)
 
   const optimalRatioByOutputBalanceQuotient = optimalRatio.multiply(outputBalance.quotient)
-  console.log(`calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: ${JSON.stringify(optimalRatioByOutputBalanceQuotient)}`)
+  console.log(`calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: ${optimalRatioByOutputBalanceQuotient.toFixed(8)}`)
 
   const optimalRatioByInputTokenPrice = optimalRatio.multiply(inputTokenPrice)
-  console.log(`calculateRatioAmountIn() optimalRatio multiplied by input token price: ${JSON.stringify(optimalRatioByInputTokenPrice)}`)
+  console.log(`calculateRatioAmountIn() optimalRatio multiplied by input token price: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
 
   const denominator = optimalRatioByInputTokenPrice.add(1)
-  console.log(`calculateRatioAmountIn() denominator: ${JSON.stringify(optimalRatioByInputTokenPrice)}`)
+  console.log(`calculateRatioAmountIn() denominator: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
 
   const numerator = inputQuotient.subtract(optimalRatioByOutputBalanceQuotient)
-  console.log(`calculateRatioAmountIn() numerator: ${JSON.stringify(numerator)}`)
+  console.log(`calculateRatioAmountIn() numerator: ${numerator.toFixed(8)}`)
 
   const amountToSwapRaw2 = numerator.divide(denominator)
-  console.log(`calculateRatioAmountIn() amountToSwapRaw2: ${JSON.stringify(amountToSwapRaw2)}`)
+  console.log(`calculateRatioAmountIn() amountToSwapRaw2: ${amountToSwapRaw2.toFixed(8)}`)
 
   // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
   const amountToSwapRaw = new Fraction(inputBalance.quotient)
