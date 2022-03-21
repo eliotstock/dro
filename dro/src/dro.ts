@@ -546,6 +546,9 @@ ${this.totalGasCost.toFixed(2)}`)
  outputBalance: ${outputBalance.toFixed(2)} USDC`)
       }
 
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() tick (lower, current, upper): \
+(${this.tickLower}, ${swapPool.tickCurrent}, ${this.tickUpper})`)
+
       const optimalRatio: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper,
         swapPool.tickCurrent)
 
