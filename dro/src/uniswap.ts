@@ -304,9 +304,11 @@ export function calculateRatioAmountIn(
   console.log(`calculateRatioAmountIn() inputBalance.quotient: ${inputBalance.quotient}`)
   console.log(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
 
+  // 1_998_121_297
   const inputQuotient = new Fraction(inputBalance.quotient)
-  console.log(`calculateRatioAmountIn() inputQuotient: ${inputQuotient.toFixed(8)}`)
+  console.log(`calculateRatioAmountIn() inputQuotient: ${inputQuotient.toFixed(0)}`)
 
+  // 39_476_363_836.45253787
   const optimalRatioByOutputBalanceQuotient = optimalRatio.multiply(outputBalance.quotient)
   console.log(`calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: ${optimalRatioByOutputBalanceQuotient.toFixed(8)}`)
 
@@ -316,6 +318,7 @@ export function calculateRatioAmountIn(
   const denominator = optimalRatioByInputTokenPrice.add(1)
   console.log(`calculateRatioAmountIn() denominator: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
 
+  // 1_998_121_297 - 39_476_363_836
   const numerator = inputQuotient.subtract(optimalRatioByOutputBalanceQuotient)
   console.log(`calculateRatioAmountIn() numerator: ${numerator.toFixed(8)}`)
 
@@ -323,13 +326,21 @@ export function calculateRatioAmountIn(
   console.log(`calculateRatioAmountIn() amountToSwapRaw2: ${amountToSwapRaw2.toFixed(8)}`)
 
   // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
-  const amountToSwapRaw = new Fraction(inputBalance.quotient)
+  let amountToSwapRaw = new Fraction(inputBalance.quotient)
     .subtract(optimalRatio.multiply(outputBalance.quotient))
     .divide(optimalRatio.multiply(inputTokenPrice).add(1))
 
   if (amountToSwapRaw.lessThan(0)) {
-    // should never happen since we do checks before calling in
-    throw new Error('calculateRatioAmountIn(): insufficient input token amount')
+    // Try inverting the optimal ratio
+    const optimalRatioInverted = optimalRatio.invert()
+
+    amountToSwapRaw = new Fraction(inputBalance.quotient)
+        .subtract(optimalRatioInverted.multiply(outputBalance.quotient))
+        .divide(optimalRatioInverted.multiply(inputTokenPrice).add(1))
+
+    if (amountToSwapRaw.lessThan(0)) {
+        throw new Error('calculateRatioAmountIn(): insufficient input token amount, even after inverting optimal ratio')
+    }
   }
 
   return CurrencyAmount.fromRawAmount(
