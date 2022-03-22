@@ -306,10 +306,12 @@ export function calculateRatioAmountIn(
 
   // TODO: Our optimal ratio looks fine, but the amount to swap can be negative if optimalRatio * outputBalance > inputBalance
   // Consider:
-  //   Opening a bug on the smart-order-router SDK, with valid inputs
-  //   Rounding the output balance down to zero when it is below some trivial amount
-  //   Not using this function and solving the simultaneous equation
+  //   Not using this function and solving the simultaneous equation in code.
   //   Solving iteratively by increasing the input amount 1 USDC or 0.0001 ETH at a time using a Position instace.
+  //   Hit the author of this up for help: https://atiselsts.github.io/pdfs/uniswap-v3-liquidity-math.pdf
+  //   Rounding the output balance down to zero when it is below some trivial amount. Pointless - it's when output balance is high that we're more likely to run into a negative swap amount.
+  // Done:
+  //   Opening a bug on the smart-order-router SDK, with valid inputs
 
   // 1_998_121_297
   const inputQuotient = new Fraction(inputBalance.quotient)

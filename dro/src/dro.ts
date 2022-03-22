@@ -516,11 +516,36 @@ ${this.totalGasCost.toFixed(2)}`)
       console.log(`[${this.rangeWidthTicks}] swapOptimally() tick (lower, current, upper): \
 (${this.tickLower}, ${swapPool.tickCurrent}, ${this.tickUpper})`)
 
-      const optimalRatio: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper,
+      const optimalRatio1: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper,
         swapPool.tickCurrent)
 
-      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio:\
- ${optimalRatio.toFixed(8)}`)
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from our code:\
+ ${optimalRatio1.toFixed(16)}`)
+
+      try {
+        const p = new Position({
+          pool: swapPool, // Token 0 is USDC
+          tickLower: this.tickLower,
+          tickUpper: this.tickUpper,
+          liquidity: 1 // calculateOptimalRatio() doesn't use the liquidity on the position
+        })
+
+        const sqrtRatioX96 = TickMath.getSqrtRatioAtTick(rangeOrderPoolTick)
+
+        // We want the ratio of token zero (USDC) for token one (WETH), at least on Mainnet
+        const zeroForOne = true
+
+        // Call private method on AlphaRouter.
+        const alphaRouter = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
+        const optimalRatio2: Fraction = alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96, zeroForOne)
+
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
+  ${optimalRatio2.toFixed(16)}`)
+      }
+      catch (e) {
+        // Ticks not aligned or in wrong order?
+        console.log(e)
+      }
 
       // const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
       //   outputBalance)
