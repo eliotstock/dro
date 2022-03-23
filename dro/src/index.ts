@@ -31,7 +31,8 @@ if (process.env.RANGE_WIDTHS == undefined) throw 'No RANGE_WIDTHS list in .env f
 
 const rangeWidths: number[] = process.env.RANGE_WIDTHS?.split(' ').map(Number)
 
-// Set of DRO instances on which we are forward testing.
+// Set of DRO instances on which we are forward testing. In production this should only have one
+// member.
 let dros: DRO[] = []
 
 // Price of WETH in USDC terms in the range order pool, formatted to two decimal places.
