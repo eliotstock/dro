@@ -39,12 +39,14 @@ export class DRO {
     lastRerangeTimestamp?: string
     locked: boolean = false
     totalGasCost: number = 0
+    alphaRouter: AlphaRouter
   
     constructor(
       _rangeWidthTicks: number,
       _noops: boolean) {
       this.rangeWidthTicks = _rangeWidthTicks
       this.noops = _noops
+      this.alphaRouter = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
     }
 
     async init() {
@@ -453,6 +455,7 @@ ${this.totalGasCost.toFixed(2)}`)
       let inputBalance
       let outputBalance
       let swapRoute
+      let optimalRatioIsZeroForOne
 
       if (ratio > 1.5) {
         // We're mostly in USDC now, so:
@@ -475,6 +478,11 @@ ${this.totalGasCost.toFixed(2)}`)
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
         }
+
+        // TODO
+        // if (this.wethFirst) {
+        //   optimalRatioIsZeroForOne = 
+        // }
 
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is USDC,\
  price: ${inputTokenPrice.toFixed(4)} WETH, input balance: ${inputBalance.toFixed(2)} USDC, output\
@@ -516,14 +524,17 @@ ${this.totalGasCost.toFixed(2)}`)
       console.log(`[${this.rangeWidthTicks}] swapOptimally() tick (lower, current, upper): \
 (${this.tickLower}, ${swapPool.tickCurrent}, ${this.tickUpper})`)
 
-      const optimalRatio1: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper,
-        swapPool.tickCurrent)
+//       const optimalRatio1: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper,
+//         swapPool.tickCurrent)
 
-      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from our code:\
- ${optimalRatio1.toFixed(16)}`)
+//       console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from our code:\
+//  ${optimalRatio1.toFixed(16)}`)
 
       try {
+        // Because we're using this tick to get the optimal ratio of assets to put into the range
+        // order position, use the range order pool here, not the swap pool.
         const p = new Position({
+          // TODO: This should be the range order pool, not the swap pool.
           pool: swapPool, // Token 0 is USDC
           tickLower: this.tickLower,
           tickUpper: this.tickUpper,
@@ -532,50 +543,55 @@ ${this.totalGasCost.toFixed(2)}`)
 
         const sqrtRatioX96 = TickMath.getSqrtRatioAtTick(rangeOrderPoolTick)
 
-        // We want the ratio of token zero (USDC) for token one (WETH), at least on Mainnet
-        const zeroForOne = true
-
         // Call private method on AlphaRouter.
-        const alphaRouter = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
-        const optimalRatio2: Fraction = alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96, zeroForOne)
+        const optimalRatio: Fraction = this.alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96,
+          optimalRatioIsZeroForOne)
+
+        // [120] swapOptimally() Optimal ratio from our code:     199922990.7641656190592135
+        // [120] swapOptimally() Optimal ratio from AlphaRouter:  576429056.8543274323699738
+        // [120] swap() We're mostly in USDC now. Swapping half our USDC to WETH.
+
+        // [120] swapOptimally() Optimal ratio from our code:     448648433.3335700990270256
+        // [120] swapOptimally() Optimal ratio from AlphaRouter:  198727103.8605680783334235
+        // [120] swap() We're mostly in USDC now. Swapping half our USDC to WETH.
 
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
-  ${optimalRatio2.toFixed(16)}`)
+  ${optimalRatio.toFixed(16)}`)
+
+        const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
+          outputBalance)
+
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
+      ${amountToSwap.toFixed(8)} ${amountToSwap.currency.symbol}`)
+
+        // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
+        // it's not fully implemented in the SDK. It always throws:
+        //   Error: No tick data provider was given
+        // Uniswap dev suggests using createUncheckedTrade() here:
+        //   https://github.com/Uniswap/v3-sdk/issues/52#issuecomment-888549553
+
+        const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
+          route: swapRoute,
+          inputAmount: amountToSwap,
+          outputAmount: CurrencyAmount.fromRawAmount(outputToken, 0), // Zero here means 'don't care'
+          tradeType: TradeType.EXACT_INPUT,
+        })
+
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
+
+        const options: SwapOptions = {
+          slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+          recipient: wallet.address,
+          deadline: moment().unix() + DEADLINE_SECONDS
+        }
+
+        const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
+        // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
       }
       catch (e) {
         // Ticks not aligned or in wrong order?
         console.log(e)
       }
-
-      // const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
-      //   outputBalance)
-
-//       console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
-//  ${amountToSwap.toFixed(8)} ${amountToSwap.currency.symbol}`)
-
-//       // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
-//       // it's not fully implemented in the SDK. It always throws:
-//       //   Error: No tick data provider was given
-//       // Uniswap dev suggests using createUncheckedTrade() here:
-//       //   https://github.com/Uniswap/v3-sdk/issues/52#issuecomment-888549553
-
-//       const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
-//         route: swapRoute,
-//         inputAmount: amountToSwap,
-//         outputAmount: CurrencyAmount.fromRawAmount(outputToken, 0), // Zero here means 'don't care'
-//         tradeType: TradeType.EXACT_INPUT,
-//       })
-
-//       console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
-
-//       const options: SwapOptions = {
-//         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
-//         recipient: wallet.address,
-//         deadline: moment().unix() + DEADLINE_SECONDS
-//       }
-
-//       const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-//       // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
     }
   
     async swap() {
