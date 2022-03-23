@@ -332,14 +332,48 @@ export function calculateOptimalRatio(tickLower: number, tickUpper: number, tick
     return optimalRatio
 }
 
-// This is verbatim from https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts
-// but this is not exported by that module. License is GPL v3.
+// This is functionally verbatim from:
+//   https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts
+// but this function is not exported by that module. License is GPL v3.
 export function calculateRatioAmountIn(
+    optimalRatio: Fraction,
+    inputTokenPrice: Fraction,
+    inputBalance: CurrencyAmount,
+    outputBalance: CurrencyAmount
+  ): CurrencyAmount {
+    // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
+    const amountToSwapRaw = new Fraction(inputBalance.quotient)
+        .subtract(optimalRatio.multiply(outputBalance.quotient))
+        .divide(optimalRatio.multiply(inputTokenPrice).add(1));
+
+    if (amountToSwapRaw.lessThan(0)) {
+        // should never happen since we do checks before calling in
+        throw new Error('calculateRatioAmountIn: insufficient input token amount');
+    }
+
+    return CurrencyAmount.fromRawAmount(
+        inputBalance.currency,
+        amountToSwapRaw.quotient
+    );
+}
+
+export function calculateRatioAmountInWithDebugging(
   optimalRatio: Fraction,
   inputTokenPrice: Fraction,
   inputBalance: CurrencyAmount,
   outputBalance: CurrencyAmount
 ): CurrencyAmount {
+    // Swapping USDC to WETH
+    // calculateRatioAmountIn() inputTokenPrice: 0.00033484
+    // calculateRatioAmountIn() inputBalance.quotient: 1_511_316_988 (1511.31 USDC)
+    // calculateRatioAmountIn() outputBalance.quotient: 148_525_588_264_069_585 (0.148 WETH)
+    // calculateRatioAmountIn() inputQuotient: 1_511_316_988
+    // calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: 29872368485216593065608194.81148793
+    // calculateRatioAmountIn() optimalRatio multiplied by input token price: 67344886988928548.57381418
+    // calculateRatioAmountIn() denominator: 67344886988928548.57381418
+    // calculateRatioAmountIn() numerator: -29872368485216591554291206.81148793
+    // calculateRatioAmountIn() amountToSwapRaw2: -443572924.69920674
+    
   console.log(`calculateRatioAmountIn() inputTokenPrice: ${inputTokenPrice.toFixed(8)}`)
   console.log(`calculateRatioAmountIn() inputBalance.quotient: ${inputBalance.quotient}`)
   console.log(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
