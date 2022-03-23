@@ -490,7 +490,7 @@ ${this.totalGasCost.toFixed(2)}`)
 
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is USDC,\
  price: ${inputTokenPrice.toFixed(4)} WETH, input balance: ${inputBalance.toFixed(2)} USDC, output\
- balance: ${outputBalance.toFixed(4)} WETH`)
+ balance: ${outputBalance.toFixed(4)} WETH, zeroForOne: ${zeroForOne}`)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
         console.log(`[${this.rangeWidthTicks}] swapOptimally() We already have\
@@ -549,7 +549,7 @@ ${this.totalGasCost.toFixed(2)}`)
           zeroForOne)
 
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
-  ${optimalRatio.toFixed(16)}`)
+ ${optimalRatio.toFixed(16)}`)
 
         const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
           outputBalance)
@@ -566,7 +566,7 @@ ${this.totalGasCost.toFixed(2)}`)
         // token, this will fail an invariant. If it's not provided, we just get the decimals on
         // the token, which is what we want anyway.
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
-${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
+ ${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
 
         // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
         // it's not fully implemented in the SDK. It always throws:
@@ -581,7 +581,7 @@ ${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
           tradeType: TradeType.EXACT_INPUT,
         })
 
-        console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
+        // console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
 
         const options: SwapOptions = {
           slippageTolerance: CHAIN_CONFIG.slippageTolerance,
@@ -590,7 +590,7 @@ ${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
         }
 
         const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-        console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
+        // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
       }
       catch (e) {
         // Ticks not aligned or in wrong order?
@@ -679,7 +679,7 @@ WETH to USDC.`)
         inputToken = TOKEN_USDC
         outputToken = TOKEN_WETH
 
-        console.log(`[${this.rangeWidthTicks}] swap() Swapping ${amountIn.toString()} USDC to\
+        console.log(`[${this.rangeWidthTicks}] swap() Current swap is from ${amountIn.toString()} USDC to\
  ${quotedAmountOut.toString()} WETH`)
       }
       else { // ratio <= 0.5
@@ -688,7 +688,7 @@ WETH to USDC.`)
 
         // Logs: Swapping 348_512_207_369_270_407 WETH to 998_562_297 USDC
         // 0.348 / 998 = 2,868
-        console.log(`[${this.rangeWidthTicks}] Swapping ${amountIn.toString()} WETH to\
+        console.log(`[${this.rangeWidthTicks}] Current swap is from ${amountIn.toString()} WETH to\
  ${quotedAmountOut.toString()} USDC`)
       }
 
@@ -699,7 +699,7 @@ WETH to USDC.`)
         tradeType: TradeType.EXACT_INPUT,
       })
 
-      console.log(`[${this.rangeWidthTicks}] swap(): Trade: ${JSON.stringify(trade)}`)
+      // console.log(`[${this.rangeWidthTicks}] swap(): Trade: ${JSON.stringify(trade)}`)
 
       const options: SwapOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
