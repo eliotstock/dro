@@ -9,6 +9,7 @@ import { useConfig, ChainConfig } from './config'
 import { BigintIsh, Fraction, Token } from '@uniswap/sdk-core'
 import { CurrencyAmount } from '@uniswap/smart-order-router'
 import { wallet } from './wallet'
+import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 import moment from 'moment'
 import JSBI from 'jsbi'
 
@@ -55,18 +56,6 @@ export const positionManagerContract = new ethers.Contract(
     CHAIN_CONFIG.provider()
 )
 
-export const usdcToken = new Token(CHAIN_CONFIG.chainId,
-    CHAIN_CONFIG.addrTokenUsdc,
-    6, // Decimals
-    'USDC',
-    'USD Coin')
-
-export const wethToken = new Token(CHAIN_CONFIG.chainId,
-    CHAIN_CONFIG.addrTokenWeth,
-    18, // Decimals
-    'WETH',
-    'Wrapped Ether')
-
 export async function updateTick() {
     const slot = await rangeOrderPoolContract.slot0()
 
@@ -80,7 +69,7 @@ export function price(): bigint {
 
     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
     // and denominator are both JSBIs.
-    const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+    const p = tickToPrice(TOKEN_WETH, TOKEN_USDC, rangeOrderPoolTick)
 
     // The least bad way to get from JSBI to BigInt is via strings for numerator and denominator.
     const num = BigInt(p.numerator.toString())
@@ -94,7 +83,7 @@ export function priceFormatted(): string {
 
     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
     // and denominator are both JSBIs.
-    const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+    const p = tickToPrice(TOKEN_WETH, TOKEN_USDC, rangeOrderPoolTick)
 
     return p.toFixed(2, {groupSeparator: ','})
 }
@@ -175,12 +164,12 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     let token1
 
     if (wethFirst) {
-        token0 = wethToken
-        token1 = usdcToken
+        token0 = TOKEN_WETH
+        token1 = TOKEN_USDC
     }
     else {
-        token0 = usdcToken
-        token1 = wethToken
+        token0 = TOKEN_USDC
+        token1 = TOKEN_WETH
     }
 
     // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
@@ -374,8 +363,8 @@ export async function createPoolOnTestnet() {
     const tickCurrent: number = 191973
 
     const newPool = new Pool(
-        usdcToken,
-        wethToken,
+        TOKEN_USDC,
+        TOKEN_WETH,
         fee,
         sqrtRatioX96,
         liquidity,

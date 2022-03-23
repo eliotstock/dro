@@ -1,5 +1,6 @@
 import { tickToPrice } from '@uniswap/v3-sdk'
-import { rangeOrderPoolTick, updateTick, usdcToken, wethToken } from '../src/uniswap'
+import { TOKEN_USDC, TOKEN_WETH } from '../src/tokens'
+import { rangeOrderPoolTick, updateTick, } from '../src/uniswap'
 
 describe('Fun with large integers', function() {
     it('Should log some stuff', async function() {
@@ -7,7 +8,7 @@ describe('Fun with large integers', function() {
 
         console.log(`Tick: ${rangeOrderPoolTick}`)
 
-        const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+        const p = tickToPrice(TOKEN_WETH, TOKEN_USDC, rangeOrderPoolTick)
         console.log(`Num as string: ${p.numerator.toString()}`)
         console.log(`Denom as string: ${p.denominator.toString()}`)
 
