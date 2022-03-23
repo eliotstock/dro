@@ -62,6 +62,57 @@ export async function updateTick() {
     rangeOrderPoolTick = slot[1]
 }
 
+async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> {
+    // Do NOT call these once on startup. They need to be called every time we use the pool.
+    const liquidity = await poolContract.liquidity()
+    const slot = await poolContract.slot0()
+
+    // Do NOT pass a strings for these parameters below! JSBI does very little type checking.
+    const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
+    const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
+
+    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+    // undefined. This will throw an error when the position gets created.
+    // invariant(slot[5] > 0, 'Pool has no fee')
+    const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
+
+    // The order of the tokens in the pool varies from chain to chain, annoyingly.
+    // Ethereum mainnet: USDC is first
+    // Arbitrum mainnet: WETH is first
+    const wethFirst: boolean = await tokenOrderIsWethFirst(poolContract)
+
+    let token0: Token
+    let token1: Token
+
+    if (wethFirst) {
+        token0 = TOKEN_WETH
+        token1 = TOKEN_USDC
+    }
+    else {
+        token0 = TOKEN_USDC
+        token1 = TOKEN_WETH
+    }
+
+    const pool = new Pool(
+        token0,
+        token1,
+        fee,
+        sqrtRatioX96AsJsbi,
+        liquidityAsJsbi,
+        slot[1] // tickCurrent
+    )
+
+    return [pool, wethFirst]
+}
+
+export async function useSwapPool(): Promise<[Pool, boolean]> {
+    return usePool(swapPoolContract)
+}
+
+export async function useRangeOrderPool(): Promise<[Pool, boolean]> {
+    return usePool(rangeOrderPoolContract)
+}
+
 // Returns USDC's small units (USDC has six decimals)
 // When the price in the pool is USDC 3,000, this will return 3_000_000_000.
 export function price(): bigint {
