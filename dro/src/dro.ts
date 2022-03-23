@@ -6,8 +6,9 @@ import { TransactionResponse, TransactionReceipt, TransactionRequest } from '@et
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
+import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateOptimalRatio, currentTokenId, calculateRatioAmountIn } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateOptimalRatio, calculateRatioAmountIn } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -16,7 +17,7 @@ const OUT_DIR = './out'
 
 // Read our .env file
 config()
-
+  
 // Static config that doesn't belong in the .env file.
 const CHAIN_CONFIG: ChainConfig = useConfig()
 
@@ -163,16 +164,16 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
         // Arbitrum mainnet
         //   WETH is token 0, USDC is token 1
         //   Minimum USDC value per ETH corresponds to the minimum tick value
-        minUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2, {groupSeparator: ','})
-        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2, {groupSeparator: ','})
+        minUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickLower).toFixed(2, {groupSeparator: ','})
+        maxUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickUpper).toFixed(2, {groupSeparator: ','})
       }
       else {
         // Ethereum mainnet:
         //   USDC is token 0, WETH is token 1
         //   Minimum USDC value per ETH corresponds to the maximum tick value
         //   Counterintuitively, WETH is still the first token we pass to tickToPrice()
-        minUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2, {groupSeparator: ','})
-        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2, {groupSeparator: ','})
+        minUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickUpper).toFixed(2, {groupSeparator: ','})
+        maxUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickLower).toFixed(2, {groupSeparator: ','})
       }
 
       console.log(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
@@ -463,12 +464,12 @@ ${this.totalGasCost.toFixed(2)}`)
       let token1: Token
 
       if (wethFirstInSwapPool) {
-        token0 = wethToken
-        token1 = usdcToken
+        token0 = TOKEN_WETH
+        token1 = TOKEN_USDC
       }
       else {
-        token0 = usdcToken
-        token1 = wethToken
+        token0 = TOKEN_USDC
+        token1 = TOKEN_WETH
       }
 
       const swapPool = new Pool(
@@ -495,11 +496,11 @@ ${this.totalGasCost.toFixed(2)}`)
         //   The input token is USDC.
         //   The output token is WETH.
         //   We want the price of USDC in terms of WETH.
-        inputToken = usdcToken
-        outputToken = wethToken
+        inputToken = TOKEN_USDC
+        outputToken = TOKEN_WETH
 
         // The order of the tokens here is significant. Input first.
-        swapRoute = new Route([swapPool], usdcToken, wethToken)
+        swapRoute = new Route([swapPool], TOKEN_USDC, TOKEN_WETH)
 
         if (wethFirstInSwapPool) {
           inputTokenPrice = swapPool.token1Price
@@ -532,11 +533,11 @@ ${this.totalGasCost.toFixed(2)}`)
         //   The input token is WETH.
         //   The output token is USDC.
         //   We want the price of WETH in terms of USDC.
-        inputToken = wethToken
-        outputToken = usdcToken
+        inputToken = TOKEN_WETH
+        outputToken = TOKEN_USDC
 
         // The order of the tokens here is significant. Input first.
-        swapRoute = new Route([swapPool], wethToken, usdcToken)
+        swapRoute = new Route([swapPool], TOKEN_WETH, TOKEN_USDC)
 
         if (wethFirstInSwapPool) {
           inputTokenPrice = swapPool.token0Price
@@ -643,8 +644,8 @@ ${this.totalGasCost.toFixed(2)}`)
       // Arbitrum. And yet swap() executes OK on both chains. Strange.
       // Refactor the token order handling away into uniswap.ts, for both pools.
       const poolEthUsdcForSwaps = new Pool(
-        usdcToken,
-        wethToken,
+        TOKEN_USDC,
+        TOKEN_WETH,
         swapPoolFee, // 0.05%
         slot[0].toString(), // sqrtRatioX96
         liquidity.toString(),
@@ -688,7 +689,7 @@ USDC to WETH.`)
         amountIn = usdc / 2n
 
         // The order of the tokens here is significant. Input first.
-        swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
+        swapRoute = new Route([poolEthUsdcForSwaps], TOKEN_USDC, TOKEN_WETH)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
         console.log(`[${this.rangeWidthTicks}] swap() We already have fairly even values of USDC \
@@ -704,7 +705,7 @@ WETH to USDC.`)
         tokenOutAddress = CHAIN_CONFIG.addrTokenUsdc
         amountIn = weth / 2n
 
-        swapRoute = new Route([poolEthUsdcForSwaps], wethToken, usdcToken)
+        swapRoute = new Route([poolEthUsdcForSwaps], TOKEN_WETH, TOKEN_USDC)
       }
   
       // This will revert with code -32015 on testnets if there is no pool for the token addresses
@@ -723,15 +724,15 @@ WETH to USDC.`)
       let outputToken
 
       if (ratio > 1.5) {
-        inputToken = usdcToken
-        outputToken = wethToken
+        inputToken = TOKEN_USDC
+        outputToken = TOKEN_WETH
 
         console.log(`[${this.rangeWidthTicks}] swap() Swapping ${amountIn.toString()} USDC to\
  ${quotedAmountOut.toString()} WETH`)
       }
       else { // ratio <= 0.5
-        inputToken = wethToken
-        outputToken = usdcToken
+        inputToken = TOKEN_WETH
+        outputToken = TOKEN_USDC
 
         // Logs: Swapping 348_512_207_369_270_407 WETH to 998_562_297 USDC
         // 0.348 / 998 = 2,868
@@ -813,15 +814,15 @@ ${availableUsdc} USDC, ${availableWeth} WETH`)
       let amount1
 
       if (this.wethFirst) {
-        token0 = wethToken
-        token1 = usdcToken
+        token0 = TOKEN_WETH
+        token1 = TOKEN_USDC
 
         amount0 = availableWeth
         amount1 = availableUsdc
       }
       else {
-        token0 = usdcToken
-        token1 = wethToken
+        token0 = TOKEN_USDC
+        token1 = TOKEN_WETH
 
         amount0 = availableUsdc
         amount1 = availableWeth
@@ -958,18 +959,18 @@ position. Remove liquidity first.`
 ${availableWeth.toString()} WETH`)
 
       if (this.wethFirst) {
-        token0 = wethToken
-        token1 = usdcToken
+        token0 = TOKEN_WETH
+        token1 = TOKEN_USDC
 
-        token0Balance = CurrencyAmount.fromRawAmount(wethToken, availableWeth)
-        token1Balance = CurrencyAmount.fromRawAmount(usdcToken, availableUsdc)
+        token0Balance = CurrencyAmount.fromRawAmount(TOKEN_WETH, availableWeth)
+        token1Balance = CurrencyAmount.fromRawAmount(TOKEN_USDC, availableUsdc)
       }
       else {
-        token0 = usdcToken
-        token1 = wethToken
+        token0 = TOKEN_USDC
+        token1 = TOKEN_WETH
 
-        token0Balance = CurrencyAmount.fromRawAmount(usdcToken, availableUsdc)
-        token1Balance = CurrencyAmount.fromRawAmount(wethToken, availableWeth)
+        token0Balance = CurrencyAmount.fromRawAmount(TOKEN_USDC, availableUsdc)
+        token1Balance = CurrencyAmount.fromRawAmount(TOKEN_WETH, availableWeth)
       }
 
       console.log(`[dro.ts] Token 0 balance: ${token0Balance.toFixed(4)}, \
