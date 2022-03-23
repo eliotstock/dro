@@ -562,8 +562,11 @@ ${this.totalGasCost.toFixed(2)}`)
           return
         }
 
+        // Note: Never pass an argument to toFixed() here. If it's less than the decimals on the
+        // token, this will fail an invariant. If it's not provided, we just get the decimals on
+        // the token, which is what we want anyway.
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
-${amountToSwap.toFixed(8)} ${amountToSwap.currency.symbol}`)
+${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
 
         // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
         // it's not fully implemented in the SDK. It always throws:
