@@ -48,6 +48,10 @@ export const quoterContract = new ethers.Contract(
     CHAIN_CONFIG.provider()
 )
 
+// Contract source:
+//   https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol
+// Etherscan UI for read functions:
+//   https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88#readContract
 export const positionManagerContract = new ethers.Contract(
     CHAIN_CONFIG.addrPositionManager,
     NonfungiblePositionManagerABI,
