@@ -462,6 +462,7 @@ ${this.totalGasCost.toFixed(2)}`)
       let inputBalance
       let outputBalance
       let swapRoute
+      let zeroForOne: boolean
 
       if (ratio > 1.5) {
         // We're mostly in USDC now, so:
@@ -478,11 +479,13 @@ ${this.totalGasCost.toFixed(2)}`)
           inputTokenPrice = swapPool.token1Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
+          zeroForOne = false // USDC for WETH, token one for token zero
         }
         else {
           inputTokenPrice = swapPool.token0Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
+          zeroForOne = true // USDC for WETH, token zero for token one
         }
 
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is USDC,\
@@ -510,20 +513,22 @@ ${this.totalGasCost.toFixed(2)}`)
           inputTokenPrice = swapPool.token0Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())
+          zeroForOne = true // WETH for USDC, token zero for token one
         }
         else {
           inputTokenPrice = swapPool.token1Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
+          zeroForOne = false // WETH for USDC, token one for token zero
         }
 
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is WETH, price:\
  ${inputTokenPrice.toFixed(4)} USDC, input balance: ${inputBalance.toFixed(4)} WETH,\
- outputBalance: ${outputBalance.toFixed(2)} USDC`)
+ outputBalance: ${outputBalance.toFixed(2)} USDC, zeroForOne: ${zeroForOne}`)
       }
 
-      console.log(`[${this.rangeWidthTicks}] swapOptimally() tick (lower, current, upper): \
-(${this.tickLower}, ${swapPool.tickCurrent}, ${this.tickUpper})`)
+//       console.log(`[${this.rangeWidthTicks}] swapOptimally() tick (lower, current, upper): \
+// (${this.tickLower}, ${swapPool.tickCurrent}, ${this.tickUpper})`)
 
       const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
@@ -540,9 +545,8 @@ ${this.totalGasCost.toFixed(2)}`)
         const sqrtRatioX96 = TickMath.getSqrtRatioAtTick(rangeOrderPoolTick)
 
         // Call private method on AlphaRouter.
-        // TODO: Is zeroForOne always true here? Test for all combinations of chain and direction.
         const optimalRatio: Fraction = this.alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96,
-          true)
+          zeroForOne)
 
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
   ${optimalRatio.toFixed(16)}`)
@@ -550,8 +554,16 @@ ${this.totalGasCost.toFixed(2)}`)
         const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
           outputBalance)
 
+        if (JSBI.lessThan(amountToSwap.quotient, JSBI.BigInt(0))) {
+          // Tokens in wrong order?
+          // Optimal ratio inverted?
+          // zeroForOne wrong?
+          console.log(`Amount to swap is negative. Bailing out.`)
+          return
+        }
+
         console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
-      ${amountToSwap.toFixed(8)} ${amountToSwap.currency.symbol}`)
+${amountToSwap.toFixed(8)} ${amountToSwap.currency.symbol}`)
 
         // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
         // it's not fully implemented in the SDK. It always throws:
