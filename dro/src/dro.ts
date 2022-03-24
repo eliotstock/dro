@@ -401,7 +401,8 @@ ${this.totalGasCost.toFixed(2)}`)
 
       const deficit = CHAIN_CONFIG.ethBalanceMin - ethBalance
 
-      console.log(`topUpEth() Running low on ETH. Unwrapping some WETH to top up.`)
+      console.log(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH. Unwrapping some WETH\
+ to top up.`)
 
       await wallet.unwrapWeth(deficit)
     }
