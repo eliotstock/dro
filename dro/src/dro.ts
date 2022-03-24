@@ -190,11 +190,11 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
       let direction: Direction
       
       if (this.wethFirst) {
-        // Pool on Arbitrum mainnet: A lower tick value means a lower price in USDC.
+        // Pool on Arbitrum: A lower tick value means a lower price in USDC.
         direction = rangeOrderPoolTick < this.tickLower ? Direction.Down : Direction.Up
       }
       else {
-        // Pool on Ethereum mainnet: A lower tick value means a higher price in USDC.
+        // Pool on Ethereum Mainnet: A lower tick value means a higher price in USDC.
         direction = rangeOrderPoolTick < this.tickLower ? Direction.Up : Direction.Down
       }
 
@@ -460,6 +460,8 @@ ${this.totalGasCost.toFixed(2)}`)
  balance: ${outputBalance.toFixed(4)} WETH, zeroForOne: ${zeroForOne}`)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
+        // This should only be the case when restarting after an error that occured after the swap
+        // but before adding liquidity again.
         console.log(`[${this.rangeWidthTicks}] swapOptimally() We already have\
  fairly even values of USDC and WETH. No need for a swap.`)
 
@@ -499,70 +501,82 @@ ${this.totalGasCost.toFixed(2)}`)
 
       const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
-      try {
-        // Because we're using this tick to get the optimal ratio of assets to put into the range
-        // order position, use the range order pool here, not the swap pool.
-        const p = new Position({
-          pool: rangeOrderPool,
-          tickLower: this.tickLower,
-          tickUpper: this.tickUpper,
-          liquidity: 1 // calculateOptimalRatio() doesn't use the liquidity on the position
-        })
+      // Because we're using this tick to get the optimal ratio of assets to put into the range
+      // order position, use the range order pool here, not the swap pool.
+      const p = new Position({
+        pool: rangeOrderPool,
+        tickLower: this.tickLower,
+        tickUpper: this.tickUpper,
+        liquidity: 1 // calculateOptimalRatio() doesn't use the liquidity on the position
+      })
 
-        const sqrtRatioX96 = TickMath.getSqrtRatioAtTick(rangeOrderPoolTick)
+      const sqrtRatioX96 = TickMath.getSqrtRatioAtTick(rangeOrderPoolTick)
 
-        // Call private method on AlphaRouter.
-        const optimalRatio: Fraction = this.alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96,
-          zeroForOne)
+      // Call private method on AlphaRouter.
+      const optimalRatio: Fraction = this.alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96,
+        zeroForOne)
 
-        console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
- ${optimalRatio.toFixed(16)}`)
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
+${optimalRatio.toFixed(16)}`)
 
-        const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
-          outputBalance)
+      const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
+        outputBalance)
 
-        if (JSBI.lessThan(amountToSwap.quotient, JSBI.BigInt(0))) {
-          // Tokens in wrong order?
-          // Optimal ratio inverted?
-          // zeroForOne wrong?
-          console.log(`Amount to swap is negative. Bailing out.`)
-          return
-        }
-
-        // Note: Never pass an argument to toFixed() here. If it's less than the decimals on the
-        // token, this will fail an invariant. If it's not provided, we just get the decimals on
-        // the token, which is what we want anyway.
-        console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
- ${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
-
-        // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
-        // it's not fully implemented in the SDK. It always throws:
-        //   Error: No tick data provider was given
-        // Uniswap dev suggests using createUncheckedTrade() here:
-        //   https://github.com/Uniswap/v3-sdk/issues/52#issuecomment-888549553
-
-        const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
-          route: swapRoute,
-          inputAmount: amountToSwap,
-          outputAmount: CurrencyAmount.fromRawAmount(outputToken, 0), // Zero here means 'don't care'
-          tradeType: TradeType.EXACT_INPUT,
-        })
-
-        // console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
-
-        const options: SwapOptions = {
-          slippageTolerance: CHAIN_CONFIG.slippageTolerance,
-          recipient: wallet.address,
-          deadline: moment().unix() + DEADLINE_SECONDS
-        }
-
-        const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-        // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
+      if (JSBI.lessThan(amountToSwap.quotient, JSBI.BigInt(0))) {
+        // Tokens in wrong order?
+        // Optimal ratio inverted?
+        // zeroForOne wrong?
+        throw `Amount to swap is negative. Fatal.`
       }
-      catch (e) {
-        // Ticks not aligned or in wrong order?
-        console.log(e)
+
+      // Note: Never pass an argument to toFixed() here. If it's less than the decimals on the
+      // token, this will fail an invariant. If it's not provided, we just get the decimals on
+      // the token, which is what we want anyway.
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
+${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
+
+      // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
+      // it's not fully implemented in the SDK. It always throws:
+      //   Error: No tick data provider was given
+      // Uniswap dev suggests using createUncheckedTrade() here:
+      //   https://github.com/Uniswap/v3-sdk/issues/52#issuecomment-888549553
+
+      const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
+        route: swapRoute,
+        inputAmount: amountToSwap,
+        outputAmount: CurrencyAmount.fromRawAmount(outputToken, 0), // Zero here means 'don't care'
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      // console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
+
+      const options: SwapOptions = {
+        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+        recipient: wallet.address,
+        deadline: moment().unix() + DEADLINE_SECONDS
       }
+
+      const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
+      // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
+
+      const nonce = await wallet.getTransactionCount("latest")
+  
+      // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
+      const txRequest = {
+        from: wallet.address,
+        to: CHAIN_CONFIG.addrSwapRouter,
+        value: VALUE_ZERO_ETHER,
+        nonce: nonce,
+        gasLimit: CHAIN_CONFIG.gasLimit,
+        gasPrice: CHAIN_CONFIG.gasPrice,
+        data: calldata
+      }
+
+      const txReceipt: TransactionReceipt = await this.sendTx(
+        `[${this.rangeWidthTicks}] swapOptimally()`, txRequest)
+
+      const gasCost = this.gasCost(txReceipt)
+      this.totalGasCost += gasCost
     }
   
     async swap() {
@@ -1113,16 +1127,18 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // Find our new range around the current price.
         this.setNewRange()
 
-        // Just logging for now. Later, a new swap() implementation. Do this before we actually
-        // swap anything.
+        // New swap() implementation. Swap the exact amount of one token that will give us the
+        // right balance of assets for the new position.
         await this.swapOptimally()
 
-        // Swap half our one asset to the other asset so that we have equal value of assets.
-        await this.swap()
+        // Old swap() implementation. Swap simply half our one asset to the other asset.
+        // await this.swap()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
         // a non zero amount of WETH. Unwrap some to ETH now if we need to.
+        // Note that this will move us slightly away from the optimal ratio of assets we just
+        // swapped to. The error is negligible.
         await this.topUpEth()
 
         // Add all our WETH and USDC to a new liquidity position.
