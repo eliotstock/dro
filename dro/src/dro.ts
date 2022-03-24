@@ -396,7 +396,7 @@ ${this.totalGasCost.toFixed(2)}`)
 
       const deficit = CHAIN_CONFIG.ethBalanceMin - ethBalance
 
-      console.log(`Running low on ETH. Unwrapping some WETH to top up.`)
+      console.log(`topUpEth() Running low on ETH. Unwrapping some WETH to top up.`)
 
       await wallet.unwrapWeth(deficit)
     }
@@ -655,7 +655,7 @@ WETH to USDC.`)
 
         // Logs: Swapping 348_512_207_369_270_407 WETH to 998_562_297 USDC
         // 0.348 / 998 = 2,868
-        console.log(`[${this.rangeWidthTicks}] Current swap is from ${amountIn.toString()} WETH to\
+        console.log(`[${this.rangeWidthTicks}] swap() Current swap is from ${amountIn.toString()} WETH to\
  ${quotedAmountOut.toString()} USDC`)
       }
 
