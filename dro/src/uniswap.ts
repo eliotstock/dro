@@ -218,36 +218,13 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     return usablePosition
 }
 
-// This can take hundreds of blocks to execute when we have hundreds of old positions.
-export async function currentTokenId(address: string): Promise<number> {
-    let index = 0
-    let lastTokenId: number = 0
+// We only have one position open at a time, so the last one is the current, open one.
+export async function currentTokenId(address: string): Promise<number | undefined> {
+    const positionCount = await positionManagerContract.balanceOf(address)
 
-    do {
-        // Increment index until tokenOfOwnerByIndex() throws an error.
-        try {
-            const t: number = await positionManagerContract.tokenOfOwnerByIndex(address, index)
-            console.log(`Token ID: ${t}`)
-            lastTokenId = t
-            index++
-        }
-        catch (e) {
-            // We've hit the last token ID
-            return lastTokenId
-        }
-    } while (true)
-    
-    // let secondTokenId: number
+    if (positionCount == 0) return undefined
 
-    // try {
-    //     secondTokenId = await positionManagerContract.tokenOfOwnerByIndex(address, 1)
-    // }
-    // catch (e) {
-    //     // Good. We should only have one position open at a time.
-    //     return tokenId
-    // }
-
-    // throw `We have more than one position open. WTF. First: ${tokenId}, second: ${secondTokenId}`
+    return await positionManagerContract.tokenOfOwnerByIndex(address, positionCount - 1)
 }
 
 export function positionWebUrl(tokenId: number): string {
