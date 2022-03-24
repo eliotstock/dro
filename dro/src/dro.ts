@@ -194,7 +194,6 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
 
       let direction: Direction
       
-      // TODO: This is giving us the wrong direction on Arbitrum. Is it also wrong on L1?
       if (this.wethFirst) {
         // Pool on Arbitrum mainnet: A lower tick value means a lower price in USDC.
         direction = rangeOrderPoolTick < this.tickLower ? Direction.Down : Direction.Up
@@ -1127,6 +1126,9 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
 
         this.locked = true
 
+        // Put a row in our analytics table and log the re-ranging.
+        this.trackRerangeEvent()
+
         await wallet.logBalances()
 
         // Check fees before removing liquidity.
@@ -1143,9 +1145,6 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
 
         // Find our new range around the current price.
         this.setNewRange()
-
-        // Put a row in our analytics table and log the re-ranging.
-        this.trackRerangeEvent()
 
         // Just logging for now. Later, a new swap() implementation. Do this before we actually
         // swap anything.
