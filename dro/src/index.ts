@@ -5,7 +5,7 @@ import { updateTick, priceFormatted } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
 import { init, dumpTokenIds, dumpRerangeEvents, meanTimeToReranging } from './db'
-import { createPoolOnTestnet } from './uniswap'
+import { createPoolOnTestnet, currentTokenId } from './uniswap'
 import moment from 'moment'
 import yargs from 'yargs/yargs'
 
@@ -209,6 +209,10 @@ async function main() {
 
     return
   }
+
+  // Not ready yet:
+  // const t = await currentTokenId(wallet.address)
+  // console.log(`Current token ID: ${t}`)
 
   // The absence of a try/catch block below is deliberate. The execution of main() already has one.
   // For this startup stuff, on any error it's better to die early and let the process manager

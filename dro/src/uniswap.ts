@@ -218,6 +218,38 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     return usablePosition
 }
 
+// This can take hundreds of blocks to execute when we have hundreds of old positions.
+export async function currentTokenId(address: string): Promise<number> {
+    let index = 0
+    let lastTokenId: number = 0
+
+    do {
+        // Increment index until tokenOfOwnerByIndex() throws an error.
+        try {
+            const t: number = await positionManagerContract.tokenOfOwnerByIndex(address, index)
+            console.log(`Token ID: ${t}`)
+            lastTokenId = t
+            index++
+        }
+        catch (e) {
+            // We've hit the last token ID
+            return lastTokenId
+        }
+    } while (true)
+    
+    // let secondTokenId: number
+
+    // try {
+    //     secondTokenId = await positionManagerContract.tokenOfOwnerByIndex(address, 1)
+    // }
+    // catch (e) {
+    //     // Good. We should only have one position open at a time.
+    //     return tokenId
+    // }
+
+    // throw `We have more than one position open. WTF. First: ${tokenId}, second: ${secondTokenId}`
+}
+
 export function positionWebUrl(tokenId: number): string {
     return `https://app.uniswap.org/#/pool/${tokenId}`
 }
