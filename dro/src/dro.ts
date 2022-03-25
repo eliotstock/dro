@@ -7,7 +7,7 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateOptimalRatio } from './uniswap'
+import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateOptimalRatio, currentTokenId } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -55,6 +55,11 @@ export class DRO {
 
       // Get the token ID for our position from the database. This is a small positive integer.
       const tokenId = await getTokenIdForOpenPosition()
+
+      // Now get the same token ID from the position manager contract/NFT. Compare.
+      // In due course, drop the database table and just use on-chain data.
+      const t = await currentTokenId(wallet.address)
+      console.log(`Token ID from DB: ${tokenId}, versus from chain: ${t}`)
 
       if (tokenId === undefined) {
         console.log(`[${this.rangeWidthTicks}] No existing position NFT`)
@@ -395,6 +400,34 @@ ${this.totalGasCost.toFixed(2)}`)
       console.log(`Running low on ETH. Unwrapping some WETH to top up.`)
 
       await wallet.unwrapWeth(deficit)
+    }
+
+    async topUpEthImproved() {
+      if (this.position || this.tokenId)
+         throw "Refusing to top up ETH. Still in a position. Remove liquidity first."
+
+      const ethBalance = await wallet.eth()
+      const wethBalance = await wallet.weth()
+
+      if (ethBalance >= CHAIN_CONFIG.ethBalanceMin) {
+        return
+      }
+
+      const deficit = CHAIN_CONFIG.ethBalanceMin - ethBalance
+      const enoughForThreeWorstCaseReRanges = CHAIN_CONFIG.ethBalanceMin * 3n
+
+      // Typical tx cost: USD 10.00
+      if (wethBalance > enoughForThreeWorstCaseReRanges) {
+        console.log(`Running low on ETH. Unwrapping enough WETH for three wost case re-ranges.`)
+
+        await wallet.unwrapWeth(enoughForThreeWorstCaseReRanges)
+      }
+      else {
+        console.log(`Running low on ETH but also on WETH. Unwrapping just enough WETH for the\
+ next re-range.`)
+
+        await wallet.unwrapWeth(deficit)
+      }
     }
 
     // Use the liquidity maths in calculateRatioAmountIn() from the smart-order-router to swap

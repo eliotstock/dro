@@ -210,10 +210,6 @@ async function main() {
     return
   }
 
-  // Not ready yet:
-  // const t = await currentTokenId(wallet.address)
-  // console.log(`Current token ID: ${t}`)
-
   // The absence of a try/catch block below is deliberate. The execution of main() already has one.
   // For this startup stuff, on any error it's better to die early and let the process manager
   // restart us with some back-off. 

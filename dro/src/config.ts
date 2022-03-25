@@ -83,8 +83,9 @@ const ETHEREUM_MAINNET: ChainConfig = {
     addrSwapRouter2: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
 
     // The most I've ever paid in gas for a set of three re-ranging transactions on L1 is
-    // 0.168 ETH. 0.2 is a safe margin over that.
-    ethBalanceMin: ethers.utils.parseUnits("0.2", "ether").toBigInt()
+    // 0.168 ETH. 0.18 is a safe margin over that. Don't go too high here, because we
+    // often unwrap a multiple of this amount to save on unwrapping tx costs.
+    ethBalanceMin: ethers.utils.parseUnits("0.18", "ether").toBigInt()
 }
 
 // Block explorer: https://arbiscan.io/.
