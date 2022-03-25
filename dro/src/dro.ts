@@ -1,13 +1,14 @@
 import { config } from 'dotenv'
-import { FeeAmount, MintOptions, nearestUsableTick, NonfungiblePositionManager, Pool, Position, Route, SwapOptions, SwapRouter, tickToPrice, Trade } from '@uniswap/v3-sdk'
+import { MintOptions, NonfungiblePositionManager, Position, Route, SwapOptions, SwapRouter, tickToPrice, Trade } from '@uniswap/v3-sdk'
 import { CurrencyAmount, Percent, TradeType, Currency, Fraction, Token } from '@uniswap/sdk-core'
 import { TickMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt, TransactionRequest } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
+import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, swapPoolContract, quoterContract, positionManagerContract, usdcToken, wethToken, rangeOrderPoolTick, RANGE_ORDER_POOL_TICK_SPACING, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateOptimalRatio, currentTokenId } from './uniswap'
+import { rangeOrderPoolContract, quoterContract, positionManagerContract, rangeOrderPoolTick, useSwapPool, useRangeOrderPool, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateRatioAmountIn, currentTokenId } from './uniswap'
 import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
@@ -39,19 +40,21 @@ export class DRO {
     lastRerangeTimestamp?: string
     locked: boolean = false
     totalGasCost: number = 0
+    alphaRouter: AlphaRouter
   
     constructor(
       _rangeWidthTicks: number,
       _noops: boolean) {
       this.rangeWidthTicks = _rangeWidthTicks
       this.noops = _noops
+      this.alphaRouter = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
     }
 
     async init() {
       // The order of the tokens in the pool varies from chain to chain, annoyingly.
       // Ethereum mainnet: USDC is first
       // Arbitrum mainnet: WETH is first
-      this.wethFirst = await tokenOrderIsWethFirst()
+      this.wethFirst = await tokenOrderIsWethFirst(rangeOrderPoolContract)
 
       // Get the token ID for our position from the database. This is a small positive integer.
       const tokenId = await getTokenIdForOpenPosition()
@@ -161,16 +164,16 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
         // Arbitrum mainnet
         //   WETH is token 0, USDC is token 1
         //   Minimum USDC value per ETH corresponds to the minimum tick value
-        minUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2, {groupSeparator: ','})
-        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2, {groupSeparator: ','})
+        minUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickLower).toFixed(2, {groupSeparator: ','})
+        maxUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickUpper).toFixed(2, {groupSeparator: ','})
       }
       else {
         // Ethereum mainnet:
         //   USDC is token 0, WETH is token 1
         //   Minimum USDC value per ETH corresponds to the maximum tick value
         //   Counterintuitively, WETH is still the first token we pass to tickToPrice()
-        minUsdc = tickToPrice(wethToken, usdcToken, this.tickUpper).toFixed(2, {groupSeparator: ','})
-        maxUsdc = tickToPrice(wethToken, usdcToken, this.tickLower).toFixed(2, {groupSeparator: ','})
+        minUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickUpper).toFixed(2, {groupSeparator: ','})
+        maxUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickLower).toFixed(2, {groupSeparator: ','})
       }
 
       console.log(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
@@ -192,11 +195,11 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
       let direction: Direction
       
       if (this.wethFirst) {
-        // Pool on Arbitrum mainnet: A lower tick value means a lower price in USDC.
+        // Pool on Arbitrum: A lower tick value means a lower price in USDC.
         direction = rangeOrderPoolTick < this.tickLower ? Direction.Down : Direction.Up
       }
       else {
-        // Pool on Ethereum mainnet: A lower tick value means a higher price in USDC.
+        // Pool on Ethereum Mainnet: A lower tick value means a higher price in USDC.
         direction = rangeOrderPoolTick < this.tickLower ? Direction.Up : Direction.Down
       }
 
@@ -397,7 +400,8 @@ ${this.totalGasCost.toFixed(2)}`)
 
       const deficit = CHAIN_CONFIG.ethBalanceMin - ethBalance
 
-      console.log(`Running low on ETH. Unwrapping some WETH to top up.`)
+      console.log(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH. Unwrapping some WETH\
+ to top up.`)
 
       await wallet.unwrapWeth(deficit)
     }
@@ -430,9 +434,9 @@ ${this.totalGasCost.toFixed(2)}`)
       }
     }
 
-    // Use the liquidity maths in calculateRatioAmountIn() from the smart-order-router to swap
-    // an optimal amount of the input token.
-    async logWhatAnOptimalSwapWouldDo() {
+    // Use the liquidity maths in Uniswap's calculateRatioAmountIn() function in the
+    // smart-order-router repo to swap an optimal amount of the input token.
+    async swapOptimally() {
       if (this.position || this.tokenId)
          throw "Refusing to swap. Still in a position. Remove liquidity first."
 
@@ -448,66 +452,51 @@ ${this.totalGasCost.toFixed(2)}`)
       // What is the ratio of our USDC balance to the USDC value of our WETH balance?
       const ratio = await wallet.tokenRatioByValue()
 
-      // The Pool instance depends on the pool liquidity and slot 0 so we need to reconstruct it
-      // every time.
-      const liquidity = await swapPoolContract.liquidity()
-      const slot = await swapPoolContract.slot0()
-      const swapPoolFee = await swapPoolContract.fee()
+      const [swapPool, wethFirstInSwapPool] = await useSwapPool()
 
-      // We are agnostic to the order of the tokens in the swap pool here.
-      const token0: Token = await swapPoolContract.token0()
-      const token1: Token = await swapPoolContract.token1()
+      // console.log(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
 
-      // TODO: Fix runtime error:
-      /*
-        /home/e/dev/dro/node_modules/@uniswap/v3-sdk/src/entities/pool.ts:77
-            ;[this.token0, this.token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA]
-                                                ^
-        TypeError: tokenA.sortsBefore is not a function
-            at new Pool (/home/e/dev/dro/node_modules/@uniswap/v3-sdk/src/entities/pool.ts:77:42)
-            at DRO.logWhatAnOptimalSwapWouldDo (/home/e/dev/dro/src/dro.ts:428:24)
-            at processTicksAndRejections (node:internal/process/task_queues:96:5)
-            at async DRO.onBlock (/home/e/dev/dro/src/dro.ts:1147:9)
-            at async JsonRpcProvider.onBlock (/home/e/dev/dro/src/index.ts:68:5)
-      */
-      const swapPool = new Pool(
-        token0,
-        token1,
-        swapPoolFee, // 0.05%
-        slot[0].toString(), // sqrtRatioX96
-        liquidity.toString(),
-        slot[1] // tickCurrent
-      )
-
-      console.log(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
-
-      const wethFirst = 'WETH' === token0.symbol
-
+      let inputToken: Token
+      let outputToken: Token
       let inputTokenPrice: Fraction
       let inputBalance
       let outputBalance
+      let swapRoute
+      let zeroForOne: boolean
 
       if (ratio > 1.5) {
         // We're mostly in USDC now, so:
         //   The input token is USDC.
         //   The output token is WETH.
         //   We want the price of USDC in terms of WETH.
-        if (wethFirst) {
+        inputToken = TOKEN_USDC
+        outputToken = TOKEN_WETH
+
+        // The order of the tokens here is significant. Input first.
+        swapRoute = new Route([swapPool], TOKEN_USDC, TOKEN_WETH)
+
+        if (wethFirstInSwapPool) {
           inputTokenPrice = swapPool.token1Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
+          zeroForOne = false // USDC for WETH, token one for token zero
         }
         else {
           inputTokenPrice = swapPool.token0Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
+          zeroForOne = true // USDC for WETH, token zero for token one
         }
 
-        console.log(`[${this.rangeWidthTicks}] Input token is USDC, price: ${inputTokenPrice.toFixed(4)} WETH, input balance: ${inputBalance.toFixed(2)} USDC, output balance: ${outputBalance.toFixed(4)} WETH`)
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is USDC,\
+ price: ${inputTokenPrice.toFixed(4)} WETH, input balance: ${inputBalance.toFixed(2)} USDC, output\
+ balance: ${outputBalance.toFixed(4)} WETH, zeroForOne: ${zeroForOne}`)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
-        console.log(`[${this.rangeWidthTicks}] We already have fairly even values of USDC \
-and WETH. No need for a swap.`)
+        // This should only be the case when restarting after an error that occured after the swap
+        // but before adding liquidity again.
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() We already have\
+ fairly even values of USDC and WETH. No need for a swap.`)
 
         return
       }
@@ -516,48 +505,118 @@ and WETH. No need for a swap.`)
         //   The input token is WETH.
         //   The output token is USDC.
         //   We want the price of WETH in terms of USDC.
-        if (wethFirst) {
+        inputToken = TOKEN_WETH
+        outputToken = TOKEN_USDC
+
+        // The order of the tokens here is significant. Input first.
+        swapRoute = new Route([swapPool], TOKEN_WETH, TOKEN_USDC)
+
+        if (wethFirstInSwapPool) {
           inputTokenPrice = swapPool.token0Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, weth.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, usdc.toString())
+          zeroForOne = true // WETH for USDC, token zero for token one
         }
         else {
           inputTokenPrice = swapPool.token1Price
           inputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
+          zeroForOne = false // WETH for USDC, token one for token zero
         }
 
-        console.log(`[${this.rangeWidthTicks}] Input token is WETH, price: ${inputTokenPrice.toFixed(4)} USDC, input balance: ${inputBalance.toFixed(4)} WETH, outputBalance: ${outputBalance.toFixed(2)} USDC`)
+        console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is WETH, price:\
+ ${inputTokenPrice.toFixed(4)} USDC, input balance: ${inputBalance.toFixed(4)} WETH,\
+ outputBalance: ${outputBalance.toFixed(2)} USDC, zeroForOne: ${zeroForOne}`)
       }
 
-      const optimalRatio: Fraction = calculateOptimalRatio(this.tickLower, this.tickUpper, swapPool.tickCurrent)
+//       console.log(`[${this.rangeWidthTicks}] swapOptimally() tick (lower, current, upper): \
+// (${this.tickLower}, ${swapPool.tickCurrent}, ${this.tickUpper})`)
 
-      console.log(`[${this.rangeWidthTicks}] Optimal ratio: ${optimalRatio.toFixed(8)}`)
+      const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
+
+      // Because we're using this tick to get the optimal ratio of assets to put into the range
+      // order position, use the range order pool here, not the swap pool.
+      const p = new Position({
+        pool: rangeOrderPool,
+        tickLower: this.tickLower,
+        tickUpper: this.tickUpper,
+        liquidity: 1 // calculateOptimalRatio() doesn't use the liquidity on the position
+      })
+
+      const sqrtRatioX96 = TickMath.getSqrtRatioAtTick(rangeOrderPoolTick)
+
+      // Call private method on AlphaRouter.
+      const optimalRatio: Fraction = this.alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96,
+        zeroForOne)
+
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
+${optimalRatio.toFixed(16)}`)
+
+      const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
+        outputBalance)
+
+      if (JSBI.lessThan(amountToSwap.quotient, JSBI.BigInt(0))) {
+        // Tokens in wrong order?
+        // Optimal ratio inverted?
+        // zeroForOne wrong?
+        throw `Amount to swap is negative. Fatal.`
+      }
+
+      // Note: Never pass an argument to toFixed() here. If it's less than the decimals on the
+      // token, this will fail an invariant. If it's not provided, we just get the decimals on
+      // the token, which is what we want anyway.
+      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
+${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
+
+      // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
+      // it's not fully implemented in the SDK. It always throws:
+      //   Error: No tick data provider was given
+      // Uniswap dev suggests using createUncheckedTrade() here:
+      //   https://github.com/Uniswap/v3-sdk/issues/52#issuecomment-888549553
+
+      const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
+        route: swapRoute,
+        inputAmount: amountToSwap,
+        outputAmount: CurrencyAmount.fromRawAmount(outputToken, 0), // Zero here means 'don't care'
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      // console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
+
+      const options: SwapOptions = {
+        slippageTolerance: CHAIN_CONFIG.slippageTolerance,
+        recipient: wallet.address,
+        deadline: moment().unix() + DEADLINE_SECONDS
+      }
+
+      const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
+      // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
+
+      const nonce = await wallet.getTransactionCount("latest")
+  
+      // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
+      const txRequest = {
+        from: wallet.address,
+        to: CHAIN_CONFIG.addrSwapRouter,
+        value: VALUE_ZERO_ETHER,
+        nonce: nonce,
+        gasLimit: CHAIN_CONFIG.gasLimit,
+        gasPrice: CHAIN_CONFIG.gasPrice,
+        data: calldata
+      }
+
+      const txReceipt: TransactionReceipt = await this.sendTx(
+        `[${this.rangeWidthTicks}] swapOptimally()`, txRequest)
+
+      const gasCost = this.gasCost(txReceipt)
+      this.totalGasCost += gasCost
     }
   
     async swap() {
       if (this.position || this.tokenId)
          throw "Refusing to swap. Still in a position. Remove liquidity first."
 
-      const swapPoolFee = await swapPoolContract.fee()
-
-      // The Pool instance depends on the pool liquidity and slot 0 so we need to reconstruct it
-      // every time.
-      const liquidity = await swapPoolContract.liquidity()
-      const slot = await swapPoolContract.slot0()
-
-      // TODO: I've hard-coded the token order here. This is the swap pool, not the range order
-      // pool. From info.uniswap.org, the token order does appear to differ between L1 and
-      // Arbitrum. And yet swap() executes OK on both chains. Strange.
-      // Refactor the token order handling away into uniswap.ts, for both pools.
-      const poolEthUsdcForSwaps = new Pool(
-        usdcToken,
-        wethToken,
-        swapPoolFee, // 0.05%
-        slot[0].toString(), // sqrtRatioX96
-        liquidity.toString(),
-        slot[1] // tickCurrent
-      )
+      const [swapPool, wethFirstInSwapPool] = await useSwapPool()
 
       const usdc = await wallet.usdc()
       const weth = await wallet.weth()
@@ -570,8 +629,8 @@ and WETH. No need for a swap.`)
       // What is the ratio of our USDC balance to the USDC value of our WETH balance?
       const ratio = await wallet.tokenRatioByValue()
 
-      let tokenIn
-      let tokenOut
+      let tokenInAddress
+      let tokenOutAddress
       let amountIn
       let swapRoute
 
@@ -591,12 +650,12 @@ and WETH. No need for a swap.`)
         console.log(`[${this.rangeWidthTicks}] swap() We're mostly in USDC now. Swapping half our \
 USDC to WETH.`)
 
-        tokenIn = CHAIN_CONFIG.addrTokenUsdc
-        tokenOut = CHAIN_CONFIG.addrTokenWeth
+        tokenInAddress = CHAIN_CONFIG.addrTokenUsdc
+        tokenOutAddress = CHAIN_CONFIG.addrTokenWeth
         amountIn = usdc / 2n
 
         // The order of the tokens here is significant. Input first.
-        swapRoute = new Route([poolEthUsdcForSwaps], usdcToken, wethToken)
+        swapRoute = new Route([swapPool], TOKEN_USDC, TOKEN_WETH)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
         console.log(`[${this.rangeWidthTicks}] swap() We already have fairly even values of USDC \
@@ -608,11 +667,11 @@ and WETH. No need for a swap.`)
         console.log(`[${this.rangeWidthTicks}] swap() We're mostly in WETH now. Swapping half our \
 WETH to USDC.`)
 
-        tokenIn = CHAIN_CONFIG.addrTokenWeth
-        tokenOut = CHAIN_CONFIG.addrTokenUsdc
+        tokenInAddress = CHAIN_CONFIG.addrTokenWeth
+        tokenOutAddress = CHAIN_CONFIG.addrTokenUsdc
         amountIn = weth / 2n
 
-        swapRoute = new Route([poolEthUsdcForSwaps], wethToken, usdcToken)
+        swapRoute = new Route([swapPool], TOKEN_WETH, TOKEN_USDC)
       }
   
       // This will revert with code -32015 on testnets if there is no pool for the token addresses
@@ -620,35 +679,41 @@ WETH to USDC.`)
       // It would be nice to try/catch here, inspect error.body.error.code here and handle -32015
       // but the type of e is always unknown.
       const quotedAmountOut = await quoterContract.callStatic.quoteExactInputSingle(
-        tokenIn,
-        tokenOut,
-        swapPoolFee, // 0.05%
+        tokenInAddress,
+        tokenOutAddress,
+        swapPool.fee, // 0.05%
         amountIn,
         0 // sqrtPriceLimitX96
       )
 
-      let trade: Trade<Currency, Currency, TradeType>
+      let inputToken
+      let outputToken
 
       if (ratio > 1.5) {
-        // Swapping USDC to WETH
-        trade = await Trade.createUncheckedTrade({
-          route: swapRoute,
-          inputAmount: CurrencyAmount.fromRawAmount(usdcToken, (usdc / 2n).toString()),
-          outputAmount: CurrencyAmount.fromRawAmount(wethToken, quotedAmountOut.toString()),
-          tradeType: TradeType.EXACT_INPUT,
-        })
+        inputToken = TOKEN_USDC
+        outputToken = TOKEN_WETH
+
+        console.log(`[${this.rangeWidthTicks}] swap() Current swap is from ${amountIn.toString()} USDC to\
+ ${quotedAmountOut.toString()} WETH`)
       }
       else { // ratio <= 0.5
-        // Swapping WETH to USDC
-        trade = await Trade.createUncheckedTrade({
-          route: swapRoute,
-          inputAmount: CurrencyAmount.fromRawAmount(wethToken, (weth / 2n).toString()),
-          outputAmount: CurrencyAmount.fromRawAmount(usdcToken, quotedAmountOut.toString()),
-          tradeType: TradeType.EXACT_INPUT,
-        })
+        inputToken = TOKEN_WETH
+        outputToken = TOKEN_USDC
+
+        // Logs: Swapping 348_512_207_369_270_407 WETH to 998_562_297 USDC
+        // 0.348 / 998 = 2,868
+        console.log(`[${this.rangeWidthTicks}] swap() Current swap is from ${amountIn.toString()} WETH to\
+ ${quotedAmountOut.toString()} USDC`)
       }
 
-      // console.log(`[${this.rangeWidthTicks}] Trade: ${JSON.stringify(trade)}`)
+      const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
+        route: swapRoute,
+        inputAmount: CurrencyAmount.fromRawAmount(inputToken, amountIn.toString()),
+        outputAmount: CurrencyAmount.fromRawAmount(outputToken, quotedAmountOut.toString()),
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      // console.log(`[${this.rangeWidthTicks}] swap(): Trade: ${JSON.stringify(trade)}`)
 
       const options: SwapOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
@@ -657,7 +722,7 @@ WETH to USDC.`)
       }
 
       const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-      // console.log(`[${this.rangeWidthTicks}] calldata: `, calldata)
+      // console.log(`[${this.rangeWidthTicks}] swap() calldata: `, calldata)
 
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -690,55 +755,10 @@ liquidity and swap first.`
       console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: \
 ${availableUsdc} USDC, ${availableWeth} WETH`)
 
-      const slot = await rangeOrderPoolContract.slot0()
+      const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
-      // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
-      // undefined. This will throw an error when the position gets created.
-      // invariant(slot[5] > 0, 'Pool has no fee')
-      const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
-
-      // Do NOT pass a string for the sqrtRatioX96 parameter below! JSBI does very little type checking.
-      const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
-
-      const liquidity = await rangeOrderPoolContract.liquidity()
-      const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
-
-      const tick = slot[1]
-
-      // The order of the tokens in the pool varies from chain to chain, annoyingly.
-      // Ethereum mainnet: USDC is first
-      // Arbitrum mainnet: WETH is first
-      let token0
-      let token1
-
-      let amount0
-      let amount1
-
-      if (this.wethFirst) {
-        token0 = wethToken
-        token1 = usdcToken
-
-        amount0 = availableWeth
-        amount1 = availableUsdc
-      }
-      else {
-        token0 = usdcToken
-        token1 = wethToken
-
-        amount0 = availableUsdc
-        amount1 = availableWeth
-      }
-
-      // A position instance requires a Pool instance.
-      let rangeOrderPool = new Pool(
-        token0,
-        token1,
-        fee, // Fee: 0.30%
-        sqrtRatioX96AsJsbi, // SqrtRatioX96 of type BigIntish which includes JSBI
-        liquidityAsJsbi, // Liquidity of type BigIntish which includes JSBI
-        slot[1], // Tick
-        // ticks
-      )
+      const amount0 = wethFirstInRangeOrderPool ? availableWeth : availableUsdc
+      const amount1 = wethFirstInRangeOrderPool ? availableUsdc : availableWeth
 
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
@@ -844,11 +864,7 @@ ${jsbiFormatted(this.position.liquidity)}`)
          throw `[${this.rangeWidthTicks}] Refusing to swap and add liquidity. Still in a \
 position. Remove liquidity first.`
 
-      // The order of the tokens in the pool varies from chain to chain, annoyingly.
-      // Ethereum mainnet: USDC is first
-      // Arbitrum mainnet: WETH is first
-      let token0
-      let token1
+      const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
       let token0Balance
       let token1Balance
@@ -859,60 +875,19 @@ position. Remove liquidity first.`
       console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc.toString()} USDC, \
 ${availableWeth.toString()} WETH`)
 
-      if (this.wethFirst) {
-        token0 = wethToken
-        token1 = usdcToken
-
-        token0Balance = CurrencyAmount.fromRawAmount(wethToken, availableWeth)
-        token1Balance = CurrencyAmount.fromRawAmount(usdcToken, availableUsdc)
+      if (wethFirstInRangeOrderPool) {
+        token0Balance = CurrencyAmount.fromRawAmount(TOKEN_WETH, availableWeth)
+        token1Balance = CurrencyAmount.fromRawAmount(TOKEN_USDC, availableUsdc)
       }
       else {
-        token0 = usdcToken
-        token1 = wethToken
-
-        token0Balance = CurrencyAmount.fromRawAmount(usdcToken, availableUsdc)
-        token1Balance = CurrencyAmount.fromRawAmount(wethToken, availableWeth)
+        token0Balance = CurrencyAmount.fromRawAmount(TOKEN_USDC, availableUsdc)
+        token1Balance = CurrencyAmount.fromRawAmount(TOKEN_WETH, availableWeth)
       }
 
       console.log(`[dro.ts] Token 0 balance: ${token0Balance.toFixed(4)}, \
 token 1 balance: ${token1Balance.toFixed(4)}`)
 
       console.log(`[dro.ts] output balance quotient: ${token1Balance.quotient}`)
-
-      const slot = await rangeOrderPoolContract.slot0()
-
-      // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
-      // undefined. This will throw an error when the position gets created.
-      // invariant(slot[5] > 0, 'Pool has no fee')
-      const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
-
-      const sqrtRatioX96 = slot[0]
-
-      console.log(`[dro.ts] sqrtRatioX96.toString(): ${sqrtRatioX96.toString()}`)
-      console.log(`[dro.ts] sqrtRatioX96 instanceof JSBI: ${sqrtRatioX96 instanceof JSBI}`)
-      console.log(`[dro.ts] typeof sqrtRatioX96 ${typeof(sqrtRatioX96)}`)
-
-      // Do NOT pass a string for the sqrtRatioX96 parameter below! JSBI does very little type
-      // checking.
-      const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
-
-      console.log(`[dro.ts] sqrtRatioX96AsJsbi.toString(): ${sqrtRatioX96AsJsbi.toString()}`)
-      console.log(`[dro.ts] sqrtRatioX96AsJsbi instanceof JSBI: \
-${sqrtRatioX96AsJsbi instanceof JSBI}`)
-      console.log(`[dro.ts] typeof sqrtRatioX96AsJsbi ${typeof(sqrtRatioX96AsJsbi)}`)
-
-      const liquidity = await rangeOrderPoolContract.liquidity()
-
-      // A position instance requires a Pool instance.
-      const rangeOrderPool = new Pool(
-        token0,
-        token1,
-        fee, // Fee: 0.30%
-        sqrtRatioX96AsJsbi, // SqrtRatioX96 of type BigIntish which includes JSBI
-        liquidity.toString(), // Liquidity
-        slot[1], // Tick
-        // ticks
-      )
 
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
@@ -944,7 +919,7 @@ ${sqrtRatioX96AsJsbi instanceof JSBI}`)
 
       const deadlineValue = moment().unix() + 1800
 
-      console.log(`[dro.ts] deadline: ${deadlineValue}`)
+      // console.log(`[dro.ts] deadline: ${deadlineValue}`)
 
       const router = new AlphaRouter({chainId: CHAIN_CONFIG.chainId,
         provider: CHAIN_CONFIG.provider()})
@@ -1165,6 +1140,9 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
 
         this.locked = true
 
+        // Put a row in our analytics table and log the re-ranging.
+        this.trackRerangeEvent()
+
         await wallet.logBalances()
 
         // Check fees before removing liquidity.
@@ -1182,18 +1160,18 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // Find our new range around the current price.
         this.setNewRange()
 
-        // Put a row in our analytics table and log the re-ranging.
-        this.trackRerangeEvent()
+        // New swap() implementation. Swap the exact amount of one token that will give us the
+        // right balance of assets for the new position.
+        await this.swapOptimally()
 
-        // Swap half our one asset to the other asset so that we have equal value of assets.
-        await this.swap()
-
-        // Just logging for now. Later, a new swap() implementation.
-        // await this.logWhatAnOptimalSwapWouldDo()
+        // Old swap() implementation. Swap simply half our one asset to the other asset.
+        // await this.swap()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
         // a non zero amount of WETH. Unwrap some to ETH now if we need to.
+        // Note that this will move us slightly away from the optimal ratio of assets we just
+        // swapped to. The error is negligible.
         await this.topUpEth()
 
         // Add all our WETH and USDC to a new liquidity position.

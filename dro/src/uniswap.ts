@@ -7,7 +7,9 @@ import { tickToPrice, TickMath, Pool, Position, MintOptions, NonfungiblePosition
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
 import { BigintIsh, Fraction, Token } from '@uniswap/sdk-core'
+import { CurrencyAmount } from '@uniswap/smart-order-router'
 import { wallet } from './wallet'
+import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 import moment from 'moment'
 import JSBI from 'jsbi'
 
@@ -58,22 +60,61 @@ export const positionManagerContract = new ethers.Contract(
     CHAIN_CONFIG.provider()
 )
 
-export const usdcToken = new Token(CHAIN_CONFIG.chainId,
-    CHAIN_CONFIG.addrTokenUsdc,
-    6, // Decimals
-    'USDC',
-    'USD Coin')
-
-export const wethToken = new Token(CHAIN_CONFIG.chainId,
-    CHAIN_CONFIG.addrTokenWeth,
-    18, // Decimals
-    'WETH',
-    'Wrapped Ether')
-
 export async function updateTick() {
     const slot = await rangeOrderPoolContract.slot0()
 
     rangeOrderPoolTick = slot[1]
+}
+
+async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> {
+    // Do NOT call these once on startup. They need to be called every time we use the pool.
+    const liquidity = await poolContract.liquidity()
+    const slot = await poolContract.slot0()
+
+    // Do NOT pass a strings for these parameters below! JSBI does very little type checking.
+    const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
+    const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
+
+    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+    // undefined. This will throw an error when the position gets created.
+    // invariant(slot[5] > 0, 'Pool has no fee')
+    const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
+
+    // The order of the tokens in the pool varies from chain to chain, annoyingly.
+    // Ethereum mainnet: USDC is first
+    // Arbitrum mainnet: WETH is first
+    const wethFirst: boolean = await tokenOrderIsWethFirst(poolContract)
+
+    let token0: Token
+    let token1: Token
+
+    if (wethFirst) {
+        token0 = TOKEN_WETH
+        token1 = TOKEN_USDC
+    }
+    else {
+        token0 = TOKEN_USDC
+        token1 = TOKEN_WETH
+    }
+
+    const pool = new Pool(
+        token0,
+        token1,
+        fee,
+        sqrtRatioX96AsJsbi,
+        liquidityAsJsbi,
+        slot[1] // tickCurrent
+    )
+
+    return [pool, wethFirst]
+}
+
+export async function useSwapPool(): Promise<[Pool, boolean]> {
+    return usePool(swapPoolContract)
+}
+
+export async function useRangeOrderPool(): Promise<[Pool, boolean]> {
+    return usePool(rangeOrderPoolContract)
 }
 
 // Returns USDC's small units (USDC has six decimals)
@@ -83,7 +124,7 @@ export function price(): bigint {
 
     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
     // and denominator are both JSBIs.
-    const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+    const p = tickToPrice(TOKEN_WETH, TOKEN_USDC, rangeOrderPoolTick)
 
     // The least bad way to get from JSBI to BigInt is via strings for numerator and denominator.
     const num = BigInt(p.numerator.toString())
@@ -97,7 +138,7 @@ export function priceFormatted(): string {
 
     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
     // and denominator are both JSBIs.
-    const p = tickToPrice(wethToken, usdcToken, rangeOrderPoolTick)
+    const p = tickToPrice(TOKEN_WETH, TOKEN_USDC, rangeOrderPoolTick)
 
     return p.toFixed(2, {groupSeparator: ','})
 }
@@ -123,11 +164,11 @@ export function rangeAround(tick: number, width: number): [number, number] {
     return [tickLower, tickUpper]
 }
 
-// Every range order pool we use has WETH as one token and USDC as the other, but the order varies
-// from Mainnet to Arbitrum, annoyingly.
-export async function tokenOrderIsWethFirst(): Promise<boolean> {
-    const token0 = await rangeOrderPoolContract.token0()
-    const token1 = await rangeOrderPoolContract.token1()
+// Every pool we use has WETH as one token and USDC as the other, but the order varies from Mainnet
+// to Arbitrum, annoyingly.
+export async function tokenOrderIsWethFirst(poolContract: ethers.Contract): Promise<boolean> {
+    const token0 = await poolContract.token0()
+    const token1 = await poolContract.token1()
 
     if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase() &&
         token1.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase()) {
@@ -178,12 +219,12 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     let token1
 
     if (wethFirst) {
-        token0 = wethToken
-        token1 = usdcToken
+        token0 = TOKEN_WETH
+        token1 = TOKEN_USDC
     }
     else {
-        token0 = usdcToken
-        token1 = wethToken
+        token0 = TOKEN_USDC
+        token1 = TOKEN_WETH
     }
 
     // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
@@ -304,6 +345,106 @@ export function calculateOptimalRatio(tickLower: number, tickUpper: number, tick
     return optimalRatio
 }
 
+// This is functionally verbatim from:
+//   https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts
+// but this function is not exported by that module. License is GPL v3.
+export function calculateRatioAmountIn(
+    optimalRatio: Fraction,
+    inputTokenPrice: Fraction,
+    inputBalance: CurrencyAmount,
+    outputBalance: CurrencyAmount
+  ): CurrencyAmount {
+    // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
+    const amountToSwapRaw = new Fraction(inputBalance.quotient)
+        .subtract(optimalRatio.multiply(outputBalance.quotient))
+        .divide(optimalRatio.multiply(inputTokenPrice).add(1));
+
+    if (amountToSwapRaw.lessThan(0)) {
+        // should never happen since we do checks before calling in
+        throw new Error('calculateRatioAmountIn: insufficient input token amount');
+    }
+
+    return CurrencyAmount.fromRawAmount(
+        inputBalance.currency,
+        amountToSwapRaw.quotient
+    );
+}
+
+export function calculateRatioAmountInWithDebugging(
+  optimalRatio: Fraction,
+  inputTokenPrice: Fraction,
+  inputBalance: CurrencyAmount,
+  outputBalance: CurrencyAmount
+): CurrencyAmount {
+    // Swapping USDC to WETH
+    // calculateRatioAmountIn() inputTokenPrice: 0.00033484
+    // calculateRatioAmountIn() inputBalance.quotient: 1_511_316_988 (1511.31 USDC)
+    // calculateRatioAmountIn() outputBalance.quotient: 148_525_588_264_069_585 (0.148 WETH)
+    // calculateRatioAmountIn() inputQuotient: 1_511_316_988
+    // calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: 29872368485216593065608194.81148793
+    // calculateRatioAmountIn() optimalRatio multiplied by input token price: 67344886988928548.57381418
+    // calculateRatioAmountIn() denominator: 67344886988928548.57381418
+    // calculateRatioAmountIn() numerator: -29872368485216591554291206.81148793
+    // calculateRatioAmountIn() amountToSwapRaw2: -443572924.69920674
+    
+  console.log(`calculateRatioAmountIn() inputTokenPrice: ${inputTokenPrice.toFixed(8)}`)
+  console.log(`calculateRatioAmountIn() inputBalance.quotient: ${inputBalance.quotient}`)
+  console.log(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
+
+  // TODO: Our optimal ratio looks fine, but the amount to swap can be negative if optimalRatio * outputBalance > inputBalance
+  // Consider:
+  //   Not using this function and solving the simultaneous equation in code.
+  //   Solving iteratively by increasing the input amount 1 USDC or 0.0001 ETH at a time using a Position instace.
+  //   Hit the author of this up for help: https://atiselsts.github.io/pdfs/uniswap-v3-liquidity-math.pdf
+  //   Rounding the output balance down to zero when it is below some trivial amount. Pointless - it's when output balance is high that we're more likely to run into a negative swap amount.
+  // Done:
+  //   Opening a bug on the smart-order-router SDK, with valid inputs
+
+  // 1_998_121_297
+  const inputQuotient = new Fraction(inputBalance.quotient)
+  console.log(`calculateRatioAmountIn() inputQuotient: ${inputQuotient.toFixed(0)}`)
+
+  // 39_476_363_836.45253787
+  const optimalRatioByOutputBalanceQuotient = optimalRatio.multiply(outputBalance.quotient)
+  console.log(`calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: ${optimalRatioByOutputBalanceQuotient.toFixed(8)}`)
+
+  const optimalRatioByInputTokenPrice = optimalRatio.multiply(inputTokenPrice)
+  console.log(`calculateRatioAmountIn() optimalRatio multiplied by input token price: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
+
+  const denominator = optimalRatioByInputTokenPrice.add(1)
+  console.log(`calculateRatioAmountIn() denominator: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
+
+  // 1_998_121_297 - 39_476_363_836
+  const numerator = inputQuotient.subtract(optimalRatioByOutputBalanceQuotient)
+  console.log(`calculateRatioAmountIn() numerator: ${numerator.toFixed(8)}`)
+
+  const amountToSwapRaw2 = numerator.divide(denominator)
+  console.log(`calculateRatioAmountIn() amountToSwapRaw2: ${amountToSwapRaw2.toFixed(8)}`)
+
+  // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
+  let amountToSwapRaw = new Fraction(inputBalance.quotient)
+    .subtract(optimalRatio.multiply(outputBalance.quotient))
+    .divide(optimalRatio.multiply(inputTokenPrice).add(1))
+
+  if (amountToSwapRaw.lessThan(0)) {
+    // Try inverting the optimal ratio
+    const optimalRatioInverted = optimalRatio.invert()
+
+    amountToSwapRaw = new Fraction(inputBalance.quotient)
+        .subtract(optimalRatioInverted.multiply(outputBalance.quotient))
+        .divide(optimalRatioInverted.multiply(inputTokenPrice).add(1))
+
+    if (amountToSwapRaw.lessThan(0)) {
+        throw new Error('calculateRatioAmountIn(): insufficient input token amount, even after inverting optimal ratio')
+    }
+  }
+
+  return CurrencyAmount.fromRawAmount(
+    inputBalance.currency,
+    amountToSwapRaw.quotient
+  )
+}
+
 export async function createPoolOnTestnet() {
     if (!CHAIN_CONFIG.isTestnet) {
         throw 'Not on a testnet'
@@ -320,8 +461,8 @@ export async function createPoolOnTestnet() {
     const tickCurrent: number = 191973
 
     const newPool = new Pool(
-        usdcToken,
-        wethToken,
+        TOKEN_USDC,
+        TOKEN_WETH,
         fee,
         sqrtRatioX96,
         liquidity,
