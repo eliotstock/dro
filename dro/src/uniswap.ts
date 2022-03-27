@@ -2,8 +2,6 @@ import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
-import { BigintIsh, Fraction, Token } from '@uniswap/sdk-core'
-import { CurrencyAmount } from '@uniswap/smart-order-router'
 import { wallet } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 import moment from 'moment'
@@ -16,6 +14,7 @@ import { abi as QuoterABI }
     from '@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'
 import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
+import { BigintIsh, Fraction, Token } from '@uniswap/sdk-core'
 import {
     tickToPrice,
     TickMath,
@@ -29,6 +28,7 @@ import {
     nearestUsableTick,
     SqrtPriceMath
 } from '@uniswap/v3-sdk'
+import { CurrencyAmount } from '@uniswap/smart-order-router'
 
 // Read our .env file
 config()
