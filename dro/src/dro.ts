@@ -1,17 +1,68 @@
 import { config } from 'dotenv'
-import { MintOptions, NonfungiblePositionManager, Position, Route, SwapOptions, SwapRouter, tickToPrice, Trade } from '@uniswap/v3-sdk'
-import { CurrencyAmount, Percent, TradeType, Currency, Fraction, Token } from '@uniswap/sdk-core'
-import { TickMath } from '@uniswap/v3-sdk'
-import { TransactionResponse, TransactionReceipt, TransactionRequest } from '@ethersproject/abstract-provider'
+import JSBI from 'jsbi'
+import { ethers } from 'ethers'
+import {
+  TransactionResponse,
+  TransactionReceipt,
+  TransactionRequest
+} from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
-import { insertRerangeEvent, insertOrReplacePosition, getTokenIdForOpenPosition, deletePosition } from './db'
-import { rangeOrderPoolContract, quoterContract, positionManagerContract, rangeOrderPoolTick, useSwapPool, useRangeOrderPool, extractTokenId, positionByTokenId, positionWebUrl, tokenOrderIsWethFirst, DEADLINE_SECONDS, VALUE_ZERO_ETHER, removeCallParameters, price, rangeAround, calculateRatioAmountIn, currentTokenId } from './uniswap'
-import { AlphaRouter, SwapToRatioResponse, SwapToRatioRoute, SwapToRatioStatus } from '@uniswap/smart-order-router'
-import JSBI from 'jsbi'
-import { ethers } from 'ethers'
+import {
+  insertRerangeEvent,
+  insertOrReplacePosition,
+  getTokenIdForOpenPosition,
+  deletePosition
+} from './db'
+
+import {
+  rangeOrderPoolContract,
+  quoterContract,
+  positionManagerContract,
+  rangeOrderPoolTick,
+  useSwapPool,
+  useRangeOrderPool,
+  extractTokenId,
+  positionByTokenId, 
+  positionWebUrl,
+  tokenOrderIsWethFirst,
+  DEADLINE_SECONDS,
+  VALUE_ZERO_ETHER,
+  removeCallParameters,
+  price,
+  rangeAround,
+  calculateRatioAmountIn,
+  currentTokenId
+} from './uniswap'
+
+// Uniswap SDK interface
+import {
+  Currency,
+  CurrencyAmount,
+  Fraction,
+  Percent,
+  Token,
+  TradeType
+} from '@uniswap/sdk-core'
+import {
+  MintOptions,
+  NonfungiblePositionManager,
+  Position,
+  Route,
+  SwapOptions,
+  SwapRouter,
+  TickMath,
+  tickToPrice,
+  Trade
+} from '@uniswap/v3-sdk'
+import {
+  AlphaRouter,
+  SwapToRatioResponse,
+  SwapToRatioRoute,
+  SwapToRatioStatus
+} from '@uniswap/smart-order-router'
 
 const OUT_DIR = './out'
 

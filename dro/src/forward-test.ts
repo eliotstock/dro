@@ -1,4 +1,4 @@
-import moment, { Duration } from 'moment'
+import { Duration } from 'moment'
 import { Direction } from './dro'
 
 const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'

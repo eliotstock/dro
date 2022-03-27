@@ -1,13 +1,12 @@
 import { config } from 'dotenv'
+import moment from 'moment'
+import yargs from 'yargs/yargs'
 import { useConfig, ChainConfig } from './config'
 import { wallet, updateGasPrice, gasPriceFormatted } from './wallet'
-import { updateTick, priceFormatted } from './uniswap'
+import { updateTick, priceFormatted, createPoolOnTestnet } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
 import { init, dumpTokenIds, dumpRerangeEvents, meanTimeToReranging } from './db'
-import { createPoolOnTestnet, currentTokenId } from './uniswap'
-import moment from 'moment'
-import yargs from 'yargs/yargs'
 
 // Read our .env file
 config()

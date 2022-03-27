@@ -1,8 +1,11 @@
 import { ethers } from 'ethers'
-import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
+import moment from 'moment'
+
+// Uniswap SDK interface
+import { abi as IUniswapV3PoolABI }
+    from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
 import { tickToPrice } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
-import moment from 'moment'
 
 const TIMESTAMP_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 

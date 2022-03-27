@@ -1,9 +1,5 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
-import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
-import { abi as QuoterABI } from '@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'
-import { abi as NonfungiblePositionManagerABI } from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
-import { tickToPrice, TickMath, Pool, Position, MintOptions, NonfungiblePositionManager, FeeAmount, toHex, Multicall, nearestUsableTick, SqrtPriceMath } from '@uniswap/v3-sdk'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { useConfig, ChainConfig } from './config'
 import { BigintIsh, Fraction, Token } from '@uniswap/sdk-core'
@@ -12,6 +8,27 @@ import { wallet } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 import moment from 'moment'
 import JSBI from 'jsbi'
+
+// Uniswap SDK interface
+import { abi as IUniswapV3PoolABI }
+    from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
+import { abi as QuoterABI }
+    from '@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'
+import { abi as NonfungiblePositionManagerABI }
+    from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
+import {
+    tickToPrice,
+    TickMath,
+    Pool,
+    Position,
+    MintOptions,
+    NonfungiblePositionManager,
+    FeeAmount,
+    toHex,
+    Multicall,
+    nearestUsableTick,
+    SqrtPriceMath
+} from '@uniswap/v3-sdk'
 
 // Read our .env file
 config()

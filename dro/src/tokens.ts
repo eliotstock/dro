@@ -1,5 +1,7 @@
 import { config } from 'dotenv'
 import { useConfig, ChainConfig } from './config'
+
+// Uniswap SDK interface
 import { Token } from '@uniswap/sdk-core'
 
 // Read our .env file
