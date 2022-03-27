@@ -126,9 +126,6 @@ export class DRO {
         // Now get the position from Uniswap for the given token ID.
         const position: Position = await positionByTokenId(tokenId, this.wethFirst)
 
-        // console.log(`Position:`)
-        // console.dir(position)
-
         if (position) {
           this.position = position
           this.tickLower = position.tickLower
@@ -161,27 +158,27 @@ remove liquidity but retain our token ID? Deleting it now.`)
           console.log(`[${this.rangeWidthTicks}] Using existing position NFT: \
 ${positionWebUrl(this.tokenId)}`)
 
-          console.log(`[${this.rangeWidthTicks}] Liquidity: \
-${jsbiFormatted(this.position.liquidity)}`)
+//           console.log(`[${this.rangeWidthTicks}] Liquidity: \
+// ${jsbiFormatted(this.position.liquidity)}`)
 
-          // The price of the WETH token is quoted in USDC and vice versa.
-          if (this.wethFirst) {
-            console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
-${position.pool.token0Price.toFixed(4)} USDC, 1: ${position.pool.token1Price.toFixed(4)} WETH`)
-          }
-          else {
-            console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
-${position.pool.token0Price.toFixed(4)} WETH, 1: ${position.pool.token1Price.toFixed(4)} USDC`)
-          }
+//           // The price of the WETH token is quoted in USDC and vice versa.
+//           if (this.wethFirst) {
+//             console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
+// ${position.pool.token0Price.toFixed(4)} USDC, 1: ${position.pool.token1Price.toFixed(4)} WETH`)
+//           }
+//           else {
+//             console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
+// ${position.pool.token0Price.toFixed(4)} WETH, 1: ${position.pool.token1Price.toFixed(4)} USDC`)
+//           }
 
-          console.log(`[${this.rangeWidthTicks}] tick (lower, current, upper): \
-(${position.tickLower}, ${position.pool.tickCurrent}, ${position.tickUpper})`)
+//           console.log(`[${this.rangeWidthTicks}] tick (lower, current, upper): \
+// (${position.tickLower}, ${position.pool.tickCurrent}, ${position.tickUpper})`)
 
-          console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from pool directly: \
-${position.pool.sqrtRatioX96.toString()}`)
+//           console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from pool directly: \
+// ${position.pool.sqrtRatioX96.toString()}`)
 
-          console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from current tick: \
-${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
+//           console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from current tick: \
+// ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
 
           this.logRangeInUsdcTerms()
         }
@@ -314,7 +311,7 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
       { from: wallet.address })
       .then((results) => {
         if (results.amount0 === undefined || results.amount1 === undefined) {
-          console.log(`[${this.rangeWidthTicks}] One amount is undefined`)
+          console.log(`[${this.rangeWidthTicks}] checkUnclaimedFees(): One amount is undefined`)
           return
         }
 
@@ -344,14 +341,14 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
       console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
     }
 
-      // Note that we consciously do no error handing or retries here. These are now handled by the
-      // process manager, a sibling Node.js module to this one.
-      // Also note that Ethers.js will do its own exponential back-off but only if the provider does
-      // NOT provide a retry-after header. Alchemy does provide this header. And yet we continue to
-      // see HTTP errors, which means we must be maxing out on retries.
-      // See:
-      //   https://github.com/ethers-io/ethers.js/issues/1162#issuecomment-1057422329
-      //   https://docs.alchemy.com/alchemy/documentation/rate-limits#option-2-retry-after
+    // Note that we consciously do no error handing or retries here. These are now handled by the
+    // process manager, a sibling Node.js module to this one.
+    // Also note that Ethers.js will do its own exponential back-off but only if the provider does
+    // NOT provide a retry-after header. Alchemy does provide this header. And yet we continue to
+    // see HTTP errors, which means we must be maxing out on retries.
+    // See:
+    //   https://github.com/ethers-io/ethers.js/issues/1162#issuecomment-1057422329
+    //   https://docs.alchemy.com/alchemy/documentation/rate-limits#option-2-retry-after
     async sendTx(logLinePrefix: string, txRequest: TransactionRequest): Promise<TransactionReceipt> {
       try {
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
@@ -397,9 +394,11 @@ ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
 
       const liquidityAfter = this.position.liquidity
 
-      console.log(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
+      if (JSBI.notEqual(JSBI.BigInt(liquidityBefore), JSBI.BigInt(liquidityAfter))) {
+        console.log(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
 ${jsbiFormatted(liquidityBefore)} at opening of position/restarting and is now \
 ${jsbiFormatted(liquidityAfter)}`)
+      }
 
       const deadline = moment().unix() + DEADLINE_SECONDS
 
@@ -601,7 +600,7 @@ ${this.totalGasCost.toFixed(2)}`)
         zeroForOne)
 
       console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
-${optimalRatio.toFixed(16)}`)
+ ${optimalRatio.toFixed(16)}`)
 
       const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
         outputBalance)
@@ -617,7 +616,7 @@ ${optimalRatio.toFixed(16)}`)
       // token, this will fail an invariant. If it's not provided, we just get the decimals on
       // the token, which is what we want anyway.
       console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
-${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
+ ${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
 
       // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
       // it's not fully implemented in the SDK. It always throws:
@@ -803,8 +802,8 @@ liquidity and swap first.`
       // Go from native bigint to JSBI via string.
       const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
       const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
-      console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: \
-${availableUsdc} USDC, ${availableWeth} WETH`)
+      // console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: \
+// ${availableUsdc} USDC, ${availableWeth} WETH`)
 
       const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
@@ -906,8 +905,8 @@ be able to remove this liquidity.`)
       const gasCost = this.gasCost(txReceipt)
       this.totalGasCost += gasCost
 
-      console.log(`[${this.rangeWidthTicks}] addLiquidity() Starting liquidity: \
-${jsbiFormatted(this.position.liquidity)}`)
+      // console.log(`[${this.rangeWidthTicks}] addLiquidity() Starting liquidity: \
+// ${jsbiFormatted(this.position.liquidity)}`)
     }
 
     async swapAndAddLiquidity() {
@@ -923,8 +922,8 @@ position. Remove liquidity first.`
       // Go from native bigint to JSBI via string.
       const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
       const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
-      console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc.toString()} USDC, \
-${availableWeth.toString()} WETH`)
+      // console.log(`swapAndAddLiquidity() Amounts available: ${availableUsdc.toString()} USDC, \
+// ${availableWeth.toString()} WETH`)
 
       if (wethFirstInRangeOrderPool) {
         token0Balance = CurrencyAmount.fromRawAmount(TOKEN_WETH, availableWeth)
@@ -935,10 +934,10 @@ ${availableWeth.toString()} WETH`)
         token1Balance = CurrencyAmount.fromRawAmount(TOKEN_WETH, availableWeth)
       }
 
-      console.log(`[dro.ts] Token 0 balance: ${token0Balance.toFixed(4)}, \
+      console.log(`Token 0 balance: ${token0Balance.toFixed(4)}, \
 token 1 balance: ${token1Balance.toFixed(4)}`)
 
-      console.log(`[dro.ts] output balance quotient: ${token1Balance.quotient}`)
+      console.log(`Output balance quotient: ${token1Balance.quotient}`)
 
       // It's difficult to keep a range order pool liquid on testnet, even one we've created
       // ourselves.
@@ -970,27 +969,27 @@ token 1 balance: ${token1Balance.toFixed(4)}`)
 
       const deadlineValue = moment().unix() + 1800
 
-      // console.log(`[dro.ts] deadline: ${deadlineValue}`)
+      // console.log(`deadline: ${deadlineValue}`)
 
       const router = new AlphaRouter({chainId: CHAIN_CONFIG.chainId,
         provider: CHAIN_CONFIG.provider()})
 
-      console.log(`[dro.ts] Poistion tickLower: ${p.tickLower}`)
-      console.log(`[dro.ts] Poistion tickUpper: ${p.tickUpper}`)
+      console.log(`Poistion tickLower: ${p.tickLower}`)
+      console.log(`Poistion tickUpper: ${p.tickUpper}`)
 
       const ZERO = JSBI.BigInt(0) // Same as v3-sdk/src/internalConstants.ts
       const slippageTolerance = new Percent(5, 100)
-      console.log(`[dro.ts] slippageTolerance.lessThan(ZERO): ${slippageTolerance.lessThan(ZERO)}`)
+      console.log(`slippageTolerance.lessThan(ZERO): ${slippageTolerance.lessThan(ZERO)}`)
 
       // From sdk-core:
       if (slippageTolerance instanceof JSBI || typeof slippageTolerance === 'number'
         || typeof slippageTolerance === 'string')
-        console.log(`[dro.ts] sdk-core will use new Fraction for tryParseFraction()`)
+        console.log(`sdk-core will use new Fraction for tryParseFraction()`)
       else if ('numerator' in slippageTolerance && 'denominator' in slippageTolerance)
-        console.log(`[dro.ts] sdk-core will use argument as return value`)
-      else console.log(`[dro.ts] sdk-core will throw 'Could not parse fraction'`)
+        console.log(`sdk-core will use argument as return value`)
+      else console.log(`sdk-core will throw 'Could not parse fraction'`)
 
-      console.log(`[dro.ts] Calling routeToRatio()`)
+      console.log(`Calling routeToRatio()`)
 
       // Source: https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/alpha-router.ts
       //         https://github.com/Uniswap/smart-order-router/blob/main/src/routers/alpha-router/functions/calculate-ratio-amount-in.ts#L17
@@ -1034,31 +1033,31 @@ token 1 balance: ${token1Balance.toFixed(4)}`)
       if (routeToRatioResponse.status == SwapToRatioStatus.SUCCESS) {
         const route: SwapToRatioRoute = routeToRatioResponse.result
 
-        console.log(`[dro.ts] route:`)
+        console.log(`route:`)
         console.dir(route)
 
-        console.log(`[dro.ts] methodParameters:`)
+        console.log(`methodParameters:`)
         console.dir(route.methodParameters)
 
         if (route.methodParameters === undefined) throw `No method parameters`
 
-        console.log(`[dro.ts] number of swaps:`)
+        console.log(`number of swaps:`)
         console.dir(route.trade.swaps.length)
 
-        console.log(`[dro.ts] first trade swap:`)
+        console.log(`first trade swap:`)
         console.dir(route.trade.swaps[0])
 
-        console.log(`[dro.ts] number of routes:`)
+        console.log(`number of routes:`)
         console.dir(route.trade.routes.length)
 
-        console.log(`[dro.ts] first trade route:`)
+        console.log(`first trade route:`)
         console.dir(route.trade.routes[0])
 
-        console.log(`[dro.ts] trade input amount: ${route.trade.inputAmount.toFixed(2)} \
+        console.log(`trade input amount: ${route.trade.inputAmount.toFixed(2)} \
 ${route.trade.inputAmount.currency.symbol}, output amount: ${route.trade.outputAmount.toFixed(2)} \
 ${route.trade.outputAmount.currency.symbol}`)
 
-        console.log(`[dro.ts] optimalRatio: ${route.optimalRatio.toFixed(4)}`)
+        console.log(`optimalRatio: ${route.optimalRatio.toFixed(4)}`)
 
         // console.log(`Gas price from route: ${route.gasPriceWei} wei`)
         // console.log(`Gas price from config: ${CHAIN_CONFIG.gasPrice.toString()}`)
@@ -1123,7 +1122,7 @@ be able to remove this liquidity.`
         this.totalGasCost += gasCost
       }
       else {
-        console.log(`[dro.ts] routeToRatioResponse:`)
+        console.log(`routeToRatioResponse:`)
         console.dir(routeToRatioResponse)
 
         // const responseAsFail: SwapToRatioFail = routeToRatioResponse
@@ -1190,6 +1189,10 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         }
 
         this.locked = true
+
+        // TODO: Consider reloading the .env file here so that we can change the range without
+        // restaritng the process, which loses us our tx costs so far. See:
+        //   https://github.com/motdotla/dotenv/issues/122
 
         // Put a row in our analytics table and log the re-ranging.
         this.trackRerangeEvent()
