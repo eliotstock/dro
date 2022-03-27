@@ -276,13 +276,27 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     return usablePosition
 }
 
+// Get the token ID of the last position, as long as it's still open (ie. has non zero liquidity).
 // We only have one position open at a time, so the last one is the current, open one.
 export async function currentTokenId(address: string): Promise<number | undefined> {
     const positionCount = await positionManagerContract.balanceOf(address)
 
     if (positionCount == 0) return undefined
 
-    return await positionManagerContract.tokenOfOwnerByIndex(address, positionCount - 1)
+    const tokenId = await positionManagerContract.tokenOfOwnerByIndex(address, positionCount - 1)
+
+    // Get the liquidity of this position
+    const position: Position = await positionManagerContract.positions(tokenId)
+
+    // Check for zero liquidity in the position
+    if (JSBI.EQ(JSBI.BigInt(0), JSBI.BigInt(position.liquidity))) {
+        console.log(`currentTokenId(): Existing position with token ID ${tokenId} has no liquidity.\
+ Ignoring position.`)
+
+        return undefined
+    }
+
+    return tokenId
 }
 
 export function positionWebUrl(tokenId: number): string {
