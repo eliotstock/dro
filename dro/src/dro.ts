@@ -443,24 +443,6 @@ ${this.totalGasCost.toFixed(2)}`)
          throw "Refusing to top up ETH. Still in a position. Remove liquidity first."
 
       const ethBalance = await wallet.eth()
-
-      if (ethBalance >= CHAIN_CONFIG.ethBalanceMin) {
-        return
-      }
-
-      const deficit = CHAIN_CONFIG.ethBalanceMin - ethBalance
-
-      console.log(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH. Unwrapping some WETH\
- to top up.`)
-
-      await wallet.unwrapWeth(deficit)
-    }
-
-    async topUpEthImproved() {
-      if (this.position || this.tokenId)
-         throw "Refusing to top up ETH. Still in a position. Remove liquidity first."
-
-      const ethBalance = await wallet.eth()
       const wethBalance = await wallet.weth()
 
       if (ethBalance >= CHAIN_CONFIG.ethBalanceMin) {
@@ -472,13 +454,14 @@ ${this.totalGasCost.toFixed(2)}`)
 
       // Typical tx cost: USD 10.00
       if (wethBalance > enoughForThreeWorstCaseReRanges) {
-        console.log(`Running low on ETH. Unwrapping enough WETH for three wost case re-ranges.`)
+        console.log(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH. Unwrapping enough \
+WETH for three wost case re-ranges.`)
 
         await wallet.unwrapWeth(enoughForThreeWorstCaseReRanges)
       }
       else {
-        console.log(`Running low on ETH but also on WETH. Unwrapping just enough WETH for the\
- next re-range.`)
+        console.log(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH but also on WETH. \
+Unwrapping just enough WETH for the next re-range.`)
 
         await wallet.unwrapWeth(deficit)
       }
@@ -1218,15 +1201,12 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // right balance of assets for the new position.
         await this.swapOptimally()
 
-        // Old swap() implementation. Swap simply half our one asset to the other asset.
-        // await this.swap()
-
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
         // a non zero amount of WETH. Unwrap some to ETH now if we need to.
         // Note that this will move us slightly away from the optimal ratio of assets we just
         // swapped to. The error is negligible.
-        await this.topUpEthImproved()
+        await this.topUpEth()
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()
