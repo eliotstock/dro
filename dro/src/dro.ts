@@ -1226,7 +1226,7 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // a non zero amount of WETH. Unwrap some to ETH now if we need to.
         // Note that this will move us slightly away from the optimal ratio of assets we just
         // swapped to. The error is negligible.
-        await this.topUpEth()
+        await this.topUpEthImproved()
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()
