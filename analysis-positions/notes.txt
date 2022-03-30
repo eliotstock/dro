@@ -1,0 +1,106 @@
+0.037 ETH:
+037_650_642_868_848_163
+
+41,248.699085 - 41,078.218169 = 170.480916
+
+170_480_916
+
+15_677_865_207_181_749_241
+
+Address constants:
+  * 0xc36442b4a4522e871399cd717abdd847ab11fe88: Uniswap v3: Positions NFT
+  * 0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8: Uniswap v3 WETH/USDC pool with 0.30% fee
+  * 0x4d35A946c2853DB8F40E1Ad1599fd48bb176DE5a: Manual range order
+  * 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2: WETH, L1
+  * 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48: USDC, L1
+
+Event topic constants:
+  * 0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde: Mint
+  * 0x0c396cd989a39f4459b5fa1aed6a9a8dcdbc45908acfd67e028cd568da98982c: Burn
+  * 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef: Transfer
+
+Goals:
+  * Plot range width versus fees claimed as a percentage of position size, ignoring time in range
+    and tx costs
+  * Add accounting for fees
+  * Add accounting for time in range, ie. annualise
+  * Split into position size buckets
+
+Queries
+  * Find all 'add' transactions in our pool
+-- logs of 'add' txs
+-- count: 279,295 log events
+select block_timestamp, transaction_hash, address, data, topics
+from bigquery-public-data.crypto_ethereum.logs
+where transaction_hash in (
+  -- hashes of txs in our pool that included a Mint event in the logs
+  -- count: 40,472 txs
+  select distinct(transaction_hash)
+  from bigquery-public-data.crypto_ethereum.logs
+  where address = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
+  and topics[SAFE_OFFSET(0)] = "0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde"
+)
+order by block_timestamp, log_index
+  * Find all 'remove' transactions in our pool
+-- logs of 'remove' txs
+-- count: 336,399 log events
+select block_timestamp, transaction_hash, address, data, topics
+from bigquery-public-data.crypto_ethereum.logs
+where transaction_hash in (
+  -- hashes of txs in our pool that included a Burn event in the logs
+  -- count: 38,614 txs
+  select distinct(transaction_hash)
+  from bigquery-public-data.crypto_ethereum.logs
+  where address = "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8"
+  and topics[SAFE_OFFSET(0)] = "0x0c396cd989a39f4459b5fa1aed6a9a8dcdbc45908acfd67e028cd568da98982c"
+)
+order by block_timestamp, log_index
+
+Log events:
+  * Given a known 'add' tx, find the token ID and range width
+    * There will be two event logs for the address 'Uniswap v3: Positions NFT' (if not, discard
+      tx). Token ID is given by the last topic for either event log, as decimal
+    * There will be only one event log for the address 'Uniswap v3 WETH/USDC pool with 0.30% fee'
+      (if not, discard tx). Tick lower and tick upper are given by the topics with indices 2 and 3.
+    * The Uniswap SDK contains a function to get from tick to price, given the tick spacing for the
+      pool.
+    * The range width has to be calculated from the lower and upper prices, not the ticks.
+  * Given a known 'remove' tx, find the amount of each asset that is fees claimed
+    * Based on liquidity amounts from the known 'add' tx
+    * There should only be one event log with address WETH and one with USDC, otherwise discard the
+      tx
+    * For a position that traded up into USDC:
+      * Which is identified by the amount1 being 0 on the *first* of the two event logs with
+        address 'Uniswap v3: Positions NFT'
+      * WETH component of fees is given by the event log with address WETH, WETH9.Transfer(), whole
+        calldata, as decimal (also Data, wad value, in WETH)
+      * Total USDC withdrawn (fees plus liquidity) is given by the event log with address USDC,
+        whole calldata, as decimal
+      * Liquidity USDC withdrawn is given by the *first* of the two event logs with address
+        'Uniswap v3: Positions NFT', the 'amount0' value from the calldata. Calldata needs to be
+        decoded using the ABI interface.
+      * USDC component of fees is then given by the difference between the last two values.
+    * For a position that traded down into WETH:
+      * Which is identified by the amount0 being 0 on the *first* of the two event logs with
+        address 'Uniswap v3: Positions NFT'
+      * USDC component of fees is given by the event log with address USDC, USDC.Transfer(), whole
+        calldata, as decimal
+      * Total WETH withdrawn (fees plus liquidity) is given by the event log with address WETH,
+        whole calldata, as decimal
+      * Liquidity WETH withdrawn is given by the  *first* of the two event logs with address
+        'Uniswap v3: Positions NFT', the 'amount1' value from the calldata. Calldata needs to be
+        decoded using the ABI interface.
+      * WETH component of fees is then given by the difference between the last two values.
+  * Given a known 'remove' tx, find the add transaction that opened it
+    * Token ID is given by the event log with address 'Uniswap v3: Positions NFT', topic index 1
+  * Given a transaction, find the tx gas cost in ETH
+
+Code
+  * Node.js project
+  * Given an add transaction, calculate the range width in bps from tick lower and tick upper.
+  * Given add and remove transactions (and the lower and upper tick from the add tx), determine
+    whether the position was out of range at the time of the remove. Note that it's not required
+    for the price in the pool to be in range throughout the interval of the position.
+
+Other
+  * Determine swap tx cost as a function of gas price based on my own swaps in the 0.05% fee pool.
