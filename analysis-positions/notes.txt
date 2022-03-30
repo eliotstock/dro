@@ -66,7 +66,6 @@ Log events:
       pool.
     * The range width has to be calculated from the lower and upper prices, not the ticks.
   * Given a known 'remove' tx, find the amount of each asset that is fees claimed
-    * Based on liquidity amounts from the known 'add' tx
     * There should only be one event log with address WETH and one with USDC, otherwise discard the
       tx
     * For a position that traded up into USDC:
