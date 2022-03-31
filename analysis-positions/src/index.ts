@@ -4,6 +4,7 @@ import { ethers } from 'ethers'
 import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
 import { abi as WethABI } from './abi/weth.json'
+import { abi as Erc20ABI } from './abi/erc20.json'
 import { tickToPrice, nearestUsableTick, TickMath } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
 import { BigQuery }  from '@google-cloud/bigquery'
@@ -35,7 +36,7 @@ const ADDR_RANGE_ORDER_MANUAL = '0x4d35A946c2853DB8F40E1Ad1599fd48bb176DE5a'
 const ADDR_TOKEN_WETH = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
 
 // USDC
-const ADDR_TOKEN_USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+const ADDR_TOKEN_USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
 
 const TOPIC_MINT = '0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde'
 const TOPIC_BURN = '0x0c396cd989a39f4459b5fa1aed6a9a8dcdbc45908acfd67e028cd568da98982c'
@@ -44,6 +45,7 @@ const TOPIC_DECREASE_LIQUIDITY = '0x26f6a048ee9138f2c0ce266f322cb99228e8d619ae2b
 
 const INTERFACE_NFT = new ethers.utils.Interface(NonfungiblePositionManagerABI)
 const INTERFACE_WETH = new ethers.utils.Interface(WethABI)
+const INTERFACE_USDC = new ethers.utils.Interface(Erc20ABI)
 
 // const TOKEN_USDC = new Token(CHAIN_ID, ADDR_TOKEN_USDC, 6, "USDC", "USD Coin")
 
@@ -60,6 +62,10 @@ const REMOVES = OUT_DIR + '/removes.json'
 // Read our .env file
 config()
 
+// Relational diagram for bigquery-public-data.crypto_ethereum:
+//   https://medium.com/google-cloud/full-relational-diagram-for-ethereum-public-data-on-google-bigquery-2825fdf0fb0b
+// Don't bother joining on the transaction table at this stage - the results will not be
+// array-ified to put the logs under the transactions, the way topics are under the logs.
 function sql(poolAddress: string, firstTopic: string) {
     return `select block_timestamp, transaction_hash, address, data, topics
     from bigquery-public-data.crypto_ethereum.logs
@@ -99,6 +105,8 @@ enum Direction {
 
 class Position {
     tokenId: number
+    removeTxLogs?: EventLog[]
+    addTxLogs?: EventLog[]
     traded?: Direction
     openedTimestamp?: string
     closedTimestamp?: string
@@ -177,7 +185,7 @@ async function runQueries() {
 
 // Given an array of event logs, build a map in which keys are tx hashes and values are arrays of
 // the logs for each tx.
-function mapByTxs(logs: EventLog[]): Map<string, EventLog[]> {
+function logsByTxHash(logs: EventLog[]): Map<string, EventLog[]> {
     const txs = new Map<string, EventLog[]>()
 
     // forEach() is blocking here.
@@ -198,14 +206,33 @@ function positionsByTokenId(txMap: Map<string, EventLog[]>): Map<number, Positio
     const positions = new Map<number, Position>()
 
     for (let [removeTxHash, logs] of txMap) {
+        // One of the event logs contains the token ID. Use that one to create the Position
+        // instance only.
         logs.forEach(function(log: EventLog) {
             // The position's token ID is given by the event log with address
             // 'Uniswap v3: Positions NFT', topic DecreaseLiquidity.
             if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
                 // Parse hex string to decimal
                 const tokenId = Number(log.topics[1])
-                const position = new Position(tokenId)
 
+                const position = new Position(tokenId)
+                position.removeTxLogs = logs
+
+                positions.set(tokenId, position)
+
+                // No need to see the rest of the logs.
+                return
+            }
+        })
+    }
+
+    return positions
+}
+
+function setDirectionAndFIlterToOutOfRange(positions: Map<number, Position>) {
+    for (let [tokenId, position] of positions) {
+        position.removeTxLogs?.forEach(function(log: EventLog) {
+            if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
                 // Decode the logs data to get amount0 and amount1 so that we can figure out
                 // whether the position was closed when out of range, and if so whether the
                 // market traded up or down.
@@ -224,17 +251,42 @@ function positionsByTokenId(txMap: Map<string, EventLog[]>): Map<number, Positio
                     // console.log(`up`)
                 }
                 else {
-                    // Position was closed in-range. Skipping.
-                    return
+                    // Position was closed in-range. Removing from our map.
+                    positions.delete(tokenId)
                 }
-
-                // console.log(`amount0: ${}, amount1: ${parsedLog.args['amount1']}`)
-                positions.set(tokenId, position)
             }
         })
     }
+}
 
-    return positions
+function setFees(positions: Map<number, Position>) {
+    for (let [tokenId, position] of positions) {
+        position.removeTxLogs?.forEach(function(log: EventLog) {
+            // For a position that traded up into USDC:
+            // WETH component of fees is given by the event log with address WETH,
+            // Transfer() event, Data, wad value, in WETH.
+            if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
+                if (position.traded == Direction.Up) {
+                    const parsedLog = INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
+                    const wad: bigint = parsedLog.args['wad']
+    
+                    position.feesWeth = wad
+                }
+            }
+
+            // For a position that traded down into WETH:
+            // USDC component of fees is given by the event log with address USDC,
+            // Transfer() event, Data, 'value' arg, in USDC.
+            if (log.address == ADDR_TOKEN_USDC && log.topics[0] == TOPIC_TRANSFER) {
+                if (position.traded == Direction.Down) {
+                    const parsedLog = INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
+                    const value: bigint = parsedLog.args['value']
+
+                    position.feesUsdc = value
+                }
+            }
+        })
+    }
 }
 
 async function main() {
@@ -263,46 +315,24 @@ async function main() {
     console.log(`Analysing...`)
 
     // Keys: tx hashes, values: array of EventLogs
-    const removeTxLogs = mapByTxs(removes)
-    const addTxLogs = mapByTxs(adds)
+    const removeTxLogs = logsByTxHash(removes)
+    const addTxLogs = logsByTxHash(adds)
 
     console.log(`remove transactions: ${removeTxLogs.size}, add transactions: ${addTxLogs.size}`)
 
-    // Create positions for each remove transaction with only the tokenId and direction populated
-    // at this stage.
+    // Create positions for each remove transaction with only the tokenId and remove TX logs
+    // populated at this stage.
     const positions = positionsByTokenId(removeTxLogs)
+    // console.log(`Sample position, with logs: ${JSON.stringify(positions.get(198342))}`)
 
-    // let r = 0
-    // let l = 0
+    // Now do a second pass to set the direction, since other values depend on that. While we're
+    // here, filter out the positions that were closed in-range.
+    setDirectionAndFIlterToOutOfRange(positions)
+    // console.log(`Sample position, with direction: ${JSON.stringify(positions.get(198342))}`)
 
-    // For each event log of a remove tx, find the fees claimed.
-    for (let [removeTxHash, logs] of removeTxLogs) {
-        // r++
-
-        logs.forEach(function(log: EventLog) {
-            // l++
-
-            // WETH component of fees is given by the event log with address WETH, Transfer(),
-            // 'wad' value.
-            if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
-                const parsedLog = INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
-                const wad: bigint = parsedLog.args['wad']
-
-                // TODO: Find the position to set this on. First we need the token ID.
-                // Which we don't have. Do we really need a map keyed by remove TX hash with
-                // values as positions?
-                // console.log(`wad: ${wad}`)
-            }
-
-            // if (log.address == ADDR_TOKEN_WETH) {
-            //     console.log(`${r} ${l} address is WETH`)
-            // }
-
-            // if (log.topics[0] == TOPIC_TRANSFER) {
-            //     console.log(`${r} ${l} first topic is Transfer, address is ${log.address}`)
-            // }
-        })
-    }
+    // Set fees, based on the direction.
+    setFees(positions)
+    console.log(`Sample position, with feesUsdc: ${JSON.stringify(positions.get(198342))}`) // Traded down into WETH.
 
     console.log(`Positions: ${positions.size}`)
 }
