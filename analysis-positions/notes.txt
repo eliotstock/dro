@@ -69,9 +69,9 @@ Log events:
     * There should only be one event log with address WETH and one with USDC, otherwise discard the
       tx
     * For a position that traded up into USDC:
-      * Which is identified by the amount1 being 0 on the *first* of the two event logs with
+      * [DONE] Which is identified by the amount1 being 0 on the *first* of the two event logs with
         address 'Uniswap v3: Positions NFT'
-      * WETH component of fees is given by the event log with address WETH, WETH9.Transfer(), whole
+      * [DONE] WETH component of fees is given by the event log with address WETH, WETH9.Transfer(), whole
         calldata, as decimal (also Data, wad value, in WETH)
       * Total USDC withdrawn (fees plus liquidity) is given by the event log with address USDC,
         whole calldata, as decimal
@@ -80,9 +80,9 @@ Log events:
         decoded using the ABI interface.
       * USDC component of fees is then given by the difference between the last two values.
     * For a position that traded down into WETH:
-      * Which is identified by the amount0 being 0 on the *first* of the two event logs with
+      * [DONE] Which is identified by the amount0 being 0 on the *first* of the two event logs with
         address 'Uniswap v3: Positions NFT'
-      * USDC component of fees is given by the event log with address USDC, USDC.Transfer(), whole
+      * [DONE] USDC component of fees is given by the event log with address USDC, USDC.Transfer(), whole
         calldata, as decimal
       * Total WETH withdrawn (fees plus liquidity) is given by the event log with address WETH,
         whole calldata, as decimal
