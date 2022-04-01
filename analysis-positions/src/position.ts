@@ -27,8 +27,8 @@ export class Position {
     openingLiquidityUsdc?: bigint
     closingLiquidityWeth?: bigint
     closingLiquidityUsdc?: bigint
-    // TODO: priceAtClosing: bigint // Quoted in USDC as a big integer.
-    // TODO: priceAtOpening: bigint // Quoted in USDC as a big integer.
+    priceAtOpening?: bigint // Quoted in USDC as a big integer.
+    priceAtClosing?: bigint // Quoted in USDC as a big integer.
     // TODO: feesTotalInUsdc(): bigint // Quoted in USDC as a big integer, depends on priceAtClosing.
     // TODO: openingLiquidityTotalInUsdc(): bigint // Quoted in USDC as a big integer, depends on priceAtOpening.
 
