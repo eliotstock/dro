@@ -1,3 +1,5 @@
+const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
+
 export interface EventLog {
     block_timestamp: {value: string}
     transaction_hash: string
@@ -27,9 +29,8 @@ export class Position {
     openingLiquidityUsdc?: bigint
     closingLiquidityWeth?: bigint
     closingLiquidityUsdc?: bigint
-    priceAtOpening?: bigint // Quoted in USDC as a big integer.
-    priceAtClosing?: bigint // Quoted in USDC as a big integer.
-    // TODO: openingLiquidityTotalInUsdc(): bigint // Quoted in USDC as a big integer, depends on priceAtOpening.
+    priceAtOpening?: bigint // Quoted in USDC
+    priceAtClosing?: bigint // Quoted in USDC
 
     constructor(_tokenId: number) {
         this.tokenId = _tokenId
@@ -73,23 +74,31 @@ export class Position {
     feesTotalInUsdc(): bigint {
         if (this.priceAtClosing == undefined) throw `No price at closing`
 
-        const n10ToThe18 = BigInt(1_000_000_000_000_000_000)
-
         if (this.traded == Direction.Down) {    
             if (this.feesUsdc == undefined) throw `No USDC fees component`
       
-            const usdcValueOfWethFees = BigInt(this.feesWethCalculated()) * BigInt(this.priceAtClosing) / n10ToThe18
+            const usdcValueOfWethFees = BigInt(this.feesWethCalculated()) * BigInt(this.priceAtClosing) / N_10_TO_THE_18
 
             return BigInt(this.feesUsdc) + usdcValueOfWethFees
         }
         else if (this.traded == Direction.Up) {
             if (this.feesWeth == undefined) throw `No WETH fees component`
 
-            const usdcValueOfWethFees = BigInt(this.feesWeth) * BigInt(this.priceAtClosing) / n10ToThe18
+            const usdcValueOfWethFees = BigInt(this.feesWeth) * BigInt(this.priceAtClosing) / N_10_TO_THE_18
 
             return BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees
         }
 
         throw `No direction`
+    }
+
+    openingLiquidityTotalInUsdc(): bigint {
+        if (this.priceAtOpening == undefined) throw `No price at opening`
+        if (this.openingLiquidityWeth == undefined) throw `No opening liquidity in WETH`
+        if (this.openingLiquidityUsdc == undefined) throw `No opening liquidity in USDC`
+    
+        const usdcValueOfWethLiquidity = BigInt(BigInt(this.openingLiquidityWeth) * BigInt(this.priceAtOpening)) / N_10_TO_THE_18
+
+        return BigInt(this.openingLiquidityUsdc) + usdcValueOfWethLiquidity
     }
 }
