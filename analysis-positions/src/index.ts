@@ -5,10 +5,9 @@ import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
 import { abi as WethABI } from './abi/weth.json'
 import { abi as Erc20ABI } from './abi/erc20.json'
-import { tickToPrice, nearestUsableTick, TickMath } from '@uniswap/v3-sdk'
+import { tickToPrice } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
 import { BigQuery }  from '@google-cloud/bigquery'
-import invariant from 'tiny-invariant'
 import stringify from 'csv-stringify/lib/sync'
 import parse from 'csv-parse/lib/sync'
 import moment from 'moment'
@@ -116,11 +115,14 @@ class Position {
     feesUsdc?: bigint
     withdrawnWeth?: bigint
     withdrawnUsdc?: bigint
+    openingLiquidityWeth?: bigint
+    openingLiquidityUsdc?: bigint
     closingLiquidityWeth?: bigint
     closingLiquidityUsdc?: bigint
     // TODO: priceAtClosing: bigint // Quoted in USDC as a big integer.
+    // TODO: priceAtOpening: bigint // Quoted in USDC as a big integer.
     // TODO: feesTotalInUsdc(): bigint // Quoted in USDC as a big integer, depends on priceAtClosing.
-    // TODO: openingLiquidityTotalInUsdc(): bigint // Quoted in USDC as a big integer.
+    // TODO: openingLiquidityTotalInUsdc(): bigint // Quoted in USDC as a big integer, depends on priceAtOpening.
 
     constructor(_tokenId: number) {
         this.tokenId = _tokenId
@@ -431,7 +433,7 @@ function setAddTxLogs(positions: Map<number, Position>,
     }
 }
 
-function setRangeWidths(positions: Map<number, Position>) {
+function setRangeWidth(positions: Map<number, Position>) {
     for (let [tokenId, position] of positions) {
         position.addTxLogs?.forEach(function(log: EventLog) {
             // Just look for a Mint() event, regardless of the address that emitted it.
@@ -463,6 +465,25 @@ function setRangeWidths(positions: Map<number, Position>) {
                     // Skip outlier positions.
                     positions.delete(tokenId)
                 }
+            }
+        })
+    }
+}
+
+function setOpeningLiquidity(positions: Map<number, Position>) {
+    for (let [tokenId, position] of positions) {
+        position.addTxLogs?.forEach(function(log: EventLog) {
+            if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
+                const parsedLog = INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
+                const wad: bigint = parsedLog.args['wad']
+
+                position.openingLiquidityWeth = wad
+            }
+            else if (log.address == ADDR_TOKEN_USDC && log.topics[0] == TOPIC_TRANSFER) {
+                const parsedLog = INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
+                const value: bigint = parsedLog.args['value']
+
+                position.openingLiquidityUsdc = value
             }
         })
     }
@@ -528,13 +549,21 @@ async function main() {
     // console.log(`Sample add tx logs: ${JSON.stringify(positions.get(198342))}`)
     // console.log(`Sample add tx logs: ${JSON.stringify(positions.get(204635))}`)
 
-    setRangeWidths(positions)
+    setRangeWidth(positions)
+
+    setOpeningLiquidity(positions)
+
+    // 21,590 USDC and 7.473 WETH
+    // console.log(`Sample position: ${positions.get(198342)?.openingLiquidityUsdc} USDC and ${positions.get(198342)?.openingLiquidityWeth} WETH`)
+
+    // 19,413 USDC and 7.632 WETH
+    // console.log(`Sample position: ${positions.get(204635)?.openingLiquidityUsdc} USDC and ${positions.get(204635)?.openingLiquidityWeth} WETH`)
 
     console.log(`Positions: ${positions.size}`)
 
-    for (let [tokenId, position] of positions) {
-        console.log(`${position.rangeWidthBps}`)
-    }
+    // for (let [tokenId, position] of positions) {
+    //     console.log(`${position.rangeWidthBps}`)
+    // }
 }
 
 main().catch((error) => {
