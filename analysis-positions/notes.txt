@@ -58,9 +58,9 @@ order by block_timestamp, log_index
 
 Log events:
   * Given a known 'add' tx, find the token ID and range width
-    * There will be two event logs for the address 'Uniswap v3: Positions NFT' (if not, discard
+    * [DONE] There will be two event logs for the address 'Uniswap v3: Positions NFT' (if not, discard
       tx). Token ID is given by the last topic for either event log, as decimal
-    * There will be only one event log for the address 'Uniswap v3 WETH/USDC pool with 0.30% fee'
+    * [DONE] There will be only one event log for the address 'Uniswap v3 WETH/USDC pool with 0.30% fee'
       (if not, discard tx). Tick lower and tick upper are given by the topics with indices 2 and 3.
     * The Uniswap SDK contains a function to get from tick to price, given the tick spacing for the
       pool.

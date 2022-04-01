@@ -47,9 +47,9 @@ const INTERFACE_NFT = new ethers.utils.Interface(NonfungiblePositionManagerABI)
 const INTERFACE_WETH = new ethers.utils.Interface(WethABI)
 const INTERFACE_USDC = new ethers.utils.Interface(Erc20ABI)
 
-// const TOKEN_USDC = new Token(CHAIN_ID, ADDR_TOKEN_USDC, 6, "USDC", "USD Coin")
+const TOKEN_USDC = new Token(CHAIN_ID, ADDR_TOKEN_USDC, 6, "USDC", "USD Coin")
 
-// const TOKEN_WETH = new Token(CHAIN_ID, ADDR_TOKEN_WETH, 18, "WETH", "Wrapped Ether")
+const TOKEN_WETH = new Token(CHAIN_ID, ADDR_TOKEN_WETH, 18, "WETH", "Wrapped Ether")
 
 // const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
@@ -109,9 +109,9 @@ class Position {
     removeTxLogs?: EventLog[]
     addTxLogs?: EventLog[]
     traded?: Direction
-    // TODO: openedTimestamp?: string
+    openedTimestamp?: string
     closedTimestamp?: string
-    // TODO: rangeWidthBps: number
+    rangeWidthBps?: number
     feesWeth?: bigint
     feesUsdc?: bigint
     withdrawnWeth?: bigint
@@ -227,6 +227,23 @@ async function runQueries() {
     return [rowsAdds, rowsRemoves]
 }
 
+// Returns USDC's small units (USDC has six decimals)
+// When the price in the pool is USDC 3,000, this will return 3_000_000_000.
+// Note that this ONLY works for the token order of the WETH/USDC 0.30% pool on L1. The token
+// order for other pools or the same pool on other chains may vary.
+// May throw 'Error: Invariant failed: TICK'
+export function tickToNativePrice(tick: number): bigint {
+    // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
+    // and denominator are both JSBIs.
+    const p = tickToPrice(TOKEN_WETH, TOKEN_USDC, tick)
+
+    // The least bad way to get from JSBI to BigInt is via strings for numerator and denominator.
+    const num = BigInt(p.numerator.toString())
+    const denom = BigInt(p.denominator.toString())
+
+    return num * BigInt(1_000_000_000_000_000_000) / denom
+}
+
 // Given an array of event logs, build a map in which keys are tx hashes and values are arrays of
 // the logs for each tx.
 function logsByTxHash(logs: EventLog[]): Map<string, EventLog[]> {
@@ -244,6 +261,27 @@ function logsByTxHash(logs: EventLog[]): Map<string, EventLog[]> {
     })
 
     return txs
+}
+
+function logsByTokenId(txMap: Map<string, EventLog[]>): Map<number, EventLog[]> {
+    const logsMapped = new Map<number, EventLog[]>()
+
+    for (let [txHash, logs] of txMap) {
+        logs.forEach(function(log: EventLog) {
+            // The position's token ID is given by the event log with address
+            // 'Uniswap v3: Positions NFT', event Transfer(), last topic of the set of four tpoics.
+            if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_TRANSFER) {
+                const tokenId: number = Number(log.topics[3])
+
+                logsMapped.set(tokenId, logs)
+
+                // No need to read any further through the logs for this transaction.
+                return
+            }
+        })
+    }
+
+    return logsMapped
 }
 
 function positionsByTokenId(txMap: Map<string, EventLog[]>): Map<number, Position> {
@@ -377,6 +415,59 @@ function setFees(positions: Map<number, Position>) {
     }
 }
 
+function setAddTxLogs(positions: Map<number, Position>,
+    addTxLogsByTokenId: Map<number, EventLog[]>) {
+    for (let [tokenId, position] of positions) {
+        const addTxLogs = addTxLogsByTokenId.get(position.tokenId)
+
+        if (addTxLogs != undefined && addTxLogs.length > 0) {
+            position.addTxLogs = addTxLogs
+            position.openedTimestamp = addTxLogs[0].block_timestamp.value
+        }
+        else {
+            // We can't do much with a position that has no add transaction logs.
+            positions.delete(tokenId)
+        }
+    }
+}
+
+function setRangeWidths(positions: Map<number, Position>) {
+    for (let [tokenId, position] of positions) {
+        position.addTxLogs?.forEach(function(log: EventLog) {
+            // Just look for a Mint() event, regardless of the address that emitted it.
+            if (log.topics[0] == TOPIC_MINT) {
+                // The last two topics are the tickLower and tickUpper
+                const tickLower = Number(log.topics[2])
+                const tickUpper = Number(log.topics[3])
+
+                // For this token order, prices are inverted from ticks (lower to upper)
+                try {
+                    const priceLower = tickToNativePrice(tickUpper)
+                    const priceUpper = tickToNativePrice(tickLower)
+
+                    const widthAbsolute = priceUpper - priceLower
+                    const priceMid = priceLower + (widthAbsolute / 2n)
+
+                    // The old 'decimal value from dividing two bigints' trick, except we want
+                    // this in basis points, so we don't divide again by our constant.
+                    const range = Number(widthAbsolute * 10_000n / priceMid)
+
+                    // if (tokenId == 204635) {
+                    //     console.log(`Prices: lower: ${priceLower}, mid: ${priceMid}, upper: ${priceUpper}. Range: ${range}`)
+                    // }
+
+                    position.rangeWidthBps = range
+                }
+                catch (e) {
+                    // Probably: 'Error: Invariant failed: TICK'
+                    // Skip outlier positions.
+                    positions.delete(tokenId)
+                }
+            }
+        })
+    }
+}
+
 async function main() {
     if (!fs.existsSync(OUT_DIR)) {
         fs.mkdirSync(OUT_DIR)
@@ -404,11 +495,9 @@ async function main() {
 
     // Keys: tx hashes, values: array of EventLogs
     const removeTxLogs = logsByTxHash(removes)
-
-    // TODO: We don't need this. Instead we need addTxLogsByTokenId. Similar to positionsByTokenId().
     const addTxLogs = logsByTxHash(adds)
 
-    console.log(`remove transactions: ${removeTxLogs.size}, add transactions: ${addTxLogs.size}`)
+    console.log(`Remove transactions: ${removeTxLogs.size}, add transactions: ${addTxLogs.size}`)
 
     // Create positions for each remove transaction with only the tokenId and remove TX logs
     // populated at this stage.
@@ -422,16 +511,30 @@ async function main() {
 
     // Set fees, based on the direction.
     setFees(positions)
-    console.log(`Sample position, traded down into WETH: ${JSON.stringify(positions.get(198342))}`)
-    console.log(`Sample position, traded up into USDC: ${JSON.stringify(positions.get(204635))}`)
+    // console.log(`Sample position, traded down into WETH: ${JSON.stringify(positions.get(198342))}`)
+    // console.log(`Sample position, traded up into USDC: ${JSON.stringify(positions.get(204635))}`)
+
+    // 0.211 WETH and 534.97 USDC
+    // console.log(`Sample position, traded down into WETH: ${positions.get(198342)?.feesLog()}`)
+
+    // 0.037 WETH and 170.48 USDC
+    // console.log(`Sample position, traded up into USDC: ${positions.get(204635)?.feesLog()}`)
+
+    const addTxLogsByTokenId = logsByTokenId(addTxLogs)
+    // console.log(`Sample add tx logs: ${JSON.stringify(addTxLogsByTokenId.get(198342))}`)
+    // console.log(`Sample add tx logs: ${JSON.stringify(addTxLogsByTokenId.get(204635))}`)
+
+    setAddTxLogs(positions, addTxLogsByTokenId)
+    // console.log(`Sample add tx logs: ${JSON.stringify(positions.get(198342))}`)
+    // console.log(`Sample add tx logs: ${JSON.stringify(positions.get(204635))}`)
+
+    setRangeWidths(positions)
 
     console.log(`Positions: ${positions.size}`)
 
-    // 0.211 WETH and 534.97 USDC
-    console.log(`Sample position, traded down into WETH: ${positions.get(198342)?.feesLog()}`)
-
-    // 0.037 WETH and 170.48 USDC
-    console.log(`Sample position, traded up into USDC: ${positions.get(204635)?.feesLog()}`)
+    for (let [tokenId, position] of positions) {
+        console.log(`${position.rangeWidthBps}`)
+    }
 }
 
 main().catch((error) => {
