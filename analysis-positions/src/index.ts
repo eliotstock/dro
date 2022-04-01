@@ -68,6 +68,12 @@ async function main() {
     // 281.75 USDC
     // console.log(`Sample position, total fees: ${positions.get(204635)?.feesTotalInUsdc()} USDC`)
 
+    // 42,719.52 USDC
+    // console.log(`Sample position, opening liquidity: ${positions.get(198342)?.openingLiquidityTotalInUsdc()} USDC`)
+
+    // 40,543.93 USDC
+    // console.log(`Sample position, opening liquidity: ${positions.get(204635)?.openingLiquidityTotalInUsdc()} USDC`)
+
     console.log(`Positions: ${positions.size}`)
 }
 
