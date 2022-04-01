@@ -102,6 +102,8 @@ export class Position {
         return BigInt(this.openingLiquidityUsdc) + usdcValueOfWethLiquidity
     }
 
+    // Total fees claimed as a proportion of opening liquidity, in percent.
+    // This completely ignores execution cost and time in range.
     grossYield(): number {
         // The old 'decimal value from dividing two bigints' trick, except we want
         // this in percent, so we don't divide again by our constant.
