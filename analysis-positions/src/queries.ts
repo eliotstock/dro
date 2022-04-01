@@ -107,6 +107,8 @@ async function runQueries() {
 
     const [rowsPrices] = await bigQueryClient.query(optionsPrices)
 
+    // The result is 230K rows.
+    // This is 130 MB to download each time we run without cache.
     console.log(`  Price history row count: ${rowsPrices.length}`)
 
     const pricesJson = JSON.stringify(rowsPrices)

@@ -1,10 +1,8 @@
 import { config } from 'dotenv'
-import moment from 'moment'
 import { getData } from './queries'
-import { logsByTxHash, logsByTokenId, positionsByTokenId, setDirectionAndFIlterToOutOfRange, setFees, setAddTxLogs, setRangeWidth, setOpeningLiquidity } from './functions'
-import { SwapEvent, rowToSwapEvent } from './price-history'
-
-// const TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
+import { logsByTxHash, logsByTokenId, positionsByTokenId, setDirectionAndFIlterToOutOfRange,
+    setFees, setAddTxLogs, setRangeWidth, setOpeningLiquidity, setOpeningClosingPrices
+} from './functions'
 
 // Read our .env file
 config()
@@ -12,15 +10,13 @@ config()
 async function main() {
     let [adds, removes, prices] = await getData()
 
-    console.log(`Price 0: ${JSON.stringify(prices[0])}`)
-
     console.log(`Analysing...`)
 
     // Keys: tx hashes, values: array of EventLogs
     const removeTxLogs = logsByTxHash(removes)
     const addTxLogs = logsByTxHash(adds)
 
-    console.log(`Remove transactions: ${removeTxLogs.size}, add transactions: ${addTxLogs.size}`)
+    console.log(`Valid add transactions: ${addTxLogs.size}, remove transactions: ${removeTxLogs.size}`)
 
     // Create positions for each remove transaction with only the tokenId and remove TX logs
     // populated at this stage.
@@ -61,19 +57,12 @@ async function main() {
     // 19,413 USDC and 7.632 WETH
     // console.log(`Sample position: ${positions.get(204635)?.openingLiquidityUsdc} USDC and ${positions.get(204635)?.openingLiquidityWeth} WETH`)
 
+    setOpeningClosingPrices(positions, prices)
+
+    // 2,916.98
+    // console.log(`Pool price at 2022-03-01: ${priceAt('2022-03-01T00:00:01.000Z')}`)
+
     console.log(`Positions: ${positions.size}`)
-
-    // for (let [tokenId, position] of positions) {
-    //     console.log(`${position.rangeWidthBps}`)
-    // }
-    const swapEvents: SwapEvent[] = []
-
-    prices.forEach(function(row: any) {
-        let e = rowToSwapEvent(row)
-        swapEvents.push(e)
-    })
-
-    console.log(`First swap event: ${JSON.stringify(swapEvents[0])}`)
 }
 
 main().catch((error) => {

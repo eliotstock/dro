@@ -1,6 +1,7 @@
 import { tickToPrice } from '@uniswap/v3-sdk'
 import { EventLog, Direction, Position } from './position'
 import * as c from './constants'
+import { load, priceAt } from './price-history'
 
 // Returns USDC's small units (USDC has six decimals)
 // When the price in the pool is USDC 3,000, this will return 3_000_000_000.
@@ -259,5 +260,21 @@ export function setOpeningLiquidity(positions: Map<number, Position>) {
                 position.openingLiquidityUsdc = value
             }
         })
+    }
+}
+
+export function setOpeningClosingPrices(positions: Map<number, Position>, prices: any) {
+    load(prices)
+
+    for (let [tokenId, position] of positions) {
+        if (position.openedTimestamp != undefined) {
+            const priceAtOpening = priceAt(position.openedTimestamp)
+            position.priceAtOpening = priceAtOpening
+        }
+
+        if (position.closedTimestamp != undefined) {
+            const priceAtClosing = priceAt(position.closedTimestamp)
+            position.priceAtClosing = priceAtClosing
+        }
     }
 }
