@@ -74,6 +74,12 @@ async function main() {
     // 40,543.93 USDC
     // console.log(`Sample position, opening liquidity: ${positions.get(204635)?.openingLiquidityTotalInUsdc()} USDC`)
 
+    // 
+    console.log(`Sample position, gross yield: ${positions.get(198342)?.grossYield()}%`)
+
+    // 
+    console.log(`Sample position, gross yield: ${positions.get(204635)?.grossYield()}%`)
+
     console.log(`Positions: ${positions.size}`)
 }
 

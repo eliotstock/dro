@@ -101,4 +101,10 @@ export class Position {
 
         return BigInt(this.openingLiquidityUsdc) + usdcValueOfWethLiquidity
     }
+
+    grossYield(): number {
+        // The old 'decimal value from dividing two bigints' trick, except we want
+        // this in percent, so we don't divide again by our constant.
+        return Number(this.feesTotalInUsdc() * 10_000n / this.openingLiquidityTotalInUsdc())
+    }
 }
