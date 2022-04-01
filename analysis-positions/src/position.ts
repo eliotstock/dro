@@ -29,7 +29,6 @@ export class Position {
     closingLiquidityUsdc?: bigint
     priceAtOpening?: bigint // Quoted in USDC as a big integer.
     priceAtClosing?: bigint // Quoted in USDC as a big integer.
-    // TODO: feesTotalInUsdc(): bigint // Quoted in USDC as a big integer, depends on priceAtClosing.
     // TODO: openingLiquidityTotalInUsdc(): bigint // Quoted in USDC as a big integer, depends on priceAtOpening.
 
     constructor(_tokenId: number) {
@@ -69,5 +68,28 @@ export class Position {
         }
 
         return 'unknown'
+    }
+
+    feesTotalInUsdc(): bigint {
+        if (this.priceAtClosing == undefined) throw `No price at closing`
+
+        const n10ToThe18 = BigInt(1_000_000_000_000_000_000)
+
+        if (this.traded == Direction.Down) {    
+            if (this.feesUsdc == undefined) throw `No USDC fees component`
+      
+            const usdcValueOfWethFees = BigInt(this.feesWethCalculated()) * BigInt(this.priceAtClosing) / n10ToThe18
+
+            return BigInt(this.feesUsdc) + usdcValueOfWethFees
+        }
+        else if (this.traded == Direction.Up) {
+            if (this.feesWeth == undefined) throw `No WETH fees component`
+
+            const usdcValueOfWethFees = BigInt(this.feesWeth) * BigInt(this.priceAtClosing) / n10ToThe18
+
+            return BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees
+        }
+
+        throw `No direction`
     }
 }

@@ -62,6 +62,12 @@ async function main() {
     // 2,916.98
     // console.log(`Pool price at 2022-03-01: ${priceAt('2022-03-01T00:00:01.000Z')}`)
 
+    // 1,070_15 USDC
+    // console.log(`Sample position, total fees: ${positions.get(198342)?.feesTotalInUsdc()} USDC`)
+
+    // 281.75 USDC
+    // console.log(`Sample position, total fees: ${positions.get(204635)?.feesTotalInUsdc()} USDC`)
+
     console.log(`Positions: ${positions.size}`)
 }
 
