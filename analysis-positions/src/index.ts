@@ -92,6 +92,7 @@ function sql(poolAddress: string, firstTopic: string) {
 //     ]
 // }
 interface EventLog {
+    block_timestamp: {value: string}
     transaction_hash: string
     address: string
     data: string
@@ -108,13 +109,56 @@ class Position {
     removeTxLogs?: EventLog[]
     addTxLogs?: EventLog[]
     traded?: Direction
-    openedTimestamp?: string
+    // TODO: openedTimestamp?: string
     closedTimestamp?: string
+    // TODO: rangeWidthBps: number
     feesWeth?: bigint
     feesUsdc?: bigint
+    withdrawnWeth?: bigint
+    withdrawnUsdc?: bigint
+    closingLiquidityWeth?: bigint
+    closingLiquidityUsdc?: bigint
+    // TODO: priceAtClosing: bigint // Quoted in USDC as a big integer.
+    // TODO: feesTotalInUsdc(): bigint // Quoted in USDC as a big integer, depends on priceAtClosing.
+    // TODO: openingLiquidityTotalInUsdc(): bigint // Quoted in USDC as a big integer.
 
     constructor(_tokenId: number) {
         this.tokenId = _tokenId
+    }
+
+    feesWethCalculated(): bigint {
+        if (this.traded == Direction.Down) {
+            if (this.withdrawnWeth == undefined) throw 'Missing withdrawnWeth'
+            if (this.closingLiquidityWeth == undefined) throw 'Missing closingLiquidityWeth'
+
+            return (this.withdrawnWeth - this.closingLiquidityWeth)
+        }
+        else {
+            throw 'Traded up, so use feesWeth property instead'
+        }
+    }
+
+    feesUsdcCalculated(): bigint {
+        if (this.traded == Direction.Up) {
+            if (this.withdrawnUsdc == undefined) throw 'Missing withdrawnUsdc'
+            if (this.closingLiquidityUsdc == undefined) throw 'Missing closingLiquidityUsdc'
+
+            return (this.withdrawnUsdc - this.closingLiquidityUsdc)
+        }
+        else {
+            throw 'Traded down, so use feesUsdc property instead'
+        }
+    }
+
+    feesLog(): string {
+        if (this.traded == Direction.Down) {
+            return `${this.feesWethCalculated()} WETH and ${this.feesUsdc} USDC`
+        }
+        else if (this.traded == Direction.Up) {
+            return `${this.feesWeth} WETH and ${this.feesUsdcCalculated()} USDC`
+        }
+
+        return 'unknown'
     }
 }
 
@@ -217,6 +261,7 @@ function positionsByTokenId(txMap: Map<string, EventLog[]>): Map<number, Positio
 
                 const position = new Position(tokenId)
                 position.removeTxLogs = logs
+                position.closedTimestamp = log.block_timestamp.value
 
                 positions.set(tokenId, position)
 
@@ -263,27 +308,70 @@ function setFees(positions: Map<number, Position>) {
     for (let [tokenId, position] of positions) {
         position.removeTxLogs?.forEach(function(log: EventLog) {
             // For a position that traded up into USDC:
-            // WETH component of fees is given by the event log with address WETH,
-            // Transfer() event, Data, wad value, in WETH.
-            if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
-                if (position.traded == Direction.Up) {
+            // eg. Position 204635:
+            //   https://etherscan.io/tx/0x44f29b0a779e8650045a9f9913235fbfed832d2514669dcc42c31913dcdfa183#eventlog
+            if (position.traded == Direction.Up) {
+                // WETH component of fees is given by the event log with address WETH,
+                // Transfer() event, Data, wad value, in WETH.
+                if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
                     const parsedLog = INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
                     const wad: bigint = parsedLog.args['wad']
-    
+
                     position.feesWeth = wad
                 }
-            }
 
+                // Total USDC withdrawn (fees plus liquidity) is given by the event log with
+                // address USDC, Transfer() event, Data, 'value' arg, in USDC.
+                if (log.address == ADDR_TOKEN_USDC && log.topics[0] == TOPIC_TRANSFER) {
+                    const parsedLog = INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
+                    const value: bigint = parsedLog.args['value']
+
+                    position.withdrawnUsdc = value
+                }
+
+                // Liquidity USDC withdrawn is given by the event log with address 'Uniswap v3:
+                // Positions NFT', DecreaseLiquidity() event, Data, 'amount0' arg, in USDC.
+                if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
+                    const parsedLog = INTERFACE_NFT.parseLog({topics: log.topics, data: log.data})
+                    const amount0: bigint = parsedLog.args['amount0']
+
+                    position.closingLiquidityUsdc = amount0
+                }
+
+                // USDC component of fees is given by the difference between the last two values.
+            }
             // For a position that traded down into WETH:
-            // USDC component of fees is given by the event log with address USDC,
-            // Transfer() event, Data, 'value' arg, in USDC.
-            if (log.address == ADDR_TOKEN_USDC && log.topics[0] == TOPIC_TRANSFER) {
-                if (position.traded == Direction.Down) {
+            // eg. Position 198342:
+            //   https://etherscan.io/tx/0x7ed3b7f8058194b92e59159c42fbccc9e60e32ce598830af6df0335906c6caf7#eventlog
+            else if (position.traded == Direction.Down) {
+                // USDC component of fees is given by the event log with address USDC,
+                // Transfer() event, Data, 'value' arg, in USDC.
+                if (log.address == ADDR_TOKEN_USDC && log.topics[0] == TOPIC_TRANSFER) {
                     const parsedLog = INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
                     const value: bigint = parsedLog.args['value']
 
                     position.feesUsdc = value
                 }
+
+                // Total WETH withdrawn (fees plus liquidity) is given by the event log with
+                // address WETH, Transfer() event, Data, 'wad' arg, in WETH.
+                if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
+                    const parsedLog = INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
+                    const wad: bigint = parsedLog.args['wad']
+
+                    position.withdrawnWeth = wad
+                }
+
+                // Liquidity WETH withdrawn is given by the event log with address 'Uniswap v3:
+                // Positions NFT', DecreaseLiquidity() event, Data, 'amount1' arg, in WETH.
+                if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
+                    const parsedLog = INTERFACE_NFT.parseLog({topics: log.topics, data: log.data})
+                    const amount1: bigint = parsedLog.args['amount1']
+
+                    position.closingLiquidityWeth = amount1
+                }
+
+                // WETH component of fees is given by the difference between the last two values.
             }
         })
     }
@@ -316,6 +404,8 @@ async function main() {
 
     // Keys: tx hashes, values: array of EventLogs
     const removeTxLogs = logsByTxHash(removes)
+
+    // TODO: We don't need this. Instead we need addTxLogsByTokenId. Similar to positionsByTokenId().
     const addTxLogs = logsByTxHash(adds)
 
     console.log(`remove transactions: ${removeTxLogs.size}, add transactions: ${addTxLogs.size}`)
@@ -332,9 +422,16 @@ async function main() {
 
     // Set fees, based on the direction.
     setFees(positions)
-    console.log(`Sample position, with feesUsdc: ${JSON.stringify(positions.get(198342))}`) // Traded down into WETH.
+    console.log(`Sample position, traded down into WETH: ${JSON.stringify(positions.get(198342))}`)
+    console.log(`Sample position, traded up into USDC: ${JSON.stringify(positions.get(204635))}`)
 
     console.log(`Positions: ${positions.size}`)
+
+    // 0.211 WETH and 534.97 USDC
+    console.log(`Sample position, traded down into WETH: ${positions.get(198342)?.feesLog()}`)
+
+    // 0.037 WETH and 170.48 USDC
+    console.log(`Sample position, traded up into USDC: ${positions.get(204635)?.feesLog()}`)
 }
 
 main().catch((error) => {
