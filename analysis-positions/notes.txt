@@ -66,30 +66,30 @@ Log events:
       pool.
     * The range width has to be calculated from the lower and upper prices, not the ticks.
   * Given a known 'remove' tx, find the amount of each asset that is fees claimed
-    * There should only be one event log with address WETH and one with USDC, otherwise discard the
+    * [WON'T DO] There should only be one event log with address WETH and one with USDC, otherwise discard the
       tx
     * For a position that traded up into USDC:
       * [DONE] Which is identified by the amount1 being 0 on the *first* of the two event logs with
         address 'Uniswap v3: Positions NFT'
       * [DONE] WETH component of fees is given by the event log with address WETH, WETH9.Transfer(), whole
         calldata, as decimal (also Data, wad value, in WETH)
-      * Total USDC withdrawn (fees plus liquidity) is given by the event log with address USDC,
+      * [DONE] Total USDC withdrawn (fees plus liquidity) is given by the event log with address USDC,
         whole calldata, as decimal
-      * Liquidity USDC withdrawn is given by the *first* of the two event logs with address
+      * [DONE] Liquidity USDC withdrawn is given by the *first* of the two event logs with address
         'Uniswap v3: Positions NFT', the 'amount0' value from the calldata. Calldata needs to be
         decoded using the ABI interface.
-      * USDC component of fees is then given by the difference between the last two values.
+      * [DONE] USDC component of fees is then given by the difference between the last two values.
     * For a position that traded down into WETH:
       * [DONE] Which is identified by the amount0 being 0 on the *first* of the two event logs with
         address 'Uniswap v3: Positions NFT'
       * [DONE] USDC component of fees is given by the event log with address USDC, USDC.Transfer(), whole
         calldata, as decimal
-      * Total WETH withdrawn (fees plus liquidity) is given by the event log with address WETH,
+      * [DONE] Total WETH withdrawn (fees plus liquidity) is given by the event log with address WETH,
         whole calldata, as decimal
-      * Liquidity WETH withdrawn is given by the  *first* of the two event logs with address
+      * [DONE] Liquidity WETH withdrawn is given by the  *first* of the two event logs with address
         'Uniswap v3: Positions NFT', the 'amount1' value from the calldata. Calldata needs to be
         decoded using the ABI interface.
-      * WETH component of fees is then given by the difference between the last two values.
+      * [DONE] WETH component of fees is then given by the difference between the last two values.
   * Given a known 'remove' tx, find the add transaction that opened it
     * Token ID is given by the event log with address 'Uniswap v3: Positions NFT', topic index 1
   * Given a transaction, find the tx gas cost in ETH
