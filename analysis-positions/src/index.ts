@@ -1,7 +1,8 @@
 import { config } from 'dotenv'
 import { getData } from './queries'
 import { logsByTxHash, logsByTokenId, positionsByTokenId, setDirectionAndFIlterToOutOfRange,
-    setFees, setAddTxLogs, setRangeWidth, setOpeningLiquidity, setOpeningClosingPrices
+    setFees, setAddTxLogs, setRangeWidth, setOpeningLiquidity, setOpeningClosingPrices,
+    removeOutliers, generateCsv
 } from './functions'
 
 // Read our .env file
@@ -16,7 +17,7 @@ async function main() {
     const removeTxLogs = logsByTxHash(removes)
     const addTxLogs = logsByTxHash(adds)
 
-    console.log(`Valid add transactions: ${addTxLogs.size}, remove transactions: ${removeTxLogs.size}`)
+    console.log(`  Valid add transactions: ${addTxLogs.size}, remove transactions: ${removeTxLogs.size}`)
 
     // Create positions for each remove transaction with only the tokenId and remove TX logs
     // populated at this stage.
@@ -80,7 +81,11 @@ async function main() {
     // 69%
     // console.log(`Sample position, gross yield: ${positions.get(204635)?.grossYield()}%`)
 
-    console.log(`Positions: ${positions.size}`)
+    removeOutliers(positions)
+
+    console.log(`  Positions: ${positions.size}`)
+
+    generateCsv(positions)
 }
 
 main().catch((error) => {

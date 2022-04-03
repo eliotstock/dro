@@ -1,3 +1,5 @@
+import moment from "moment"
+
 const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
 
 export interface EventLog {
@@ -21,12 +23,12 @@ export class Position {
     openedTimestamp?: string
     closedTimestamp?: string
     rangeWidthBps?: number
-    feesWeth?: bigint
-    feesUsdc?: bigint
-    withdrawnWeth?: bigint
-    withdrawnUsdc?: bigint
-    openingLiquidityWeth?: bigint
-    openingLiquidityUsdc?: bigint
+    feesWeth: bigint = 0n
+    feesUsdc: bigint = 0n
+    withdrawnWeth: bigint = 0n
+    withdrawnUsdc: bigint = 0n
+    openingLiquidityWeth: bigint = 0n
+    openingLiquidityUsdc: bigint = 0n
     closingLiquidityWeth?: bigint
     closingLiquidityUsdc?: bigint
     priceAtOpening?: bigint // Quoted in USDC
@@ -38,25 +40,23 @@ export class Position {
 
     feesWethCalculated(): bigint {
         if (this.traded == Direction.Down) {
-            if (this.withdrawnWeth == undefined) throw 'Missing withdrawnWeth'
-            if (this.closingLiquidityWeth == undefined) throw 'Missing closingLiquidityWeth'
+            if (this.closingLiquidityWeth == undefined) throw `Missing closingLiquidityWeth: ${this.tokenId}`
 
-            return (this.withdrawnWeth - this.closingLiquidityWeth)
+            return (BigInt(this.withdrawnWeth) - BigInt(this.closingLiquidityWeth))
         }
         else {
-            throw 'Traded up, so use feesWeth property instead'
+            throw `Traded up, so use feesWeth property instead: ${this.tokenId}`
         }
     }
 
     feesUsdcCalculated(): bigint {
         if (this.traded == Direction.Up) {
-            if (this.withdrawnUsdc == undefined) throw 'Missing withdrawnUsdc'
-            if (this.closingLiquidityUsdc == undefined) throw 'Missing closingLiquidityUsdc'
+            if (this.closingLiquidityUsdc == undefined) throw `Missing closingLiquidityUsdc: ${this.tokenId}`
 
-            return (this.withdrawnUsdc - this.closingLiquidityUsdc)
+            return (BigInt(this.withdrawnUsdc) - BigInt(this.closingLiquidityUsdc))
         }
         else {
-            throw 'Traded down, so use feesUsdc property instead'
+            throw `Traded down, so use feesUsdc property instead: ${this.tokenId}`
         }
     }
 
@@ -72,30 +72,24 @@ export class Position {
     }
 
     feesTotalInUsdc(): bigint {
-        if (this.priceAtClosing == undefined) throw `No price at closing`
+        if (this.priceAtClosing == undefined) throw `No price at closing: ${this.tokenId}`
 
-        if (this.traded == Direction.Down) {    
-            if (this.feesUsdc == undefined) throw `No USDC fees component`
-      
+        if (this.traded == Direction.Down) {
             const usdcValueOfWethFees = BigInt(this.feesWethCalculated()) * BigInt(this.priceAtClosing) / N_10_TO_THE_18
 
             return BigInt(this.feesUsdc) + usdcValueOfWethFees
         }
         else if (this.traded == Direction.Up) {
-            if (this.feesWeth == undefined) throw `No WETH fees component`
-
             const usdcValueOfWethFees = BigInt(this.feesWeth) * BigInt(this.priceAtClosing) / N_10_TO_THE_18
 
             return BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees
         }
 
-        throw `No direction`
+        throw `No direction: ${this.tokenId}`
     }
 
     openingLiquidityTotalInUsdc(): bigint {
-        if (this.priceAtOpening == undefined) throw `No price at opening`
-        if (this.openingLiquidityWeth == undefined) throw `No opening liquidity in WETH`
-        if (this.openingLiquidityUsdc == undefined) throw `No opening liquidity in USDC`
+        if (this.priceAtOpening == undefined) throw `No price at opening: ${this.tokenId}`
     
         const usdcValueOfWethLiquidity = BigInt(BigInt(this.openingLiquidityWeth) * BigInt(this.priceAtOpening)) / N_10_TO_THE_18
 
@@ -108,5 +102,17 @@ export class Position {
         // The old 'decimal value from dividing two bigints' trick, except we want
         // this in percent, so we don't divide again by our constant.
         return Number(this.feesTotalInUsdc() * 10_000n / this.openingLiquidityTotalInUsdc())
+    }
+
+    timeOpenDays(): number {
+        if (this.openedTimestamp == undefined || this.closedTimestamp == undefined) {
+            throw `Missing opened/closed timestamps: ${this.tokenId}`
+        }
+
+        const opened = moment(this.openedTimestamp)
+        const closed = moment(this.closedTimestamp)
+        const timeInRange = moment.duration(closed.diff(opened), 'milliseconds')
+
+        return timeInRange.asDays()
     }
 }

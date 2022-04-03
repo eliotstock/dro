@@ -34,10 +34,9 @@ function sqlForAddRemoveLiquidity(poolAddress: string, firstTopic: string) {
 //     ]
 // }
 
-const OUT_DIR = './out'
-const ADDS = OUT_DIR + '/adds.json'
-const REMOVES = OUT_DIR + '/removes.json'
-const PRICES = OUT_DIR + '/prices.json'
+const ADDS = c.OUT_DIR + '/adds.json'
+const REMOVES = c.OUT_DIR + '/removes.json'
+const PRICES = c.OUT_DIR + '/prices.json'
 
 // Query Google's public dataset for Ethereum mainnet transaction logs.
 // Billing: https://console.cloud.google.com/billing/005CEF-5B6B62-DD610F/reports;grouping=GROUP_BY_SKU;projects=dro-backtest?project=dro-backtest
@@ -123,8 +122,8 @@ async function runQueries() {
 
 // Get data from cache if possible, BigQuery if not.
 export async function getData() {
-    if (!fs.existsSync(OUT_DIR)) {
-        fs.mkdirSync(OUT_DIR)
+    if (!fs.existsSync(c.OUT_DIR)) {
+        fs.mkdirSync(c.OUT_DIR)
     }
 
     let adds

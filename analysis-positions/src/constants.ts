@@ -42,3 +42,5 @@ export const INTERFACE_USDC = new ethers.utils.Interface(Erc20ABI)
 export const TOKEN_USDC = new Token(CHAIN_ID, ADDR_TOKEN_USDC, 6, "USDC", "USD Coin")
 
 export const TOKEN_WETH = new Token(CHAIN_ID, ADDR_TOKEN_WETH, 18, "WETH", "Wrapped Ether")
+
+export const OUT_DIR = './out'

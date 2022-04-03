@@ -1,7 +1,12 @@
 import { tickToPrice } from '@uniswap/v3-sdk'
+import fs from 'fs'
 import { EventLog, Direction, Position } from './position'
 import * as c from './constants'
 import { load, priceAt } from './price-history'
+
+const POSITIONS = c.OUT_DIR + '/positions.csv'
+
+const N_10_TO_THE_6 = BigInt(1_000_000)
 
 // Returns USDC's small units (USDC has six decimals)
 // When the price in the pool is USDC 3,000, this will return 3_000_000_000.
@@ -102,12 +107,10 @@ export function setDirectionAndFIlterToOutOfRange(positions: Map<number, Positio
                 if (amount0 == 0) {
                     // Position closed out of range and the market traded down into WETH.
                     position.traded = Direction.Down
-                    // console.log(`down`)
                 }
                 else if (amount1 == 0) {
                     // Position closed out of range and the market traded up into USDC.
                     position.traded = Direction.Up
-                    // console.log(`up`)
                 }
                 else {
                     // Position was closed in-range. Removing from our map.
@@ -277,4 +280,64 @@ export function setOpeningClosingPrices(positions: Map<number, Position>, prices
             position.priceAtClosing = priceAtClosing
         }
     }
+}
+
+export function removeOutliers(positions: Map<number, Position>) {
+    let outliers = 0
+
+    for (let [tokenId, p] of positions) {
+        // How we can possibly get negative fees I have no idea, but he have about 14 of these.
+        if (p.feesTotalInUsdc() < 0n) {
+            positions.delete(tokenId)
+            outliers++
+        }
+
+        // Some positions have freakish yield
+        if (p.grossYield() > 200_000) {
+            positions.delete(tokenId)
+            outliers++
+        }
+    }
+
+    if (outliers > 0){
+        console.log(`  Removed ${outliers} outliers`)
+    }
+}
+
+export function generateCsv(positions: Map<number, Position>) {
+    let csvLines = 'tokenId,rangeWidthBps,opened,closed,timeOpenDays,sizeUsd,feesUsd,grossYieldPercent\n'
+
+    // const errors = new Map<string, number>()
+    let errors = 0
+
+    for (let [tokenId, p] of positions) {
+        try {
+            const csvLine = `${tokenId},\
+${p.rangeWidthBps},\
+${p.openedTimestamp},\
+${p.closedTimestamp},\
+${p.timeOpenDays()},\
+${usdcFormatted(p.openingLiquidityTotalInUsdc())},\
+${usdcFormatted(p.feesTotalInUsdc())},\
+${p.grossYield()}\n`
+
+            csvLines += csvLine
+        }
+        catch (e) {
+            errors++
+        }
+    }
+
+    if (!fs.existsSync(c.OUT_DIR)) {
+        fs.mkdirSync(c.OUT_DIR)
+    }
+
+    fs.writeFileSync(POSITIONS, csvLines)
+
+    console.log(`  CSV missing ${errors} positions with errors`)
+}
+
+// Given 1_000_000, return 1.00. No commas.
+function usdcFormatted(value: bigint): number {
+    return Number(value * 100n / N_10_TO_THE_6) / 100
 }
