@@ -2,7 +2,7 @@ import { config } from 'dotenv'
 import { getData } from './queries'
 import { logsByTxHash, logsByTokenId, positionsByTokenId, setDirectionAndFIlterToOutOfRange,
     setFees, setAddTxLogs, setRangeWidth, setOpeningLiquidity, setOpeningClosingPrices,
-    removeOutliers, generateCsv
+    cleanData, generateCsv
 } from './functions'
 
 // Read our .env file
@@ -81,7 +81,7 @@ async function main() {
     // 69%
     // console.log(`Sample position, gross yield: ${positions.get(204635)?.grossYield()}%`)
 
-    removeOutliers(positions)
+    cleanData(positions)
 
     console.log(`  Positions: ${positions.size}`)
 
