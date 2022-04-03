@@ -282,18 +282,12 @@ export function setOpeningClosingPrices(positions: Map<number, Position>, prices
     }
 }
 
-export function removeOutliers(positions: Map<number, Position>) {
+export function cleanData(positions: Map<number, Position>) {
     let outliers = 0
 
     for (let [tokenId, p] of positions) {
         // How we can possibly get negative fees I have no idea, but he have about 14 of these.
         if (p.feesTotalInUsdc() < 0n) {
-            positions.delete(tokenId)
-            outliers++
-        }
-
-        // Some positions have freakish yield
-        if (p.grossYield() > 200_000) {
             positions.delete(tokenId)
             outliers++
         }
