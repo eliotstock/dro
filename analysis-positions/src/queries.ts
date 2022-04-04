@@ -1,7 +1,14 @@
 import fs from 'fs'
 import { resolve } from 'path'
 import { BigQuery }  from '@google-cloud/bigquery'
-import * as c from './constants'
+import {
+    TOPIC_BURN,
+    TOPIC_MINT,
+    TOPIC_SWAP,
+    OUT_DIR,
+    ADDR_POOL
+} from './constants'
+import { abbreviate } from './functions'
 import { sqlForPriceHistory } from './price-history'
 
 // Relational diagram for bigquery-public-data.crypto_ethereum:
@@ -34,9 +41,9 @@ function sqlForAddRemoveLiquidity(poolAddress: string, firstTopic: string) {
 //     ]
 // }
 
-const ADDS = c.OUT_DIR + '/adds.json'
-const REMOVES = c.OUT_DIR + '/removes.json'
-const PRICES = c.OUT_DIR + '/prices.json'
+const ADDS = `${OUT_DIR}/adds-${abbreviate(ADDR_POOL)}.json`
+const REMOVES = `${OUT_DIR}/removes${abbreviate(ADDR_POOL)}.json`
+const PRICES = `${OUT_DIR}/prices${abbreviate(ADDR_POOL)}.json`
 
 // Query Google's public dataset for Ethereum mainnet transaction logs.
 // Billing: https://console.cloud.google.com/billing/005CEF-5B6B62-DD610F/reports;grouping=GROUP_BY_SKU;projects=dro-backtest?project=dro-backtest
@@ -63,7 +70,7 @@ async function runQueries() {
     console.log("Querying...")
 
     // Find all logs from transactions that were adding liquidity to the pool.
-    const sqlQueryAdds = sqlForAddRemoveLiquidity(c.ADDR_POOL, c.TOPIC_MINT)
+    const sqlQueryAdds = sqlForAddRemoveLiquidity(ADDR_POOL, TOPIC_MINT)
 
     const optionsAdds = {
         query: sqlQueryAdds,
@@ -74,13 +81,13 @@ async function runQueries() {
 
     // The result is 280K rows, starting on 2021-05-05 when Uniswap v3 went live. Good.
     // This is 150 MB to download each time we run without cache.
-    console.log(`  Add log events row count: ${rowsAdds.length}`)
+    console.log(`  Log events for 'add' transactions, row count: ${rowsAdds.length}`)
 
     const addsJson = JSON.stringify(rowsAdds)
     fs.writeFileSync(ADDS, addsJson)
     
     // Find all logs from transactions that were removing liquidity from the pool.
-    const sqlQueryRemoves = sqlForAddRemoveLiquidity(c.ADDR_POOL, c.TOPIC_BURN)
+    const sqlQueryRemoves = sqlForAddRemoveLiquidity(ADDR_POOL, TOPIC_BURN)
     
     const optionsRemoves = {
         query: sqlQueryRemoves,
@@ -91,13 +98,13 @@ async function runQueries() {
 
     // The result is 340K rows.
     // This is 180 MB to download each time we run without cache.
-    console.log(`  Remove log events row count: ${rowsRemoves.length}`)
+    console.log(`  Log events for 'remove' transactions, row count: ${rowsRemoves.length}`)
 
     const removesJson = JSON.stringify(rowsRemoves)
     fs.writeFileSync(REMOVES, removesJson)
 
     // Get a price history for the pool.
-    const sqlQueryPrices = sqlForPriceHistory(c.ADDR_POOL, c.TOPIC_SWAP)
+    const sqlQueryPrices = sqlForPriceHistory(ADDR_POOL, TOPIC_SWAP)
 
     const optionsPrices = {
         query: sqlQueryPrices,
@@ -122,8 +129,8 @@ async function runQueries() {
 
 // Get data from cache if possible, BigQuery if not.
 export async function getData() {
-    if (!fs.existsSync(c.OUT_DIR)) {
-        fs.mkdirSync(c.OUT_DIR)
+    if (!fs.existsSync(OUT_DIR)) {
+        fs.mkdirSync(OUT_DIR)
     }
 
     let adds

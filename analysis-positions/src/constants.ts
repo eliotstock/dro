@@ -1,3 +1,4 @@
+import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
@@ -9,19 +10,6 @@ const CHAIN_ID = 1
 
 // Uniswap v3 positions NFT
 export const ADDR_POSITIONS_NFT = '0xc36442b4a4522e871399cd717abdd847ab11fe88'
-
-// USDC/WETH 0.30%
-// https://info.uniswap.org/#/pools/0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8
-// 280K event logs
-export const ADDR_POOL = '0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8'
-
-// USDC/WETH 0.05%
-// https://info.uniswap.org/#/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
-// 114K event logs
-// const ADDR_POOL = '0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640'
-
-// EOA with some position history
-export const ADDR_RANGE_ORDER_MANUAL = '0x4d35A946c2853DB8F40E1Ad1599fd48bb176DE5a'
 
 // WETH
 export const ADDR_TOKEN_WETH = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
@@ -44,3 +32,10 @@ export const TOKEN_USDC = new Token(CHAIN_ID, ADDR_TOKEN_USDC, 6, "USDC", "USD C
 export const TOKEN_WETH = new Token(CHAIN_ID, ADDR_TOKEN_WETH, 18, "WETH", "Wrapped Ether")
 
 export const OUT_DIR = './out'
+
+// Read our .env file
+config()
+
+export const ADDR_POOL: string = process.env.ADDR_POOL || 'no-pool'
+
+if (ADDR_POOL == 'no-pool') throw 'No ADDR_POOL value in .env file.'
