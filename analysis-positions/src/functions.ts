@@ -1,10 +1,24 @@
 import { tickToPrice } from '@uniswap/v3-sdk'
 import fs from 'fs'
 import { EventLog, Direction, Position } from './position'
-import * as c from './constants'
+import {
+    ADDR_POSITIONS_NFT,
+    ADDR_TOKEN_WETH,
+    ADDR_TOKEN_USDC,
+    TOPIC_MINT,
+    TOPIC_TRANSFER,
+    TOPIC_DECREASE_LIQUIDITY,
+    INTERFACE_NFT,
+    INTERFACE_WETH,
+    INTERFACE_USDC,
+    TOKEN_USDC,
+    TOKEN_WETH,
+    OUT_DIR,
+    ADDR_POOL
+} from './constants'
 import { load, priceAt } from './price-history'
 
-const POSITIONS = c.OUT_DIR + '/positions.csv'
+const POSITIONS = `${OUT_DIR}/positions-${abbreviate(ADDR_POOL)}.csv`
 
 const N_10_TO_THE_6 = BigInt(1_000_000)
 
@@ -16,7 +30,7 @@ const N_10_TO_THE_6 = BigInt(1_000_000)
 export function tickToNativePrice(tick: number): bigint {
     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
     // and denominator are both JSBIs.
-    const p = tickToPrice(c.TOKEN_WETH, c.TOKEN_USDC, tick)
+    const p = tickToPrice(TOKEN_WETH, TOKEN_USDC, tick)
 
     // The least bad way to get from JSBI to BigInt is via strings for numerator and denominator.
     const num = BigInt(p.numerator.toString())
@@ -51,7 +65,7 @@ export function logsByTokenId(txMap: Map<string, EventLog[]>): Map<number, Event
         logs.forEach(function(log: EventLog) {
             // The position's token ID is given by the event log with address
             // 'Uniswap v3: Positions NFT', event Transfer(), last topic of the set of four tpoics.
-            if (log.address == c.ADDR_POSITIONS_NFT && log.topics[0] == c.TOPIC_TRANSFER) {
+            if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_TRANSFER) {
                 const tokenId: number = Number(log.topics[3])
 
                 logsMapped.set(tokenId, logs)
@@ -74,7 +88,7 @@ export function positionsByTokenId(txMap: Map<string, EventLog[]>): Map<number, 
         logs.forEach(function(log: EventLog) {
             // The position's token ID is given by the event log with address
             // 'Uniswap v3: Positions NFT', topic DecreaseLiquidity.
-            if (log.address == c.ADDR_POSITIONS_NFT && log.topics[0] == c.TOPIC_DECREASE_LIQUIDITY) {
+            if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
                 // Parse hex string to decimal
                 const tokenId = Number(log.topics[1])
 
@@ -96,11 +110,11 @@ export function positionsByTokenId(txMap: Map<string, EventLog[]>): Map<number, 
 export function setDirectionAndFilterToOutOfRange(positions: Map<number, Position>) {
     for (let [tokenId, position] of positions) {
         position.removeTxLogs?.forEach(function(log: EventLog) {
-            if (log.address == c.ADDR_POSITIONS_NFT && log.topics[0] == c.TOPIC_DECREASE_LIQUIDITY) {
+            if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
                 // Decode the logs data to get amount0 and amount1 so that we can figure out
                 // whether the position was closed when out of range, and if so whether the
                 // market traded up or down.
-                const parsedLog = c.INTERFACE_NFT.parseLog({topics: log.topics, data: log.data})
+                const parsedLog = INTERFACE_NFT.parseLog({topics: log.topics, data: log.data})
                 const amount0: number = parsedLog.args['amount0']
                 const amount1: number = parsedLog.args['amount1']
 
@@ -130,8 +144,8 @@ export function setFees(positions: Map<number, Position>) {
             if (position.traded == Direction.Up) {
                 // WETH component of fees is given by the event log with address WETH,
                 // Transfer() event, Data, wad value, in WETH.
-                if (log.address == c.ADDR_TOKEN_WETH && log.topics[0] == c.TOPIC_TRANSFER) {
-                    const parsedLog = c.INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
+                if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
+                    const parsedLog = INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
                     const wad: bigint = parsedLog.args['wad']
 
                     position.feesWeth = wad
@@ -139,8 +153,8 @@ export function setFees(positions: Map<number, Position>) {
 
                 // Total USDC withdrawn (fees plus liquidity) is given by the event log with
                 // address USDC, Transfer() event, Data, 'value' arg, in USDC.
-                if (log.address == c.ADDR_TOKEN_USDC && log.topics[0] == c.TOPIC_TRANSFER) {
-                    const parsedLog = c.INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
+                if (log.address == ADDR_TOKEN_USDC && log.topics[0] == TOPIC_TRANSFER) {
+                    const parsedLog = INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
                     const value: bigint = parsedLog.args['value']
 
                     position.withdrawnUsdc = value
@@ -148,8 +162,8 @@ export function setFees(positions: Map<number, Position>) {
 
                 // Liquidity USDC withdrawn is given by the event log with address 'Uniswap v3:
                 // Positions NFT', DecreaseLiquidity() event, Data, 'amount0' arg, in USDC.
-                if (log.address == c.ADDR_POSITIONS_NFT && log.topics[0] == c.TOPIC_DECREASE_LIQUIDITY) {
-                    const parsedLog = c.INTERFACE_NFT.parseLog({topics: log.topics, data: log.data})
+                if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
+                    const parsedLog = INTERFACE_NFT.parseLog({topics: log.topics, data: log.data})
                     const amount0: bigint = parsedLog.args['amount0']
 
                     position.closingLiquidityUsdc = amount0
@@ -163,8 +177,8 @@ export function setFees(positions: Map<number, Position>) {
             else if (position.traded == Direction.Down) {
                 // USDC component of fees is given by the event log with address USDC,
                 // Transfer() event, Data, 'value' arg, in USDC.
-                if (log.address == c.ADDR_TOKEN_USDC && log.topics[0] == c.TOPIC_TRANSFER) {
-                    const parsedLog = c.INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
+                if (log.address == ADDR_TOKEN_USDC && log.topics[0] == TOPIC_TRANSFER) {
+                    const parsedLog = INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
                     const value: bigint = parsedLog.args['value']
 
                     position.feesUsdc = value
@@ -172,8 +186,8 @@ export function setFees(positions: Map<number, Position>) {
 
                 // Total WETH withdrawn (fees plus liquidity) is given by the event log with
                 // address WETH, Transfer() event, Data, 'wad' arg, in WETH.
-                if (log.address == c.ADDR_TOKEN_WETH && log.topics[0] == c.TOPIC_TRANSFER) {
-                    const parsedLog = c.INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
+                if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
+                    const parsedLog = INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
                     const wad: bigint = parsedLog.args['wad']
 
                     position.withdrawnWeth = wad
@@ -181,8 +195,8 @@ export function setFees(positions: Map<number, Position>) {
 
                 // Liquidity WETH withdrawn is given by the event log with address 'Uniswap v3:
                 // Positions NFT', DecreaseLiquidity() event, Data, 'amount1' arg, in WETH.
-                if (log.address == c.ADDR_POSITIONS_NFT && log.topics[0] == c.TOPIC_DECREASE_LIQUIDITY) {
-                    const parsedLog = c.INTERFACE_NFT.parseLog({topics: log.topics, data: log.data})
+                if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
+                    const parsedLog = INTERFACE_NFT.parseLog({topics: log.topics, data: log.data})
                     const amount1: bigint = parsedLog.args['amount1']
 
                     position.closingLiquidityWeth = amount1
@@ -214,7 +228,7 @@ export function setRangeWidth(positions: Map<number, Position>) {
     for (let [tokenId, position] of positions) {
         position.addTxLogs?.forEach(function(log: EventLog) {
             // Just look for a Mint() event, regardless of the address that emitted it.
-            if (log.topics[0] == c.TOPIC_MINT) {
+            if (log.topics[0] == TOPIC_MINT) {
                 // The last two topics are the tickLower and tickUpper
                 const tickLower = Number(log.topics[2])
                 const tickUpper = Number(log.topics[3])
@@ -250,14 +264,14 @@ export function setRangeWidth(positions: Map<number, Position>) {
 export function setOpeningLiquidity(positions: Map<number, Position>) {
     for (let [tokenId, position] of positions) {
         position.addTxLogs?.forEach(function(log: EventLog) {
-            if (log.address == c.ADDR_TOKEN_WETH && log.topics[0] == c.TOPIC_TRANSFER) {
-                const parsedLog = c.INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
+            if (log.address == ADDR_TOKEN_WETH && log.topics[0] == TOPIC_TRANSFER) {
+                const parsedLog = INTERFACE_WETH.parseLog({topics: log.topics, data: log.data})
                 const wad: bigint = parsedLog.args['wad']
 
                 position.openingLiquidityWeth = wad
             }
-            else if (log.address == c.ADDR_TOKEN_USDC && log.topics[0] == c.TOPIC_TRANSFER) {
-                const parsedLog = c.INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
+            else if (log.address == ADDR_TOKEN_USDC && log.topics[0] == TOPIC_TRANSFER) {
+                const parsedLog = INTERFACE_USDC.parseLog({topics: log.topics, data: log.data})
                 const value: bigint = parsedLog.args['value']
 
                 position.openingLiquidityUsdc = value
@@ -322,13 +336,17 @@ ${p.grossYieldInPercent()}\n`
         }
     }
 
-    if (!fs.existsSync(c.OUT_DIR)) {
-        fs.mkdirSync(c.OUT_DIR)
+    if (!fs.existsSync(OUT_DIR)) {
+        fs.mkdirSync(OUT_DIR)
     }
 
     fs.writeFileSync(POSITIONS, csvLines)
 
     console.log(`  CSV missing ${errors} positions with errors`)
+}
+
+export function abbreviate(account: string): string {
+    return account.substring(0, 6)
 }
 
 // Given 1_000_000, return 1.00. No commas.
