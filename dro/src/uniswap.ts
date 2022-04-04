@@ -97,6 +97,8 @@ async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> 
     // invariant(slot[5] > 0, 'Pool has no fee')
     const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
 
+    console.log(`usePool(): Fee from slot0: ${slot[5]}`)
+
     // The order of the tokens in the pool varies from chain to chain, annoyingly.
     // Ethereum mainnet: USDC is first
     // Arbitrum mainnet: WETH is first
@@ -122,6 +124,8 @@ async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> 
         liquidityAsJsbi,
         slot[1] // tickCurrent
     )
+
+    console.log(`usePool(): Tick spacing: ${pool.tickSpacing}`)
 
     return [pool, wethFirst]
 }
@@ -249,6 +253,8 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     // invariant(slot[5] > 0, 'Pool has no fee')
     const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
 
+    console.log(`positionByTokenId(): Fee from slot0: ${slot[5]}`)
+
     const usablePool = new Pool(
         token0,
         token1,
@@ -257,6 +263,8 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
         liquidity.toString(), // Liquidity
         slot[1] // Tick
     )
+
+    console.log(`positionByTokenId(): Tick spacing: ${usablePool.tickSpacing}`)
 
     // console.log(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
 
