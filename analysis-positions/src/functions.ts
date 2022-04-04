@@ -93,7 +93,7 @@ export function positionsByTokenId(txMap: Map<string, EventLog[]>): Map<number, 
     return positions
 }
 
-export function setDirectionAndFIlterToOutOfRange(positions: Map<number, Position>) {
+export function setDirectionAndFilterToOutOfRange(positions: Map<number, Position>) {
     for (let [tokenId, position] of positions) {
         position.removeTxLogs?.forEach(function(log: EventLog) {
             if (log.address == c.ADDR_POSITIONS_NFT && log.topics[0] == c.TOPIC_DECREASE_LIQUIDITY) {
@@ -235,7 +235,7 @@ export function setRangeWidth(positions: Map<number, Position>) {
                     //     console.log(`Prices: lower: ${priceLower}, mid: ${priceMid}, upper: ${priceUpper}. Range: ${range}`)
                     // }
 
-                    position.rangeWidthBps = range
+                    position.rangeWidthInBps = range
                 }
                 catch (e) {
                     // Probably: 'Error: Invariant failed: TICK'
@@ -294,12 +294,12 @@ export function cleanData(positions: Map<number, Position>) {
     }
 
     if (outliers > 0){
-        console.log(`  Removed ${outliers} outliers`)
+        console.log(`  Removed ${outliers} positions with invalid data`)
     }
 }
 
 export function generateCsv(positions: Map<number, Position>) {
-    let csvLines = 'tokenId,rangeWidthBps,opened,closed,timeOpenDays,sizeUsd,feesUsd,grossYieldPercent\n'
+    let csvLines = 'tokenId,rangeWidthInBps,opened,closed,timeOpenInDays,sizeInUsd,feesInUsd,grossYieldInPercent\n'
 
     // const errors = new Map<string, number>()
     let errors = 0
@@ -307,13 +307,13 @@ export function generateCsv(positions: Map<number, Position>) {
     for (let [tokenId, p] of positions) {
         try {
             const csvLine = `${tokenId},\
-${p.rangeWidthBps},\
+${p.rangeWidthInBps},\
 ${p.openedTimestamp},\
 ${p.closedTimestamp},\
-${p.timeOpenDays()},\
+${p.timeOpenInDays()},\
 ${usdcFormatted(p.openingLiquidityTotalInUsdc())},\
 ${usdcFormatted(p.feesTotalInUsdc())},\
-${p.grossYield()}\n`
+${p.grossYieldInPercent()}\n`
 
             csvLines += csvLine
         }
