@@ -113,11 +113,33 @@ async function runQueries() {
 
     const [rowsPrices] = await bigQueryClient.query(optionsPrices)
 
-    // The result is 230K rows.
-    // This is 130 MB to download each time we run without cache.
+    // The result is 230K rows for the 0.30% fee pool, but 1.6M rows for the 0.05% fee pool.
+    // That's too much to pass to JSON.stringify() in one go - it could be the cause of
+    // 'RangeError: Invalid string length'. So we need to build up our JSON string row by row.
     console.log(`  Price history row count: ${rowsPrices.length}`)
+    
+    let priceErrors = 0
+    let pricesJson = '[\n'
 
-    const pricesJson = JSON.stringify(rowsPrices)
+    rowsPrices.forEach(function(row: any) {
+        try {
+            pricesJson += JSON.stringify(row)
+            pricesJson += ',\n'
+        }
+        catch (e) {
+            // Probably: 'RangeError: Invalid string length'. Skip this price.
+            // TODO: This is hitting 724,846 errors for the 0.05% fee pool. Investigate, but we can
+            // live with partial data is these are evenly spaced.
+            priceErrors++
+        }
+    })
+
+    if (priceErrors > 0) {
+        console.log(`Skipped ${priceErrors} with errors.`)
+    }
+
+    pricesJson += ']'
+
     fs.writeFileSync(PRICES, pricesJson)
 
     // Don't stop the stopwatch until we've iterated over the data.
