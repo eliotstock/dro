@@ -22,7 +22,7 @@ export class Position {
     traded?: Direction
     openedTimestamp?: string
     closedTimestamp?: string
-    rangeWidthBps?: number
+    rangeWidthInBps?: number
     feesWeth: bigint = 0n
     feesUsdc: bigint = 0n
     withdrawnWeth: bigint = 0n
@@ -82,6 +82,14 @@ export class Position {
         else if (this.traded == Direction.Up) {
             const usdcValueOfWethFees = BigInt(this.feesWeth) * BigInt(this.priceAtClosing) / N_10_TO_THE_18
 
+            // if (this.tokenId == 139631 || this.tokenId == 139633) {
+            //     console.log(`${this.tokenId} feesWeth: ${this.feesWeth}`)
+
+            //     // usdcValueOfWethFees: 35_632_575, feesUsdcCalculated: 33_825_603, feesTotalInUsdc: 69_458_178
+            //     // usdcValueOfWethFees: 84_958_130, feesUsdcCalculated: 74_994_683, feesTotalInUsdc: 159_952_813
+            //     console.log(`${this.tokenId} usdcValueOfWethFees: ${usdcValueOfWethFees}, feesUsdcCalculated: ${this.feesUsdcCalculated()}, feesTotalInUsdc: ${BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees}`)
+            // }
+
             return BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees
         }
 
@@ -98,13 +106,18 @@ export class Position {
 
     // Total fees claimed as a proportion of opening liquidity, in percent.
     // This completely ignores execution cost and time in range.
-    grossYield(): number {
-        // The old 'decimal value from dividing two bigints' trick, except we want
-        // this in percent, so we don't divide again by our constant.
-        return Number(this.feesTotalInUsdc() * 10_000n / this.openingLiquidityTotalInUsdc())
+    grossYieldInPercent(): number {
+        // if (this.tokenId == 139631 || this.tokenId == 139633) {
+        //     // Fees total USDC: 69.46, opening liquidity USDC: 2,540.94
+        //     // Fees total USDC: 159.95, opening liquidity USDC: 4,320.65
+        //     console.log(`Fees total USDC: ${this.feesTotalInUsdc()}, opening liquidity USDC: ${this.openingLiquidityTotalInUsdc()}`)
+        // }
+
+        // The old 'decimal value from dividing two bigints' trick.
+        return Number(this.feesTotalInUsdc() * 10_000n / this.openingLiquidityTotalInUsdc()) / 100
     }
 
-    timeOpenDays(): number {
+    timeOpenInDays(): number {
         if (this.openedTimestamp == undefined || this.closedTimestamp == undefined) {
             throw `Missing opened/closed timestamps: ${this.tokenId}`
         }

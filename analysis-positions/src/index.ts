@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 import { getData } from './queries'
-import { logsByTxHash, logsByTokenId, positionsByTokenId, setDirectionAndFIlterToOutOfRange,
+import { logsByTxHash, logsByTokenId, positionsByTokenId, setDirectionAndFilterToOutOfRange,
     setFees, setAddTxLogs, setRangeWidth, setOpeningLiquidity, setOpeningClosingPrices,
     cleanData, generateCsv
 } from './functions'
@@ -24,10 +24,22 @@ async function main() {
     const positions = positionsByTokenId(removeTxLogs)
     // console.log(`Sample position, with logs: ${JSON.stringify(positions.get(198342))}`)
 
+    // console.log(`  Data contains experimental position, token ID...`)
+    // console.log(`  148298: ${positions.get(148298) != undefined}`)
+    // console.log(`  148299: ${positions.get(148299) != undefined}`)
+    // console.log(`  148300: ${positions.get(148300) != undefined}`)
+    // console.log(`  148301: ${positions.get(148301) != undefined}`)
+
     // Now do a second pass to set the direction, since other values depend on that. While we're
     // here, filter out the positions that were closed in-range.
-    setDirectionAndFIlterToOutOfRange(positions)
+    setDirectionAndFilterToOutOfRange(positions)
     // console.log(`Sample position, with direction: ${JSON.stringify(positions.get(198342))}`)
+
+    // console.log(`  Data contains experimental position, token ID...`)
+    // console.log(`  148298: ${positions.get(148298) != undefined}`)
+    // console.log(`  148299: ${positions.get(148299) != undefined}`)
+    // console.log(`  148300: ${positions.get(148300) != undefined}`)
+    // console.log(`  148301: ${positions.get(148301) != undefined}`)
 
     // Set fees, based on the direction.
     setFees(positions)
