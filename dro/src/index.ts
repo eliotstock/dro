@@ -6,7 +6,6 @@ import { wallet, updateGasPrice, gasPriceFormatted } from './wallet'
 import { updateTick, priceFormatted, createPoolOnTestnet } from './uniswap'
 import { DRO } from './dro'
 import { monitor } from './swap-monitor'
-import { init, dumpTokenIds, dumpRerangeEvents, meanTimeToReranging } from './db'
 
 // Read our .env file
 config()
@@ -79,8 +78,6 @@ async function main() {
     monitor: { type: 'boolean', default: false },
     approve: { type: 'boolean', default: false },
     privateKey: { type: 'boolean', default: false },
-    dbDump: { type: 'boolean', default: false },
-    mtr: { type: 'boolean', default: false },
     testnetCreatePool: { type: 'boolean', default: false },
     wrapEth: { type: 'boolean', default: false },
   }).parseSync()
@@ -159,32 +156,6 @@ async function main() {
     // Required 1_250_000_000_000_000_000
     // Got      1_186_361_607_590_516_298
     await wallet.wrapEth('0.5')
-
-    return
-  }
-
-  // Create our database if it doesn't already exist.
-  init()
-
-  // `--db-dump` means dump our database contents to the console.
-  if (argv.dbDump) {
-    console.log(`Database:`)
-
-    await dumpTokenIds()
-
-    await dumpRerangeEvents()
-
-    return
-  }
-
-  // `--mtr` means show our mean time to re-ranging for some range widths.
-  if (argv.mtr) {
-
-    for (const width of rangeWidths) {
-      const mtr = await meanTimeToReranging(width)
-  
-      console.log(`Mean time to re-ranging for range width ${width}: ${mtr}`)
-    }
 
     return
   }

@@ -10,8 +10,7 @@ RUN groupadd -g 901 dro && \
 
 # Install base dependencies
 RUN apt-get update -q && \
-    apt-get install -q -y \
-        sqlite && \
+    apt-get install -q -y && \
     npm install \
         ts-node \
         typescript

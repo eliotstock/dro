@@ -10,12 +10,6 @@ import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
-import {
-  insertRerangeEvent,
-  insertOrReplacePosition,
-  getTokenIdForOpenPosition,
-  deletePosition
-} from './db'
 
 import {
   rangeOrderPoolContract,
@@ -107,24 +101,20 @@ export class DRO {
       // Arbitrum mainnet: WETH is first
       this.wethFirst = await tokenOrderIsWethFirst(rangeOrderPoolContract)
 
-      // Get the token ID for our position from the database. This is a small positive integer.
-      const tokenId = await getTokenIdForOpenPosition()
-
-      // Now get the same token ID from the position manager contract/NFT. Compare.
+      // Get the token ID for our position from the position manager contract/NFT.
       // In due course, drop the database table and just use on-chain data.
-      const t = await currentTokenId(wallet.address)
-      console.log(`Token ID from DB: ${tokenId}, versus from chain: ${t}`)
+      this.tokenId = await currentTokenId(wallet.address)
 
-      if (tokenId === undefined) {
+      if (this.tokenId === undefined) {
         console.log(`[${this.rangeWidthTicks}] No existing position NFT`)
       }
       else {
-        this.tokenId = tokenId
-
         console.log(`[${this.rangeWidthTicks}] Token ID: ${this.tokenId}`)
 
         // Now get the position from Uniswap for the given token ID.
-        const position: Position = await positionByTokenId(tokenId, this.wethFirst)
+        // TODO: Consider combining currentTokenId() and positionByTokenId() on uniswap.ts now that
+        // we're getting the token ID from the chain.
+        const position: Position = await positionByTokenId(this.tokenId, this.wethFirst)
 
         if (position) {
           this.position = position
@@ -134,51 +124,8 @@ export class DRO {
           // Note that at this point, tickLower and tickUpper are based on the existing position
           // whereas rangeWidthTicks is from the .env file. The two may not agree!
 
-          if (JSBI.EQ(JSBI.BigInt(0), this.position.liquidity)) {
-            // Logging suggests that removeLiquidity() is executing completely and the position has
-            // been deleted from the db, and yet we continue to see this happen.
-            console.error(`[${this.rangeWidthTicks}] Existing position has no liquidity. Did we \
-remove liquidity but retain our token ID? Deleting it now.`)
-
-            deletePosition(this.rangeWidthTicks)
-            this.tokenId = undefined
-            this.position = undefined
-            this.totalGasCost = 0
-
-            return
-          }
-
-          // Note that we never get our min and max ticks from the Position instance. Leave them as
-          // zero here, meaning outOfRange() will return true on the first call and setNewRange()
-          // will set them based on the range width in the .env file.
-          // This enables us to kill the process, change the range width in the .env file, restart
-          // and get a re-range to happen based on the new range.
-          // this.tickLower = position.tickLower
-          // this.tickUpper = position.tickUpper
           console.log(`[${this.rangeWidthTicks}] Using existing position NFT: \
 ${positionWebUrl(this.tokenId)}`)
-
-//           console.log(`[${this.rangeWidthTicks}] Liquidity: \
-// ${jsbiFormatted(this.position.liquidity)}`)
-
-//           // The price of the WETH token is quoted in USDC and vice versa.
-//           if (this.wethFirst) {
-//             console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
-// ${position.pool.token0Price.toFixed(4)} USDC, 1: ${position.pool.token1Price.toFixed(4)} WETH`)
-//           }
-//           else {
-//             console.log(`[${this.rangeWidthTicks}] Prices, token 0: \
-// ${position.pool.token0Price.toFixed(4)} WETH, 1: ${position.pool.token1Price.toFixed(4)} USDC`)
-//           }
-
-//           console.log(`[${this.rangeWidthTicks}] tick (lower, current, upper): \
-// (${position.tickLower}, ${position.pool.tickCurrent}, ${position.tickUpper})`)
-
-//           console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from pool directly: \
-// ${position.pool.sqrtRatioX96.toString()}`)
-
-//           console.log(`[${this.rangeWidthTicks}] sqrtRatioX96 from current tick: \
-// ${TickMath.getSqrtRatioAtTick(position.pool.tickCurrent)}`)
 
           this.logRangeInUsdcTerms()
         }
@@ -187,9 +134,6 @@ ${positionWebUrl(this.tokenId)}`)
           process.exit(99)
         }
       }
-
-      // No more forward testing for now.
-      // forwardTestInit(this.rangeWidthTicks)
     }
   
     outOfRange() {
@@ -254,29 +198,17 @@ ${positionWebUrl(this.tokenId)}`)
       let timeInRange: Duration
       let timeInRangeReadable: string = 'an unknown period'
 
-      // No more forward testing for now.
-      // let forwardTestLogLine: string = ''
-
       if (this.lastRerangeTimestamp) {
         const a = moment(this.lastRerangeTimestamp)
         const b = moment() // Now
         const timeToRerangingMillis = b.diff(a)
         timeInRange = moment.duration(timeToRerangingMillis, 'milliseconds')
         timeInRangeReadable = timeInRange.humanize()
-
-        // Do some forward testing on how this range width is performing.
-        // forwardTestLogLine = forwardTestRerange(this.rangeWidthTicks,
-        //   timeInRange,
-        //   direction)
       }
 
       this.lastRerangeTimestamp = moment().toISOString()
 
       if (notInitialRange) {
-        // Insert a row in the database for analytics, except when we're just starting up and there's
-        // no range yet.
-        insertRerangeEvent(this.rangeWidthTicks, moment().toISOString(), direction)
-
         console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRangeReadable}`)
       }
     }
@@ -290,9 +222,7 @@ ${positionWebUrl(this.tokenId)}`)
     //   https://github.com/Uniswap/interface/blob/eff512deb8f0ab832eb8d1834f6d1a20219257d0/src/hooks/useV3PositionFees.ts#L32
     async checkUnclaimedFees() {
       if (!this.position || !this.tokenId) {
-        // This is expected when running in noop mode, or when running one width in prod but
-        // forward testing a bunch of other range widths. No need to log it.
-        // console.error(`[${this.rangeWidthTicks}] Can't check unclaimed fees. Not in a position yet.`)
+        // This is expected when running in no-op mode. No need to log it.
         return
       }
   
@@ -418,9 +348,6 @@ ${jsbiFormatted(liquidityAfter)}`)
 
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] removeLiquidity()`, txRequest)
-
-      // Delete our position from the database as soon after this transaction as possible.
-      deletePosition(this.rangeWidthTicks)
 
       const gasCost = this.gasCost(txReceipt)
 
@@ -877,8 +804,6 @@ spacing of ${rangeOrderPool.tickSpacing}. Can't create position.`
       if (this.tokenId) {
         const webUrl = positionWebUrl(this.tokenId)
         console.log(`[${this.rangeWidthTicks}] addLiquidity() Position URL: ${webUrl}`)
-
-        insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
       }
       else {
         console.error(`[${this.rangeWidthTicks}] addLiquidity() No token ID from logs. We won't \
@@ -1093,8 +1018,6 @@ ${route.trade.outputAmount.currency.symbol}`)
         if (this.tokenId) {
           const webUrl = positionWebUrl(this.tokenId)
           console.log(`swapAndAddLiquidity() Position URL: ${webUrl}`)
-
-          insertOrReplacePosition(this.rangeWidthTicks, moment().toISOString(), this.tokenId)
         }
         else {
           throw `[${this.rangeWidthTicks}] swapAndAddLiquidity() No token ID from logs. We won't \

@@ -12,7 +12,6 @@
     "log": "tail -f -n 1000 ./out/dro.log",
     "balances": "ts-node ./src/index.ts --balances",
     "approve": "ts-node ./src/index.ts --approve",
-    "sql": "sqlite3 ./out/database.db",
     "monitor": "ts-node ./src/index.ts --monitor >>./out/swap_events.csv 2>&1"
   },
   "author": "",
@@ -26,8 +25,6 @@
     "dotenv": "^10.0.0",
     "ethers": "^5.4.7",
     "moment": "^2.29.1",
-    "sqlite": "^4.0.23",
-    "sqlite3": "^5.0.2",
     "tiny-invariant": "^1.2.0",
     "typescript": "^4.4.3",
     "yargs": "^17.2.1"

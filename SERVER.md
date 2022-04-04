@@ -122,14 +122,13 @@ network:
     1. Copy the `curl` script from https://github.com/nvm-sh/nvm and execute it.
     1. Exit and restart the terminal to get `nvm` onto the path.
     1. `cd` to this repo and `nvm use` then `nvm install [version]`
-    1. `sudo apt install make gcc g++ python sqlite dpkg-dev`
+    1. `sudo apt install make gcc g++ python dpkg-dev`
     1. Edit your apt sources list (in the .d directory) to add the source servers.
         1. `sudo cp /etc/apt/sources.list /etc/apt/sources.list.d/foo.list`
         1. `sudo nano /etc/apt/sources.list.d/foo.list`
         1. Comment out all the `deb` lines, uncomment all the `deb-src` lines and save
         1. `sudo apt update`
-    1. `sudo apt source sqlite`
-    1. (Optional) If re-installing, don't forget to copy up the `database.db` and `dro.log` files to `out`.
+    1. (Optional) If re-installing, don't forget to copy up the `dro.log` file to `out`.
     1. Switch to the `README.md` in this repo to configure and run the dro.
 1. (Optional) Switch the display to portrait mode.
     1. Test this works first: `sudo echo 3 | sudo tee /sys/class/graphics/fbcon/rotate_all`
