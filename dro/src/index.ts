@@ -19,12 +19,8 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 //   "Ticks are all 1.0001 to an integer power, which means each tick is .01% away from the next
 //    tick."
 // Note that .01% is one basis point ("bip"), so every tick is a single bip change in price.
-// But the tick spacing in our pool is 60, so our range width must be a multiple of that.
-// Forget about using a range width of 60 bps. When we re-range, we want a new range that's
-// centered on the current price. This is impossible when the range width is the smallest
-// possible width - we can't set a min tick 30 bps lower than the current price. The same applies
-// to range widths that are multiples of 60 bps but not 120 bps - they cannot be centered on the 
-// current price. Therefore, choose ranges widths that are multiples of 120 bps.
+// Tick spacing is 10 for the 0.05% fee tier pool, 60 for the 0.30% fee tier pool.
+// Range width should be a multiple of the tick spacing, with a minimum of double the tick spacing.
 if (process.env.RANGE_WIDTHS == undefined) throw 'No RANGE_WIDTHS list in .env file.'
 
 const rangeWidths: number[] = process.env.RANGE_WIDTHS?.split(' ').map(Number)

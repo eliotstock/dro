@@ -80,6 +80,7 @@ export class DRO {
     wethFirst: boolean = true
     position?: Position
     tokenId?: number
+    tickSpacing?: number
     unclaimedFeesUsdc: bigint = 0n
     unclaimedFeesWeth: bigint = 0n
     lastRerangeTimestamp?: string
@@ -104,6 +105,9 @@ export class DRO {
       // Get the token ID for our position from the position manager contract/NFT.
       // In due course, drop the database table and just use on-chain data.
       this.tokenId = await currentTokenId(wallet.address)
+
+      // We need this in order to find the new range each time.
+      this.tickSpacing = await rangeOrderPoolContract.tickSpacing()
 
       if (this.tokenId === undefined) {
         console.log(`[${this.rangeWidthTicks}] No existing position NFT`)
@@ -173,8 +177,9 @@ ${positionWebUrl(this.tokenId)}`)
   
     setNewRange() {
       if (rangeOrderPoolTick == undefined) throw 'No tick yet.'
+      if (this.tickSpacing == undefined) throw 'No tick spacing'
 
-      const [lower, upper] = rangeAround(rangeOrderPoolTick, this.rangeWidthTicks)
+      const [lower, upper] = rangeAround(rangeOrderPoolTick, this.rangeWidthTicks, this.tickSpacing)
       this.tickLower = lower
       this.tickUpper = upper
 
