@@ -87,6 +87,8 @@ async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> 
     // Do NOT call these once on startup. They need to be called every time we use the pool.
     const liquidity = await poolContract.liquidity()
     const slot = await poolContract.slot0()
+    const feeFromContract = await poolContract.fee()
+    const tickSpacingFromContract = await poolContract.tickSpacing()
 
     // Do NOT pass a strings for these parameters below! JSBI does very little type checking.
     const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
@@ -97,7 +99,7 @@ async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> 
     // invariant(slot[5] > 0, 'Pool has no fee')
     const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
 
-    console.log(`usePool(): Fee from slot0: ${slot[5]}`)
+    console.log(`usePool(): Fee from slot0: ${slot[5]}, fee from contract: ${feeFromContract}`)
 
     // The order of the tokens in the pool varies from chain to chain, annoyingly.
     // Ethereum mainnet: USDC is first
@@ -125,7 +127,7 @@ async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> 
         slot[1] // tickCurrent
     )
 
-    console.log(`usePool(): Tick spacing: ${pool.tickSpacing}`)
+    console.log(`usePool(): Tick spacing: ${pool.tickSpacing}, tick spacing from contract: ${tickSpacingFromContract}`)
 
     return [pool, wethFirst]
 }
@@ -232,6 +234,8 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
 
     const slot = await rangeOrderPoolContract.slot0()
     const liquidity = await rangeOrderPoolContract.liquidity()
+    const feeFromContract = await rangeOrderPoolContract.fee()
+    const tickSpacingFromContract = await rangeOrderPoolContract.tickSpacing()
 
     // The order of the tokens in the pool varies from chain to chain, annoyingly.
     //   Ethereum mainnet: USDC is first
@@ -253,7 +257,7 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     // invariant(slot[5] > 0, 'Pool has no fee')
     const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
 
-    console.log(`positionByTokenId(): Fee from slot0: ${slot[5]}`)
+    console.log(`positionByTokenId(): Fee from slot0: ${slot[5]}, fee from contract: ${feeFromContract}`)
 
     const usablePool = new Pool(
         token0,
@@ -264,7 +268,7 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
         slot[1] // Tick
     )
 
-    console.log(`positionByTokenId(): Tick spacing: ${usablePool.tickSpacing}`)
+    console.log(`positionByTokenId(): Tick spacing: ${usablePool.tickSpacing}, tick spacing from contract: ${tickSpacingFromContract}`)
 
     // console.log(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
 
