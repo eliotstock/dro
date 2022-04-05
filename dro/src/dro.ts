@@ -186,7 +186,7 @@ ${positionWebUrl(this.tokenId)}`)
       this.logRangeInUsdcTerms()
     }
 
-    trackRerangeEvent() {
+    logRerangeEvent() {
       const notInitialRange: boolean = (this.tickLower != 0)
 
       let direction: Direction
@@ -717,8 +717,6 @@ liquidity and swap first.`
       // Go from native bigint to JSBI via string.
       const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
       const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
-      // console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: \
-// ${availableUsdc} USDC, ${availableWeth} WETH`)
 
       const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
@@ -1106,7 +1104,7 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         //   https://github.com/motdotla/dotenv/issues/122
 
         // Put a row in our analytics table and log the re-ranging.
-        this.trackRerangeEvent()
+        this.logRerangeEvent()
 
         await wallet.logBalances()
 
