@@ -85,21 +85,34 @@ export async function updateTick() {
 
 async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> {
     // Do NOT call these once on startup. They need to be called every time we use the pool.
-    const liquidity = await poolContract.liquidity()
-    const slot = await poolContract.slot0()
-    const feeFromContract = await poolContract.fee()
-    const tickSpacingFromContract = await poolContract.tickSpacing()
+    const [liquidity, slot, fee, tickSpacing] = await Promise.all([
+        poolContract.liquidity(),
+        poolContract.slot0(),
+        poolContract.fee(),
+        poolContract.tickSpacing()
+    ])
+
+    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+    // undefined. This will throw an error when the position gets created.
+    if (fee == 0) throw `No fee. WTF.`
+    if (tickSpacing == 0) throw `No tick spacing. WTF.`
+
+    console.log(`usePool(): Fee: ${fee}, tick spacing: ${tickSpacing}`)
+
+    // const liquidity = await poolContract.liquidity()
+    // const slot = await poolContract.slot0()
+    // const feeFromContract = await poolContract.fee()
+    // const tickSpacingFromContract = await poolContract.tickSpacing()
 
     // Do NOT pass a strings for these parameters below! JSBI does very little type checking.
     const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
     const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
 
-    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
-    // undefined. This will throw an error when the position gets created.
-    // invariant(slot[5] > 0, 'Pool has no fee')
-    const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
 
-    console.log(`usePool(): Fee from slot0: ${slot[5]}, fee from contract: ${feeFromContract}`)
+    // invariant(slot[5] > 0, 'Pool has no fee')
+    // const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
+
+    // console.log(`usePool(): Fee from slot0: ${slot[5]}, fee from contract: ${feeFromContract}`)
 
     // The order of the tokens in the pool varies from chain to chain, annoyingly.
     // Ethereum mainnet: USDC is first
@@ -127,7 +140,7 @@ async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> 
         slot[1] // tickCurrent
     )
 
-    console.log(`usePool(): Tick spacing: ${pool.tickSpacing}, tick spacing from contract: ${tickSpacingFromContract}`)
+    // console.log(`usePool(): Tick spacing: ${pool.tickSpacing}, tick spacing from contract: ${tickSpacingFromContract}`)
 
     return [pool, wethFirst]
 }
@@ -232,10 +245,20 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     // The Pool instance on the position at this point is sorely lacking. Replace it. Because all
     // the properties on the Position are readonly this means constructing a new one.
 
-    const slot = await rangeOrderPoolContract.slot0()
-    const liquidity = await rangeOrderPoolContract.liquidity()
-    const feeFromContract = await rangeOrderPoolContract.fee()
-    const tickSpacingFromContract = await rangeOrderPoolContract.tickSpacing()
+    // Do NOT call these once on startup. They need to be called every time we use the pool.
+    const [liquidity, slot, fee, tickSpacing] = await Promise.all([
+        rangeOrderPoolContract.liquidity(),
+        rangeOrderPoolContract.slot0(),
+        rangeOrderPoolContract.fee(),
+        rangeOrderPoolContract.tickSpacing()
+    ])
+
+    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+    // undefined. This will throw an error when the position gets created.
+    if (fee == 0) throw `No fee. WTF.`
+    if (tickSpacing == 0) throw `No tick spacing. WTF.`
+
+    console.log(`positionByTokenId(): Fee: ${fee}, tick spacing: ${tickSpacing}`)
 
     // The order of the tokens in the pool varies from chain to chain, annoyingly.
     //   Ethereum mainnet: USDC is first
@@ -255,9 +278,9 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
     // undefined. This will throw an error when the position gets created.
     // invariant(slot[5] > 0, 'Pool has no fee')
-    const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
+    // const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
 
-    console.log(`positionByTokenId(): Fee from slot0: ${slot[5]}, fee from contract: ${feeFromContract}`)
+    // console.log(`positionByTokenId(): Fee from slot0: ${slot[5]}, fee from contract: ${feeFromContract}`)
 
     const usablePool = new Pool(
         token0,
@@ -268,7 +291,7 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
         slot[1] // Tick
     )
 
-    console.log(`positionByTokenId(): Tick spacing: ${usablePool.tickSpacing}, tick spacing from contract: ${tickSpacingFromContract}`)
+    // console.log(`positionByTokenId(): Tick spacing: ${usablePool.tickSpacing}, tick spacing from contract: ${tickSpacingFromContract}`)
 
     // console.log(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
 
