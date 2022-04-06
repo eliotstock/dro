@@ -767,7 +767,8 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         await this.addLiquidity()
 
         const stopwatchMillis = (Date.now() - stopwatchStart)
-        console.log(`Remove/swap/add roundtrip took ${Math.round(stopwatchMillis / 1_000)}s`)
+        console.log(`[${this.rangeWidthTicks}] Remove/swap/add roundtrip took \
+${Math.round(stopwatchMillis / 1_000)}s`)
 
         // Deposit assets and let the protocol swap the optimal size for the liquidity position,
         // then enter the liquidity position all in one transaction.
