@@ -13,7 +13,6 @@ import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 
 import {
   rangeOrderPoolContract,
-  quoterContract,
   positionManagerContract,
   rangeOrderPoolTick,
   useSwapPool,
@@ -36,7 +35,6 @@ import {
   Currency,
   CurrencyAmount,
   Fraction,
-  Percent,
   Token,
   TradeType
 } from '@uniswap/sdk-core'
@@ -51,12 +49,7 @@ import {
   tickToPrice,
   Trade
 } from '@uniswap/v3-sdk'
-import {
-  AlphaRouter,
-  SwapToRatioResponse,
-  SwapToRatioRoute,
-  SwapToRatioStatus
-} from '@uniswap/smart-order-router'
+import { AlphaRouter } from '@uniswap/smart-order-router'
 
 const OUT_DIR = './out'
 
@@ -452,10 +445,6 @@ Unwrapping just enough WETH for the next re-range.`)
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token1, weth.toString())
           zeroForOne = true // USDC for WETH, token zero for token one
         }
-
-        console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is USDC,\
- price: ${inputTokenPrice.toFixed(4)} WETH, input balance: ${inputBalance.toFixed(2)} USDC, output\
- balance: ${outputBalance.toFixed(4)} WETH, zeroForOne: ${zeroForOne}`)
       }
       else if (ratio > 0.5 && ratio <= 1.5) {
         // This should only be the case when restarting after an error that occured after the swap
@@ -488,14 +477,7 @@ Unwrapping just enough WETH for the next re-range.`)
           outputBalance = CurrencyAmount.fromRawAmount(swapPool.token0, usdc.toString())
           zeroForOne = false // WETH for USDC, token one for token zero
         }
-
-        console.log(`[${this.rangeWidthTicks}] swapOptimally() Input token is WETH, price:\
- ${inputTokenPrice.toFixed(4)} USDC, input balance: ${inputBalance.toFixed(4)} WETH,\
- outputBalance: ${outputBalance.toFixed(2)} USDC, zeroForOne: ${zeroForOne}`)
       }
-
-//       console.log(`[${this.rangeWidthTicks}] swapOptimally() tick (lower, current, upper): \
-// (${this.tickLower}, ${swapPool.tickCurrent}, ${this.tickUpper})`)
 
       const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
@@ -513,9 +495,6 @@ Unwrapping just enough WETH for the next re-range.`)
       // Call private method on AlphaRouter.
       const optimalRatio: Fraction = this.alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96,
         zeroForOne)
-
-      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal ratio from AlphaRouter:\
- ${optimalRatio.toFixed(16)}`)
 
       const amountToSwap = calculateRatioAmountIn(optimalRatio, inputTokenPrice, inputBalance,
         outputBalance)
@@ -546,8 +525,6 @@ Unwrapping just enough WETH for the next re-range.`)
         tradeType: TradeType.EXACT_INPUT,
       })
 
-      // console.log(`[${this.rangeWidthTicks}] swapOptimally() Trade: ${JSON.stringify(trade)}`)
-
       const options: SwapOptions = {
         slippageTolerance: CHAIN_CONFIG.slippageTolerance,
         recipient: wallet.address,
@@ -555,7 +532,6 @@ Unwrapping just enough WETH for the next re-range.`)
       }
 
       const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
-      // console.log(`[${this.rangeWidthTicks}] swapOptimally() calldata: `, calldata)
 
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -751,7 +727,6 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // restaritng the process, which loses us our tx costs so far. See:
         //   https://github.com/motdotla/dotenv/issues/122
 
-        // Put a row in our analytics table and log the re-ranging.
         this.logRerangeEvent()
 
         await wallet.logBalances()
@@ -771,15 +746,15 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // Find our new range around the current price.
         this.setNewRange()
 
-        // New swap() implementation. Swap the exact amount of one token that will give us the
-        // right balance of assets for the new position.
+        // Swap the exact amount of one token that will give us the right balance of assets for the
+        // new position.
         await this.swapOptimally()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
         // a non zero amount of WETH. Unwrap some to ETH now if we need to.
         // Note that this will move us slightly away from the optimal ratio of assets we just
-        // swapped to. The error is negligible.
+        // swapped to.
         await this.topUpEth()
 
         // Add all our WETH and USDC to a new liquidity position.
