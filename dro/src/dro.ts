@@ -738,6 +738,9 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         // coming next.
         this.logUnclaimedFees()
 
+        // Time our remove/swap/add roundtrip.
+        const stopwatchStart = Date.now()
+
         // Remove all of our liquidity now and close our position.
         await this.removeLiquidity()
 
@@ -751,14 +754,20 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         await this.swapOptimally()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
-        // (add, remove, swap). This is the only point in the cycle where we're guaranteed to have
-        // a non zero amount of WETH. Unwrap some to ETH now if we need to.
-        // Note that this will move us slightly away from the optimal ratio of assets we just
-        // swapped to.
+        // (add, remove, swap). We could do tihs at two points in the cycle:
+        // 1. After the swap. We're guaranteed to have a non zero amount of WETH, but this will
+        //    move us slightly away from the optimal ratio of assets we just swapped to.
+        // 2. After the remove, but only when we re-range down, such that we're all in WETH. This
+        //    will let our swaps be closer to optimal, but we'll be doing it less often. There's a
+        //    risk that if we happen to get five re-ranges up in a row, we'll run out of ETH.
+        // Go with option 1 for now.
         await this.topUpEth()
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()
+
+        const stopwatchMillis = (Date.now() - stopwatchStart)
+        console.log(`Remove/swap/add roundtrip took ${Math.round(stopwatchMillis / 1_000)}s`)
 
         // Deposit assets and let the protocol swap the optimal size for the liquidity position,
         // then enter the liquidity position all in one transaction.
