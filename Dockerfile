@@ -4,10 +4,6 @@ LABEL org.opencontainers.image.source="https://github.com/biketracker/dro"
 # Create app directory
 WORKDIR /app
 
-# Set the user, we don't want this running as root
-RUN groupadd -g 901 dro && \
-    useradd -r -u 901 -g dro dro
-
 # Install base dependencies
 RUN npm install \
         ts-node \
@@ -21,6 +17,5 @@ COPY dro ./dro
 RUN npm install ./dro
 
 # Entrypoint
-USER dro
 ENTRYPOINT [ "npm", "--prefix", "./proc", "run" ]
 CMD [ "proc" ]
