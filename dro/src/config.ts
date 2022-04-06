@@ -47,12 +47,11 @@ const ETHEREUM_MAINNET: ChainConfig = {
 
     addrTokenWeth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
 
-    // USDC/ETH pool with 0.3% fee: https://info.uniswap.org/#/pools/0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8
-    // This is the pool into which we enter a range order. It is NOT the pool in which we execute swaps.
-    // UI for adding liquidity to this pool: https://app.uniswap.org/#/add/ETH/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/3000
-    addrPoolRangeOrder: "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8",
+    // USDC/ETH pool with 0.05% fee.
+    // This is the pool into which we enter our range order.
+    addrPoolRangeOrder: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
 
-    // USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
+    // USDC/ETH pool with 0.05% fee.
     // This is the pool in which we execute our swaps.
     addrPoolSwaps: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
 
@@ -106,10 +105,10 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     addrTokenWeth: '0x82af49447d8a07e3bd95bd0d56f35241523fbab1',
 
-    // USDC/ETH pool with 0.3% fee: https://info.uniswap.org/#/arbitrum/pools/0x17c14d2c404d167802b16c450d3c99f88f2c4f4d
-    addrPoolRangeOrder: '0x17c14D2c404D167802b16C450d3c99F88F2c4F4d',
+    // USDC/ETH pool with 0.05% fee
+    addrPoolRangeOrder: '0xc31e54c7a869b9fcbecc14363cf510d1c41fa443',
 
-    // USDC/ETH pool with 0.05% fee: https://info.uniswap.org/#/arbitrum/pools/0xc31e54c7a869b9fcbecc14363cf510d1c41fa443
+    // USDC/ETH pool with 0.05% fee
     addrPoolSwaps: '0xc31e54c7a869b9fcbecc14363cf510d1c41fa443',
 
     slippageTolerance: new Percent(10, 1_000), // 1.0%
@@ -165,7 +164,7 @@ const ETHEREUM_KOVAN: ChainConfig = {
     // We created this pool ourselves, using uniswap.ts:createPoolOnTestnet().
     addrPoolRangeOrder: "0x36f114d17fdcf3df2a96b4ad317345ac62a6a6f7",
 
-    // Would normally be different to the range order pool, but is the same on Kovan.
+    // Same pool as above.
     addrPoolSwaps: "0x36f114d17fdcf3df2a96b4ad317345ac62a6a6f7",
 
     // Go crazy high here. We will probably be the only liquidity in the pool anyway.

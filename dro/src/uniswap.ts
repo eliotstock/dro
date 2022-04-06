@@ -22,7 +22,6 @@ import {
     Position,
     MintOptions,
     NonfungiblePositionManager,
-    FeeAmount,
     toHex,
     Multicall,
     nearestUsableTick,
@@ -44,10 +43,6 @@ export let rangeOrderPoolTick: number
 export const DEADLINE_SECONDS = 180
 
 export const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
-
-// This is what `await rangeOrderPoolContract.tickSpacing()` would return, but we want to avoid
-// the await.
-export const RANGE_ORDER_POOL_TICK_SPACING: number = 60 // ticks (bps)
 
 export const rangeOrderPoolContract = new ethers.Contract(
     CHAIN_CONFIG.addrPoolRangeOrder,
@@ -85,19 +80,23 @@ export async function updateTick() {
 
 async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> {
     // Do NOT call these once on startup. They need to be called every time we use the pool.
-    const liquidity = await poolContract.liquidity()
-    const slot = await poolContract.slot0()
+    const [liquidity, slot, fee, tickSpacing] = await Promise.all([
+        poolContract.liquidity(),
+        poolContract.slot0(),
+        poolContract.fee(),
+        poolContract.tickSpacing()
+    ])
+
+    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+    // undefined. This will throw an error when the position gets created.
+    if (fee == 0) throw `No fee. WTF.`
+    if (tickSpacing == 0) throw `No tick spacing. WTF.`
+
+    console.log(`usePool(): Fee: ${fee}, tick spacing: ${tickSpacing}`)
 
     // Do NOT pass a strings for these parameters below! JSBI does very little type checking.
     const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
     const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
-
-    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
-    // undefined. This will throw an error when the position gets created.
-    // invariant(slot[5] > 0, 'Pool has no fee')
-    const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
-
-    console.log(`usePool(): Fee from slot0: ${slot[5]}`)
 
     // The order of the tokens in the pool varies from chain to chain, annoyingly.
     // Ethereum mainnet: USDC is first
@@ -124,8 +123,6 @@ async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> 
         liquidityAsJsbi,
         slot[1] // tickCurrent
     )
-
-    console.log(`usePool(): Tick spacing: ${pool.tickSpacing}`)
 
     return [pool, wethFirst]
 }
@@ -167,20 +164,20 @@ export function priceFormatted(): string {
 
 // Given the current tick (price) in the pool and a range width in ticks, what are the lower and
 // upper ticks of the range? 
-export function rangeAround(tick: number, width: number): [number, number] {
+export function rangeAround(tick: number, width: number, tickSpacing: number): [number, number] {
     // Note that if rangeWidthTicks is not a multiple of the tick spacing for the pool, the range
     // returned here can be quite different to rangeWidthTicks.
     let tickLower = Math.round(tick - (width / 2))
 
     // Don't go under MIN_TICK, which can happen on testnets.
     tickLower = Math.max(tickLower, TickMath.MIN_TICK)
-    tickLower = nearestUsableTick(tickLower, RANGE_ORDER_POOL_TICK_SPACING)
+    tickLower = nearestUsableTick(tickLower, tickSpacing)
 
     let tickUpper = Math.round(tick + (width / 2))
 
     // Don't go over MAX_TICK, which can happen on testnets.
     tickUpper = Math.min(tickUpper, TickMath.MAX_TICK)
-    tickUpper = nearestUsableTick(tickUpper, RANGE_ORDER_POOL_TICK_SPACING)
+    tickUpper = nearestUsableTick(tickUpper, tickSpacing)
 
     return [tickLower, tickUpper]
 }
@@ -224,14 +221,27 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
     return undefined
 }
 
+// TODO: Reduce repitiion here, possibly by calling usePool() from here.
 export async function positionByTokenId(tokenId: number, wethFirst: boolean): Promise<Position> {
     const position: Position = await positionManagerContract.positions(tokenId)
 
     // The Pool instance on the position at this point is sorely lacking. Replace it. Because all
     // the properties on the Position are readonly this means constructing a new one.
 
-    const slot = await rangeOrderPoolContract.slot0()
-    const liquidity = await rangeOrderPoolContract.liquidity()
+    // Do NOT call these once on startup. They need to be called every time we use the pool.
+    const [liquidity, slot, fee, tickSpacing] = await Promise.all([
+        rangeOrderPoolContract.liquidity(),
+        rangeOrderPoolContract.slot0(),
+        rangeOrderPoolContract.fee(),
+        rangeOrderPoolContract.tickSpacing()
+    ])
+
+    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+    // undefined. This will throw an error when the position gets created.
+    if (fee == 0) throw `No fee. WTF.`
+    if (tickSpacing == 0) throw `No tick spacing. WTF.`
+
+    console.log(`positionByTokenId(): Fee: ${fee}, tick spacing: ${tickSpacing}`)
 
     // The order of the tokens in the pool varies from chain to chain, annoyingly.
     //   Ethereum mainnet: USDC is first
@@ -248,13 +258,6 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
         token1 = TOKEN_WETH
     }
 
-    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
-    // undefined. This will throw an error when the position gets created.
-    // invariant(slot[5] > 0, 'Pool has no fee')
-    const fee = slot[5] > 0 ? slot[5] : FeeAmount.MEDIUM
-
-    console.log(`positionByTokenId(): Fee from slot0: ${slot[5]}`)
-
     const usablePool = new Pool(
         token0,
         token1,
@@ -263,8 +266,6 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
         liquidity.toString(), // Liquidity
         slot[1] // Tick
     )
-
-    console.log(`positionByTokenId(): Tick spacing: ${usablePool.tickSpacing}`)
 
     // console.log(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
 
