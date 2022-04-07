@@ -278,6 +278,9 @@ ${positionWebUrl(this.tokenId)}`)
     //   https://github.com/ethers-io/ethers.js/issues/1162#issuecomment-1057422329
     //   https://docs.alchemy.com/alchemy/documentation/rate-limits#option-2-retry-after
     async sendTx(logLinePrefix: string, txRequest: TransactionRequest): Promise<TransactionReceipt> {
+      // Time our tx.
+      const stopwatchStart = Date.now()
+
       try {
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
         // console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
@@ -285,6 +288,10 @@ ${positionWebUrl(this.tokenId)}`)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
         // console.dir(txReceipt)
+
+        const stopwatchMillis = (Date.now() - stopwatchStart)
+        console.log(`[${this.rangeWidthTicks}] Transaction took \
+${Math.round(stopwatchMillis / 1_000)}s`)
 
         return txReceipt
       }
