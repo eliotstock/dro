@@ -223,13 +223,9 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
 
 // TODO: Reduce repitiion here, possibly by calling usePool() from here.
 export async function positionByTokenId(tokenId: number, wethFirst: boolean): Promise<Position> {
-    const position: Position = await positionManagerContract.positions(tokenId)
-
-    // The Pool instance on the position at this point is sorely lacking. Replace it. Because all
-    // the properties on the Position are readonly this means constructing a new one.
-
     // Do NOT call these once on startup. They need to be called every time we use the pool.
-    const [liquidity, slot, fee, tickSpacing] = await Promise.all([
+    const [position, liquidity, slot, fee, tickSpacing] = await Promise.all([
+        positionManagerContract.positions(tokenId),
         rangeOrderPoolContract.liquidity(),
         rangeOrderPoolContract.slot0(),
         rangeOrderPoolContract.fee(),
@@ -242,6 +238,9 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     if (tickSpacing == 0) throw `No tick spacing. WTF.`
 
     console.log(`positionByTokenId(): Fee: ${fee}, tick spacing: ${tickSpacing}`)
+
+    // The Pool instance on the position at this point is sorely lacking. Replace it. Because all
+    // the properties on the Position are readonly this means constructing a new one.
 
     // The order of the tokens in the pool varies from chain to chain, annoyingly.
     //   Ethereum mainnet: USDC is first

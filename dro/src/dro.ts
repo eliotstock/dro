@@ -374,8 +374,10 @@ ${this.totalGasCost.toFixed(2)}`)
       if (this.position || this.tokenId)
          throw "Refusing to top up ETH. Still in a position. Remove liquidity first."
 
-      const ethBalance = await wallet.eth()
-      const wethBalance = await wallet.weth()
+      const [ethBalance, wethBalance] = await Promise.all([
+        wallet.eth(),
+        wallet.weth()
+      ])
 
       if (ethBalance >= CHAIN_CONFIG.ethBalanceMin) {
         return
@@ -405,17 +407,14 @@ Unwrapping just enough WETH for the next re-range.`)
       if (this.position || this.tokenId)
          throw "Refusing to swap. Still in a position. Remove liquidity first."
 
-      // TODO: Run all the below await()s in parallel.
-      const usdc = await wallet.usdc()
-      const weth = await wallet.weth()
+      // What are our balances and the ratio of our USDC balance to the USDC value of our WETH
+      // balance?
+      const [usdc, weth, ratio] = await wallet.tokenBalancesAndRatio()
 
       if (usdc == 0n && weth == 0n) {
         console.log(`This account has no USDC or WETH. Fatal. HFSP.`)
         process.exit(412)
       }
-
-      // What is the ratio of our USDC balance to the USDC value of our WETH balance?
-      const ratio = await wallet.tokenRatioByValue()
 
       const [swapPool, wethFirstInSwapPool] = await useSwapPool()
 
@@ -486,6 +485,7 @@ Unwrapping just enough WETH for the next re-range.`)
         }
       }
 
+      // TODO: This 'await' can be avoided when the range order pool is the same as the swap pool.
       const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
       // Because we're using this tick to get the optimal ratio of assets to put into the range
@@ -564,10 +564,13 @@ Unwrapping just enough WETH for the next re-range.`)
       if (this.position || this.tokenId)
         throw `[${this.rangeWidthTicks}] Can't add liquidity. Already in a position. Remove \
 liquidity and swap first.`
+
+      // What are our balances? We don't need the ratio here.
+      const [usdcNative, wethNative, ratio] = await wallet.tokenBalancesAndRatio()
   
       // Go from native bigint to JSBI via string.
-      const availableUsdc = JSBI.BigInt((await wallet.usdc()).toString())
-      const availableWeth = JSBI.BigInt((await wallet.weth()).toString())
+      const availableUsdc = JSBI.BigInt((usdcNative).toString())
+      const availableWeth = JSBI.BigInt((wethNative).toString())
 
       const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
@@ -750,8 +753,6 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
 
         // Remove all of our liquidity now and close our position.
         await this.removeLiquidity()
-
-        await wallet.logBalances()
 
         // Find our new range around the current price.
         this.setNewRange()
