@@ -92,8 +92,6 @@ async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> 
     if (fee == 0) throw `No fee. WTF.`
     if (tickSpacing == 0) throw `No tick spacing. WTF.`
 
-    console.log(`usePool(): Fee: ${fee}, tick spacing: ${tickSpacing}`)
-
     // Do NOT pass a strings for these parameters below! JSBI does very little type checking.
     const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
     const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
@@ -236,8 +234,6 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     // undefined. This will throw an error when the position gets created.
     if (fee == 0) throw `No fee. WTF.`
     if (tickSpacing == 0) throw `No tick spacing. WTF.`
-
-    console.log(`positionByTokenId(): Fee: ${fee}, tick spacing: ${tickSpacing}`)
 
     // The Pool instance on the position at this point is sorely lacking. Replace it. Because all
     // the properties on the Position are readonly this means constructing a new one.
@@ -488,6 +484,10 @@ export function calculateRatioAmountInWithDebugging(
     inputBalance.currency,
     amountToSwapRaw.quotient
   )
+}
+
+export function rangeOrderPoolIsSwapPool(): boolean {
+    return CHAIN_CONFIG.addrPoolRangeOrder == CHAIN_CONFIG.addrPoolSwaps
 }
 
 export async function createPoolOnTestnet() {
