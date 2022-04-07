@@ -11,8 +11,7 @@
     "r": "ts-node ./src/index.ts --r >>./out/dro.log 2>&1",
     "log": "tail -f -n 1000 ./out/dro.log",
     "balances": "ts-node ./src/index.ts --balances",
-    "approve": "ts-node ./src/index.ts --approve",
-    "monitor": "ts-node ./src/index.ts --monitor >>./out/swap_events.csv 2>&1"
+    "approve": "ts-node ./src/index.ts --approve"
   },
   "author": "",
   "license": "ISC",
