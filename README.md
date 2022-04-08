@@ -11,7 +11,7 @@
 1. You need a local `.env` file. Start by copying the example: `cp .env.example .env`. Then edit the values:
     1. `DRO_ACCOUNT_MNEMONIC`: A seed phrase of 12 words, the first account from which is the one you're going to use
     1. `PROVIDER_URL`: Including the Infura project ID or Alchemy API key. Using a local node is fine.
-    1. `CHAIN` eg. `CHAIN="ethereumMainnet"`: See `dro/src/config.ts` for valid values.
+    1. `CHAIN` eg. `"ethereumMainnet"`: See `dro/src/config.ts` for valid values.
     1. `RANGE_WIDTH` eg. `"600"`: Single value in basis points (bps). Start with `"1800"` if you're not sure.
 1. Approve Uniswap's smart contracts to spend your WETH and USDC.
     1. `npm run approve`
