@@ -486,18 +486,17 @@ Unwrapping just enough WETH for the next re-range.`)
         }
       }
 
-      // Performance optimisation. Some 'await's can be avoided when the range order pool is the
-      // same as the swap pool.
       let rangeOrderPool
 
-      // Uncomment once we're sure the below un-tuple'ing syntax works.
-      // if (rangeOrderPoolIsSwapPool()) {
-      //   rangeOrderPool = swapPool
-      // }
-      // else {
+      // Performance optimisation. Some 'await's can be avoided when the range order pool is the
+      // same as the swap pool.
+      if (rangeOrderPoolIsSwapPool()) {
+        rangeOrderPool = swapPool
+      }
+      else {
         // Only interested in the first element from the tuple returned.
         rangeOrderPool = (await useRangeOrderPool())[0]
-      // }
+      }
 
       // Because we're using this tick to get the optimal ratio of assets to put into the range
       // order position, use the range order pool here, not the swap pool.
