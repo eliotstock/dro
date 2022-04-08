@@ -8,11 +8,11 @@
 1. Fund the account you're going to use with:
     1. Some ETH for gas, at least 0.2 ETH on Mainnet or 0.015 ETH on Arbitrum
     1. Either USDC or WETH (or both is fine) to the value of at least 1K USD
-1. Put a value for each of these variables in an `.env` file. Only one of the project IDs is required, strictly speaking.
+1. You need a local `.env` file. Start by copying the example: `cp .env.example .env`. Then edit the values:
     1. `DRO_ACCOUNT_MNEMONIC`: A seed phrase of 12 words, the first account from which is the one you're going to use
     1. `PROVIDER_URL`: Including the Infura project ID or Alchemy API key. Using a local node is fine.
     1. `CHAIN` eg. `CHAIN="ethereumMainnet"`: See `dro/src/config.ts` for valid values.
-    1. `RANGE_WIDTHS` eg. `RANGE_WIDTHS="120 240 360 480 600 720 840 960 1800"`: Space separated list of wdiths, in basis points (bps). Start with `"360"`
+    1. `RANGE_WIDTH` eg. `"600"`: Single value in basis points (bps). Start with `"1800"` if you're not sure.
 1. Approve Uniswap's smart contracts to spend your WETH and USDC.
     1. `npm run approve`
 1. Run with error handling.

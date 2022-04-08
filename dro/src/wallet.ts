@@ -101,9 +101,11 @@ export class EthUsdcWallet extends ethers.Wallet {
         return r
     }
 
-    async tokenRatioByValue(): Promise<number> {
-        const usdc = await this.usdc()
-        const weth = await this.weth()
+    async tokenBalancesAndRatio(): Promise<[bigint, bigint, number]> {
+        const [usdc, weth] = await Promise.all([
+            this.usdc(),
+            this.weth()
+        ])
 
         // This is USDC * 10e6, eg. 3_000_000_000 when the price of ETH is USD 3,000.
         const p: bigint = price()
@@ -111,7 +113,9 @@ export class EthUsdcWallet extends ethers.Wallet {
 
         // console.log(`usdc: ${usdc}`)
         // console.log(`weth: ${weth}`) // 86_387_721_003_586_366
-        return EthUsdcWallet._tokenRatioByValue(usdc, weth, p)
+        const ratio = EthUsdcWallet._tokenRatioByValue(usdc, weth, p)
+
+        return [usdc, weth, ratio]
     }
 
     async logBalances() {
