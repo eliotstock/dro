@@ -16,6 +16,9 @@ RUN npm install ./proc
 COPY dro ./dro
 RUN npm install ./dro
 
+# Volumes
+VOLUME /app/dro/out
+
 # Entrypoint
 ENTRYPOINT [ "npm", "--prefix", "./proc", "run" ]
 CMD [ "proc" ]
