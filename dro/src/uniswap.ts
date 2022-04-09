@@ -300,8 +300,8 @@ export async function currentTokenId(address: string): Promise<number | undefine
     // Check for zero liquidity in the position
     // This has been tested with an account with only old, closed positions.
     if (JSBI.EQ(JSBI.BigInt(0), JSBI.BigInt(position.liquidity))) {
-        console.log(`currentTokenId(): Existing position with token ID ${tokenId} has no liquidity.\
- Ignoring position.`)
+        // console.log(`currentTokenId(): Existing position with token ID ${tokenId} has no liquidity.\
+ // Ignoring position.`)
 
         return undefined
     }
@@ -484,10 +484,6 @@ export function calculateRatioAmountInWithDebugging(
     inputBalance.currency,
     amountToSwapRaw.quotient
   )
-}
-
-export function rangeOrderPoolIsSwapPool(): boolean {
-    return CHAIN_CONFIG.addrPoolRangeOrder == CHAIN_CONFIG.addrPoolSwaps
 }
 
 export async function createPoolOnTestnet() {
