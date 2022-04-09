@@ -6,7 +6,7 @@
   "scripts": {
     "test": "mocha -r ts-node/register 'test/*.ts'",
     "prod": "ts-node ./src/index.ts 2>&1 | tee -a ./out/dro.log",
-    "n": "ts-node ./src/index.ts 2>&1 | tee -a ./out/dro.log",
+    "n": "ts-node ./src/index.ts --n 2>&1 | tee -a ./out/dro.log",
     "r": "ts-node ./src/index.ts 2>&1 | tee -a ./out/dro.log",
     "log": "tail -f -n 1000 ./out/dro.log",
     "balances": "ts-node ./src/index.ts --balances",
