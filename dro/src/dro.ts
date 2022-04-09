@@ -27,8 +27,7 @@ import {
   price,
   rangeAround,
   calculateRatioAmountIn,
-  currentTokenId,
-  rangeOrderPoolIsSwapPool
+  currentTokenId
 } from './uniswap'
 
 // Uniswap SDK interface
@@ -101,7 +100,6 @@ export class DRO {
       this.wethFirstInRangeOrderPool = await tokenOrderIsWethFirst(rangeOrderPoolContract)
 
       // Get the token ID for our position from the position manager contract/NFT.
-      // In due course, drop the database table and just use on-chain data.
       this.tokenId = await currentTokenId(wallet.address)
 
       // We need this in order to find the new range each time.
@@ -440,7 +438,7 @@ Unwrapping just enough WETH for the next re-range.`)
 
     // Use the liquidity maths in Uniswap's calculateRatioAmountIn() function in the
     // smart-order-router repo to swap an optimal amount of the input token.
-    async swapOptimally() {
+    async swap() {
       if (this.position || this.tokenId)
          throw "Refusing to swap. Still in a position. Remove liquidity first."
 
@@ -752,6 +750,11 @@ be able to remove this liquidity.`)
     }
 
     async onPriceChanged() {
+      if (this.locked) {
+        // Stay quiet while we're busy re-ranging.
+        return
+      }
+
       await this.checkUnclaimedFees()
       this.logUnclaimedFees()
     }
@@ -810,7 +813,7 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
 
         // Swap the exact amount of one token that will give us the right balance of assets for the
         // new position.
-        await this.swapOptimally()
+        await this.swap()
 
         // Make sure we have enough ETH (not WETH) on hand to execute the next three transactions
         // (add, remove, swap). We could do tihs at two points in the cycle:
