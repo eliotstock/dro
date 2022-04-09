@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  dro:
+    build: .
+    entrypoint: [ "npm", "--prefix", "./dro", "run" ]
+    command: ["prod"]
+    restart: unless-stopped
+    volumes:
+      - ${PWD}/.env:/app/dro/.env:ro
+      - ${PWD}/out:/app/dro/out:rw
