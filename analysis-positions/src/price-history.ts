@@ -4,15 +4,16 @@ import { tickToNativePrice } from './functions'
 
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
-export function sqlForPriceHistory(poolAddress: string, firstTopic: string) {
-    return `select block_timestamp, topics, data from
-    bigquery-public-data.crypto_ethereum.logs
-    where address = "${poolAddress}"
-    and topics[SAFE_OFFSET(0)] = "${firstTopic}"
-    order by block_timestamp`
+export function sqlForPriceHistory(poolAddress: string, firstTopic: string, t0: string) {
+    return `SELECT block_timestamp, topics, data
+    FROM bigquery-public-data.crypto_ethereum.logs
+    WHERE address = "${poolAddress}"
+    AND topics[SAFE_OFFSET(0)] = "${firstTopic}"
+    AND block_timestamp > "${t0}"
+    ORDER BY block_timestamp`
 }
 
-// Only about 200K prices as of 2022-04.
+// Only about 200K prices as of 2022-04, if t0 is the start of v3.
 const POOL_PRICES = new Map<string, bigint>()
 
 // Given a log from the Swap() event, return a tuple with the timestamp and the price in USDC.

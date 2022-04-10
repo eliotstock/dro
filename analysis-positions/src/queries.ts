@@ -15,16 +15,17 @@ import { sqlForPriceHistory } from './price-history'
 //   https://medium.com/google-cloud/full-relational-diagram-for-ethereum-public-data-on-google-bigquery-2825fdf0fb0b
 // Don't bother joining on the transaction table at this stage - the results will not be
 // array-ified to put the logs under the transactions, the way topics are under the logs.
-function sqlForAddRemoveLiquidity(poolAddress: string, firstTopic: string) {
-    return `select block_timestamp, transaction_hash, address, data, topics
-    from bigquery-public-data.crypto_ethereum.logs
-    where transaction_hash in (
-      select distinct(transaction_hash)
-      from bigquery-public-data.crypto_ethereum.logs
-      where address = "${poolAddress}"
-      and topics[SAFE_OFFSET(0)] = "${firstTopic}"
+function sqlForAddRemoveLiquidity(poolAddress: string, firstTopic: string, t0: string) {
+    return `SELECT block_timestamp, transaction_hash, address, data, topics
+    FROM bigquery-public-data.crypto_ethereum.logs
+    WHERE transaction_hash IN (
+      SELECT distinct(transaction_hash)
+      FROM bigquery-public-data.crypto_ethereum.logs
+      WHERE address = "${poolAddress}"
+      AND topics[SAFE_OFFSET(0)] = "${firstTopic}"
+      AND block_timestamp > "${t0}"
     )
-    order by block_timestamp, log_index`
+    ORDER BY block_timestamp, log_index`
 }
 
 //  Sample row:
@@ -48,17 +49,22 @@ const PRICES = `${OUT_DIR}/prices${abbreviate(ADDR_POOL)}.json`
 // Query Google's public dataset for Ethereum mainnet transaction logs.
 // Billing: https://console.cloud.google.com/billing/005CEF-5B6B62-DD610F/reports;grouping=GROUP_BY_SKU;projects=dro-backtest?project=dro-backtest
 async function runQueries() {
-    if (process.env.GCP_PROJECT_ID == undefined)
+    if (process.env.GCP_PROJECT_ID === undefined)
         throw "No GCP_PROJECT_ID in .env file (or no .env file)."
 
-    if (process.env.GCP_KEY_PATH == undefined)
+    if (process.env.GCP_KEY_PATH === undefined)
         throw "No GCP_KEY_PATH in .env file (or no .env file)."
+
+    if (process.env.T0 === undefined)
+        throw "No T0 in .env file (or no .env file)."
 
     const config = {
         projectId: process.env.GCP_PROJECT_ID,
         keyPath: resolve(process.env.GCP_KEY_PATH)
     }
     // console.log(`GCP config:`, config)
+
+    const t0: string = process.env.T0
 
     // Merely passing our config to the BigQuery constructor is not sufficient. We need to set this
     // on the environment too.
@@ -70,7 +76,7 @@ async function runQueries() {
     console.log("Querying...")
 
     // Find all logs from transactions that were adding liquidity to the pool.
-    const sqlQueryAdds = sqlForAddRemoveLiquidity(ADDR_POOL, TOPIC_MINT)
+    const sqlQueryAdds = sqlForAddRemoveLiquidity(ADDR_POOL, TOPIC_MINT, t0)
 
     const optionsAdds = {
         query: sqlQueryAdds,
@@ -87,7 +93,7 @@ async function runQueries() {
     fs.writeFileSync(ADDS, addsJson)
     
     // Find all logs from transactions that were removing liquidity from the pool.
-    const sqlQueryRemoves = sqlForAddRemoveLiquidity(ADDR_POOL, TOPIC_BURN)
+    const sqlQueryRemoves = sqlForAddRemoveLiquidity(ADDR_POOL, TOPIC_BURN, t0)
     
     const optionsRemoves = {
         query: sqlQueryRemoves,
@@ -104,7 +110,7 @@ async function runQueries() {
     fs.writeFileSync(REMOVES, removesJson)
 
     // Get a price history for the pool.
-    const sqlQueryPrices = sqlForPriceHistory(ADDR_POOL, TOPIC_SWAP)
+    const sqlQueryPrices = sqlForPriceHistory(ADDR_POOL, TOPIC_SWAP, t0)
 
     const optionsPrices = {
         query: sqlQueryPrices,
@@ -122,6 +128,13 @@ async function runQueries() {
     let pricesJson = '[\n'
 
     rowsPrices.forEach(function(row: any) {
+        if (row['block_timestamp'] === undefined || row['topics'] === undefined || row['data'] === undefined) {
+            priceErrors++
+            console.log(`Problem row:`)
+            console.dir(row)
+            return
+        }
+
         try {
             pricesJson += JSON.stringify(row)
             pricesJson += ',\n'
@@ -129,10 +142,13 @@ async function runQueries() {
         catch (e) {
             // Probably: 'RangeError: Invalid string length'. Skip this price.
             // TODO: This is hitting 724,846 errors for the 0.05% fee pool. Investigate, but we can
-            // live with partial data is these are evenly spaced.
+            // live with partial data if these are evenly spaced.
             priceErrors++
         }
     })
+
+    // Remove ',\n' to ensure valid JSON.
+    pricesJson = pricesJson.slice(0, -2)
 
     if (priceErrors > 0) {
         console.log(`Skipped ${priceErrors} with errors.`)
