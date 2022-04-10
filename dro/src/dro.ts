@@ -293,7 +293,7 @@ ${positionWebUrl(this.tokenId)}`)
         // console.dir(txReceipt)
 
         const stopwatchMillis = (Date.now() - stopwatchStart)
-        console.log(`[${this.rangeWidthTicks}] Transaction took \
+        console.log(`[${this.rangeWidthTicks}] ${logLinePrefix} Transaction took \
 ${Math.round(stopwatchMillis / 1_000)}s`)
 
         return txReceipt
@@ -493,7 +493,7 @@ Unwrapping just enough WETH for the next re-range.`)
       else if (ratio > 0.5 && ratio <= 1.5) {
         // This should only be the case when restarting after an error that occured after the swap
         // but before adding liquidity again.
-        console.log(`[${this.rangeWidthTicks}] swapOptimally() We already have\
+        console.log(`[${this.rangeWidthTicks}] swap() We already have\
  fairly even values of USDC and WETH. No need for a swap.`)
 
         return
@@ -563,7 +563,7 @@ Unwrapping just enough WETH for the next re-range.`)
       // Note: Never pass an argument to toFixed() here. If it's less than the decimals on the
       // token, this will fail an invariant. If it's not provided, we just get the decimals on
       // the token, which is what we want anyway.
-      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
+      console.log(`[${this.rangeWidthTicks}] swap() Optimal swap is from\
  ${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
 
       // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
@@ -601,7 +601,7 @@ Unwrapping just enough WETH for the next re-range.`)
       }
 
       const txReceipt: TransactionReceipt = await this.sendTx(
-        `[${this.rangeWidthTicks}] swapOptimally()`, txRequest)
+        `[${this.rangeWidthTicks}] swap()`, txRequest)
 
       const gasCost = this.gasCost(txReceipt)
       this.totalGasCost += gasCost
