@@ -37,6 +37,8 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 
 const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
 
+const TOPIC_0_INCREASE_LIQUIDITY = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f'
+
 export class PositionWithTokenId {
     readonly position: Position
     readonly tokenId: number
@@ -88,53 +90,6 @@ export async function updateTick() {
     const slot = await rangeOrderPoolContract.slot0()
 
     rangeOrderPoolTick = slot[1]
-}
-
-async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> {
-    // Do NOT call these once on startup. They need to be called every time we use the pool.
-    const [liquidity, slot, fee, tickSpacing] = await Promise.all([
-        poolContract.liquidity(),
-        poolContract.slot0(),
-        poolContract.fee(),
-        poolContract.tickSpacing()
-    ])
-
-    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
-    // undefined. This will throw an error when the position gets created.
-    if (fee == 0) throw `No fee. WTF.`
-    if (tickSpacing == 0) throw `No tick spacing. WTF.`
-
-    // Do NOT pass a strings for these parameters below! JSBI does very little type checking.
-    const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
-    const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
-
-    // The order of the tokens in the pool varies from chain to chain, annoyingly.
-    // Ethereum mainnet: USDC is first
-    // Arbitrum mainnet: WETH is first
-    const wethFirst: boolean = await tokenOrderIsWethFirst(poolContract)
-
-    let token0: Token
-    let token1: Token
-
-    if (wethFirst) {
-        token0 = TOKEN_WETH
-        token1 = TOKEN_USDC
-    }
-    else {
-        token0 = TOKEN_USDC
-        token1 = TOKEN_WETH
-    }
-
-    const pool = new Pool(
-        token0,
-        token1,
-        fee,
-        sqrtRatioX96AsJsbi,
-        liquidityAsJsbi,
-        slot[1] // tickCurrent
-    )
-
-    return [pool, wethFirst]
 }
 
 export async function useSwapPool(): Promise<[Pool, boolean]> {
@@ -192,45 +147,6 @@ export function rangeAround(tick: number, width: number, tickSpacing: number): [
     return [tickLower, tickUpper]
 }
 
-// Every pool we use has WETH as one token and USDC as the other, but the order varies from Mainnet
-// to Arbitrum, annoyingly.
-export async function tokenOrderIsWethFirst(poolContract: ethers.Contract): Promise<boolean> {
-    const token0 = await poolContract.token0()
-    const token1 = await poolContract.token1()
-
-    if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase() &&
-        token1.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase()) {
-        // console.log(`Token order in the pool is 0: WETH, 1: USDC`)
-        return true
-    }
-    else if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase() &&
-        token1.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase()) {
-        // console.log(`Token order in the pool is 0: USDC, 1: WETH`)
-        return false
-    }
-    else {
-        throw 'Tokens in range order pool contract are not WETH and USDC. WTF.'
-    }
-}
-
-const TOPIC_0_INCREASE_LIQUIDITY = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f'
-
-export function extractTokenId(txReceipt: TransactionReceipt): number | undefined {
-    if (!Array.isArray(txReceipt.logs)) throw `Expected a logs array`
-
-    for (const log of txReceipt.logs) {
-        if (log.topics[0] === TOPIC_0_INCREASE_LIQUIDITY && log.topics[1]) {
-            const tokenIdHexString = log.topics[1]
-            const tokenId = ethers.BigNumber.from(tokenIdHexString)
-
-            // This will throw an error if Uniswap ever has more LP positions than Number.MAX_SAFE_INTEGER.
-            return tokenId.toNumber()
-        }
-    }
-
-    return undefined
-}
-
 export async function currentPosition(address: string): Promise<PositionWithTokenId | undefined> {
     // Get the token ID for our position from the position manager contract/NFT.
     const tokenId = await currentTokenId(address)
@@ -256,6 +172,43 @@ export async function currentPosition(address: string): Promise<PositionWithToke
     })
 
     return new PositionWithTokenId(usablePosition, tokenId)
+}
+
+// Every pool we use has WETH as one token and USDC as the other, but the order varies from Mainnet
+// to Arbitrum, annoyingly.
+export async function tokenOrderIsWethFirst(poolContract: ethers.Contract): Promise<boolean> {
+    const token0 = await poolContract.token0()
+    const token1 = await poolContract.token1()
+
+    if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase() &&
+        token1.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase()) {
+        // console.log(`Token order in the pool is 0: WETH, 1: USDC`)
+        return true
+    }
+    else if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase() &&
+        token1.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase()) {
+        // console.log(`Token order in the pool is 0: USDC, 1: WETH`)
+        return false
+    }
+    else {
+        throw 'Tokens in range order pool contract are not WETH and USDC. WTF.'
+    }
+}
+
+export function extractTokenId(txReceipt: TransactionReceipt): number | undefined {
+    if (!Array.isArray(txReceipt.logs)) throw `Expected a logs array`
+
+    for (const log of txReceipt.logs) {
+        if (log.topics[0] === TOPIC_0_INCREASE_LIQUIDITY && log.topics[1]) {
+            const tokenIdHexString = log.topics[1]
+            const tokenId = ethers.BigNumber.from(tokenIdHexString)
+
+            // This will throw an error if Uniswap ever has more LP positions than Number.MAX_SAFE_INTEGER.
+            return tokenId.toNumber()
+        }
+    }
+
+    return undefined
 }
 
 // Replaced by currentPosition()
@@ -320,33 +273,6 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
     return usablePosition
 }
 */
-
-// Get the token ID of the last position, as long as it's still open (ie. has non zero liquidity).
-// We only have one position open at a time, so the last one is the current, open one.
-async function currentTokenId(address: string): Promise<number | undefined> {
-    // This count includes all the closed positions.
-    const positionCount = await positionManagerContract.balanceOf(address)
-
-    if (positionCount == 0) {
-        return undefined
-    }
-
-    const tokenId = await positionManagerContract.tokenOfOwnerByIndex(address, positionCount - 1)
-
-    // Get the liquidity of this position
-    const position: Position = await positionManagerContract.positions(tokenId)
-
-    // Check for zero liquidity in the position
-    // This has been tested with an account with only old, closed positions.
-    if (JSBI.EQ(JSBI.BigInt(0), JSBI.BigInt(position.liquidity))) {
-        // console.log(`currentTokenId(): Existing position with token ID ${tokenId} has no liquidity.\
- // Ignoring position.`)
-
-        return undefined
-    }
-
-    return tokenId
-}
 
 export function positionWebUrl(tokenId: number): string {
     // TODO: Add chain parameter. Works without one for L1 of if you're already on the right chain.
@@ -626,4 +552,78 @@ export async function createPoolOnTestnet() {
 
     // Otherwise, check etherscan for the logs from this tx. There should be a pool address in
     // there. Put that in the config for this testnet.
+}
+
+// Get the token ID of the last position, as long as it's still open (ie. has non zero liquidity).
+// We only have one position open at a time, so the last one is the current, open one.
+async function currentTokenId(address: string): Promise<number | undefined> {
+    // This count includes all the closed positions.
+    const positionCount = await positionManagerContract.balanceOf(address)
+
+    if (positionCount == 0) {
+        return undefined
+    }
+
+    const tokenId = await positionManagerContract.tokenOfOwnerByIndex(address, positionCount - 1)
+
+    // Get the liquidity of this position
+    const position: Position = await positionManagerContract.positions(tokenId)
+
+    // Check for zero liquidity in the position
+    // This has been tested with an account with only old, closed positions.
+    if (JSBI.EQ(JSBI.BigInt(0), JSBI.BigInt(position.liquidity))) {
+        // console.log(`currentTokenId(): Existing position with token ID ${tokenId} has no liquidity.\
+ // Ignoring position.`)
+
+        return undefined
+    }
+
+    return tokenId
+}
+
+async function usePool(poolContract: ethers.Contract): Promise<[Pool, boolean]> {
+    // Do NOT call these once on startup. They need to be called every time we use the pool.
+    const [liquidity, slot, fee, tickSpacing] = await Promise.all([
+        poolContract.liquidity(),
+        poolContract.slot0(),
+        poolContract.fee(),
+        poolContract.tickSpacing()
+    ])
+
+    // The fee in the pool determines the tick spacing and if it's zero, the tick spacing will be
+    // undefined. This will throw an error when the position gets created.
+    if (fee == 0) throw `No fee. WTF.`
+    if (tickSpacing == 0) throw `No tick spacing. WTF.`
+
+    // Do NOT pass a strings for these parameters below! JSBI does very little type checking.
+    const sqrtRatioX96AsJsbi = JSBI.BigInt(slot[0].toString())
+    const liquidityAsJsbi = JSBI.BigInt(liquidity.toString())
+
+    // The order of the tokens in the pool varies from chain to chain, annoyingly.
+    // Ethereum mainnet: USDC is first
+    // Arbitrum mainnet: WETH is first
+    const wethFirst: boolean = await tokenOrderIsWethFirst(poolContract)
+
+    let token0: Token
+    let token1: Token
+
+    if (wethFirst) {
+        token0 = TOKEN_WETH
+        token1 = TOKEN_USDC
+    }
+    else {
+        token0 = TOKEN_USDC
+        token1 = TOKEN_WETH
+    }
+
+    const pool = new Pool(
+        token0,
+        token1,
+        fee,
+        sqrtRatioX96AsJsbi,
+        liquidityAsJsbi,
+        slot[1] // tickCurrent
+    )
+
+    return [pool, wethFirst]
 }
