@@ -296,6 +296,19 @@ export function setOpeningClosingPrices(positions: Map<number, Position>, prices
     }
 }
 
+// TODO: Requires joining on the transaction table to get the gas, gas_price or receipt_gas_used
+// columns.
+export function setGasCosts(positions: Map<number, Position>, prices: any) {
+    for (let [tokenId, position] of positions) {
+        position.addTxLogs?.forEach(function(log: EventLog) {
+            // TODO
+        })
+        position.removeTxLogs?.forEach(function(log: EventLog) {
+            // TODO
+        })
+    }
+}
+
 export function cleanData(positions: Map<number, Position>) {
     let outliers = 0
 
