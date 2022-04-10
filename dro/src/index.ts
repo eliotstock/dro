@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 import moment from 'moment'
-import { useConfig, ChainConfig } from './config'
+import { useConfig, ChainConfig, useProvider } from './config'
 import { updateGasPrice, gasPriceFormatted } from './wallet'
 import { handleCommandLineArgs } from './command'
 import { updateTick, priceFormatted } from './uniswap'
@@ -76,7 +76,7 @@ async function main() {
   await dro.init()
 
   // Get a callback to onBlock() on every new block.
-  CHAIN_CONFIG.provider().on('block', onBlock)
+  useProvider().on('block', onBlock)
 }
   
 main().catch((e) => {

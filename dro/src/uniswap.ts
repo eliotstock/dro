@@ -1,7 +1,7 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
-import { useConfig, ChainConfig } from './config'
+import { useConfig, ChainConfig, useProvider } from './config'
 import { wallet } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 import moment from 'moment'
@@ -61,19 +61,19 @@ export const VALUE_ZERO_ETHER = ethers.utils.parseEther("0")
 export const rangeOrderPoolContract = new ethers.Contract(
     CHAIN_CONFIG.addrPoolRangeOrder,
     IUniswapV3PoolABI,
-    CHAIN_CONFIG.provider()
+    useProvider()
 )
 
 export const swapPoolContract = new ethers.Contract(
     CHAIN_CONFIG.addrPoolSwaps,
     IUniswapV3PoolABI,
-    CHAIN_CONFIG.provider()
+    useProvider()
 )
 
 export const quoterContract = new ethers.Contract(
     CHAIN_CONFIG.addrQuoter,
     QuoterABI,
-    CHAIN_CONFIG.provider()
+    useProvider()
 )
 
 // Contract source:
@@ -83,7 +83,7 @@ export const quoterContract = new ethers.Contract(
 export const positionManagerContract = new ethers.Contract(
     CHAIN_CONFIG.addrPositionManager,
     NonfungiblePositionManagerABI,
-    CHAIN_CONFIG.provider()
+    useProvider()
 )
 
 export async function updateTick() {

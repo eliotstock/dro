@@ -7,7 +7,7 @@ import {
   TransactionRequest
 } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
-import { useConfig, ChainConfig } from './config'
+import { useConfig, ChainConfig, useProvider } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 
@@ -89,7 +89,7 @@ export class DRO {
       _noops: boolean) {
       this.rangeWidthTicks = _rangeWidthTicks
       this.noops = _noops
-      this.alphaRouter = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
+      this.alphaRouter = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: useProvider()})
     }
 
     async init() {
