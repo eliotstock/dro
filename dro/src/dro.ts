@@ -248,31 +248,38 @@ export class DRO {
       const MAX_UINT128 = 340282366920938463463374607431768211455n // 2^128 - 1
   
       const tokenIdHexString = ethers.utils.hexValue(this.position.tokenId)
-  
-      // Contract function: https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol#L309
-      // Function params: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol#L160
-      positionManagerContract.callStatic.collect({
+
+      const collectParams = {
         tokenId: tokenIdHexString,
         recipient: wallet.address,
         amount0Max: MAX_UINT128, // Solidity type: uint128
         amount1Max: MAX_UINT128, // Solidity type: uint128
-      },
-      { from: wallet.address })
-      .then((results) => {
-        if (results.amount0 === undefined || results.amount1 === undefined) {
-          console.log(`[${this.rangeWidthTicks}] checkUnclaimedFees(): One amount is undefined`)
-          return
-        }
+      }
 
-        if (this.wethFirstInRangeOrderPool) {
-          this.unclaimedFeesWeth = BigInt(results.amount0)
-          this.unclaimedFeesUsdc = BigInt(results.amount1)
-        }
-        else {
-          this.unclaimedFeesUsdc = BigInt(results.amount0)
-          this.unclaimedFeesWeth = BigInt(results.amount1)
-        }
-      })
+      const callOverrides = {
+        from: wallet.address
+      }
+  
+      // Contract function: https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol#L309
+      // Function params: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol#L160
+      // collect() returns Promise<[BigNumber, BigNumber] & { amount0: BigNumber; amount1: BigNumber }
+      // Uniswap interface invocation: https://github.com/Uniswap/interface/blob/main/src/hooks/useV3PositionFees.ts#L33
+      const [amount0, amount1] = await positionManagerContract.callStatic.collect(collectParams,
+        callOverrides)
+
+      if (amount0 === undefined || amount1 === undefined) {
+        console.log(`[${this.rangeWidthTicks}] checkUnclaimedFees(): One amount is undefined`)
+        return
+      }
+
+      if (this.wethFirstInRangeOrderPool) {
+        this.unclaimedFeesWeth = BigInt(amount0)
+        this.unclaimedFeesUsdc = BigInt(amount1)
+      }
+      else {
+        this.unclaimedFeesUsdc = BigInt(amount0)
+        this.unclaimedFeesWeth = BigInt(amount1)
+      }
     }
 
     logUnclaimedFees() {
@@ -798,14 +805,6 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         const stopwatchMillis = (Date.now() - stopwatchStart)
         console.log(`[${this.rangeWidthTicks}] Remove/swap/add roundtrip took \
 ${Math.round(stopwatchMillis / 1_000)}s`)
-
-        // Deposit assets and let the protocol swap the optimal size for the liquidity position,
-        // then enter the liquidity position all in one transaction.
-        // Uniswap repo smart-order-router is not ready for production use. Wait for these
-        // blocking bugs to get a response before using it:
-        //   https://github.com/Uniswap/smart-order-router/issues/64
-        //   https://github.com/Uniswap/smart-order-router/issues/65
-        // await this.swapAndAddLiquidity()
 
         // We should now hold as close to zero USDC and WETH as possible.
         await wallet.logBalances()
