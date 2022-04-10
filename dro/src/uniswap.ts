@@ -328,8 +328,6 @@ async function currentTokenId(address: string): Promise<number | undefined> {
     const positionCount = await positionManagerContract.balanceOf(address)
 
     if (positionCount == 0) {
-        console.log(`currentTokenId(): No positions`)
-        
         return undefined
     }
 
