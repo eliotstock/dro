@@ -37,6 +37,18 @@ const CHAIN_CONFIG: ChainConfig = useConfig()
 
 const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
 
+export class PositionWithTokenId {
+    readonly position: Position
+    readonly tokenId: number
+
+    constructor(
+        _position: Position,
+        _tokenId: number) {
+        this.position = _position
+        this.tokenId = _tokenId
+    }
+}
+
 export let rangeOrderPoolTick: number
 
 // On all transactions, set the deadline to 3 minutes from now
@@ -219,7 +231,35 @@ export function extractTokenId(txReceipt: TransactionReceipt): number | undefine
     return undefined
 }
 
-// TODO: Reduce repitiion here, possibly by calling usePool() from here.
+export async function currentPosition(address: string): Promise<PositionWithTokenId | undefined> {
+    // Get the token ID for our position from the position manager contract/NFT.
+    const tokenId = await currentTokenId(address)
+
+    if (tokenId === undefined) {
+        console.log(`No existing position NFT`)
+
+        return undefined
+    }
+    else {
+        console.log(`Using existing position NFT: ${positionWebUrl(tokenId)}`)
+    }
+
+    const position = await positionManagerContract.positions(tokenId)
+
+    const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
+
+    const usablePosition = new Position({
+        pool: rangeOrderPool,
+        liquidity: position.liquidity,
+        tickLower: position.tickLower,
+        tickUpper: position.tickUpper
+    })
+
+    return new PositionWithTokenId(usablePosition, tokenId)
+}
+
+// Replaced by currentPosition()
+/*
 export async function positionByTokenId(tokenId: number, wethFirst: boolean): Promise<Position> {
     // Do NOT call these once on startup. They need to be called every time we use the pool.
     const [position, liquidity, slot, fee, tickSpacing] = await Promise.all([
@@ -279,10 +319,11 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
 
     return usablePosition
 }
+*/
 
 // Get the token ID of the last position, as long as it's still open (ie. has non zero liquidity).
 // We only have one position open at a time, so the last one is the current, open one.
-export async function currentTokenId(address: string): Promise<number | undefined> {
+async function currentTokenId(address: string): Promise<number | undefined> {
     // This count includes all the closed positions.
     const positionCount = await positionManagerContract.balanceOf(address)
 
@@ -310,6 +351,7 @@ export async function currentTokenId(address: string): Promise<number | undefine
 }
 
 export function positionWebUrl(tokenId: number): string {
+    // TODO: Add chain parameter. Works without one for L1 of if you're already on the right chain.
     return `https://app.uniswap.org/#/pool/${tokenId}`
 }
 
