@@ -157,7 +157,7 @@ export async function currentPosition(address: string): Promise<PositionWithToke
         return undefined
     }
     else {
-        console.log(`Using existing position NFT: ${positionWebUrl(tokenId)}`)
+        console.log(`Position NFT: ${positionWebUrl(tokenId)}`)
     }
 
     const position = await positionManagerContract.positions(tokenId)

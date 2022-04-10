@@ -318,8 +318,7 @@ export class DRO {
         // console.dir(txReceipt)
 
         const stopwatchMillis = (Date.now() - stopwatchStart)
-        console.log(`[${this.rangeWidthTicks}] ${logLinePrefix} Transaction took \
-${Math.round(stopwatchMillis / 1_000)}s`)
+        console.log(`${logLinePrefix} Transaction took ${Math.round(stopwatchMillis / 1_000)}s`)
 
         return txReceipt
       }
