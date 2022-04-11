@@ -1,12 +1,14 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // If debugging in VSC stops execution before your code runs, make VSC use the same version of
+    // Node as your shell does, eg:
+    //   nvm alias default 16.10.0
+    // Alternatively, use a "runtimeVersion" property below.
     "version": "0.2.0",
     "configurations": [
         {
             "name": "dro",
             "type": "node",
+            "runtimeVersion": "16.10.0",
             "program": "${workspaceFolder}/dro/src/index.ts",
             "request": "launch",
             "skipFiles": [
@@ -19,18 +21,19 @@
             "cwd": "${workspaceFolder}/dro"
         },
         {
-            "name": "backtest",
+            "name": "analysis-positions",
             "type": "node",
-            "program": "${workspaceFolder}/backtest/src/index.ts",
+            "runtimeVersion": "16.10.0",
+            "program": "${workspaceFolder}/analysis-positions/src/index.ts",
             "request": "launch",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "preLaunchTask": "tsc: build - backtest/tsconfig.json",
+            "preLaunchTask": "tsc: build - analysis-positions/tsconfig.json",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
             ],
-            "cwd": "${workspaceFolder}/backtest"
+            "cwd": "${workspaceFolder}/analysis-positions"
         }
     ]
 }
