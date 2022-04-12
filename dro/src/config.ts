@@ -1,17 +1,19 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { Percent } from '@uniswap/sdk-core'
-import { JsonRpcProvider } from '@ethersproject/providers'
 
 // Read our .env file
 config()
+
+// Note that the Uniswap interface codebase does something similar here:
+//   https://github.com/Uniswap/interface/blob/main/src/constants/chainInfo.ts
+// Does't seem worth extending this.
 
 export interface ChainConfig {
     name: string
     chainId: number
     isTestnet: boolean
     isL2: boolean
-    provider(): JsonRpcProvider
     addrTokenUsdc: string
     addrTokenWeth: string
     addrPoolRangeOrder: string
@@ -38,10 +40,6 @@ const ETHEREUM_MAINNET: ChainConfig = {
     isTestnet: false,
 
     isL2: false,
-
-    provider() {
-        return new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL)
-    },
 
     addrTokenUsdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
 
@@ -97,10 +95,6 @@ const ARBITRUM_MAINNET: ChainConfig = {
 
     isL2: true,
 
-    provider() {
-        return new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL)
-    },
-
     addrTokenUsdc: '0xff970a61a04b1ca14834a43f5de4533ebddb5cc8',
 
     addrTokenWeth: '0x82af49447d8a07e3bd95bd0d56f35241523fbab1',
@@ -152,10 +146,6 @@ const ETHEREUM_KOVAN: ChainConfig = {
 
     isL2: false,
 
-    provider() {
-        return new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL)
-    },
-
     // This is our own USDC test contract. The deployer is the DRO account and has all the supply.
     addrTokenUsdc: "0x6aD91931622d2b60B95561BfE17646469bB6E670",
 
@@ -203,11 +193,17 @@ const CHAIN_CONFIGS = {
 }
 
 export function useConfig(): ChainConfig {
-    if (process.env.PROVIDER_URL == undefined) throw 'No PROVIDER_URL in .env file, or no .env file.'
-
     if (process.env.CHAIN == undefined) throw 'No CHAIN in .env file, or no .env file.'
 
     const chain: string = process.env.CHAIN
 
     return (CHAIN_CONFIGS as any)[chain]
+}
+
+if (process.env.PROVIDER_URL == undefined) throw 'No PROVIDER_URL in .env file, or no .env file.'
+
+const PROVIDER = new ethers.providers.JsonRpcProvider(process.env.PROVIDER_URL)
+
+export function useProvider(): ethers.providers.JsonRpcProvider {
+    return PROVIDER
 }

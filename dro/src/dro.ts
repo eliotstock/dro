@@ -7,7 +7,7 @@ import {
   TransactionRequest
 } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
-import { useConfig, ChainConfig } from './config'
+import { useConfig, ChainConfig, useProvider } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 
@@ -18,7 +18,6 @@ import {
   useSwapPool,
   useRangeOrderPool,
   extractTokenId,
-  positionByTokenId, 
   positionWebUrl,
   tokenOrderIsWethFirst,
   DEADLINE_SECONDS,
@@ -27,7 +26,8 @@ import {
   price,
   rangeAround,
   calculateRatioAmountIn,
-  currentTokenId
+  currentPosition,
+  PositionWithTokenId
 } from './uniswap'
 
 // Uniswap SDK interface
@@ -75,8 +75,7 @@ export class DRO {
     swapPool?: Pool
     wethFirstInRangeOrderPool: boolean = true
     wethFirstInSwapPool: boolean = true
-    position?: Position
-    tokenId?: number
+    position?: PositionWithTokenId
     tickSpacing?: number
     unclaimedFeesUsdc: bigint = 0n
     unclaimedFeesWeth: bigint = 0n
@@ -90,7 +89,7 @@ export class DRO {
       _noops: boolean) {
       this.rangeWidthTicks = _rangeWidthTicks
       this.noops = _noops
-      this.alphaRouter = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: CHAIN_CONFIG.provider()})
+      this.alphaRouter = new AlphaRouter({chainId: CHAIN_CONFIG.chainId, provider: useProvider()})
     }
 
     async init() {
@@ -99,41 +98,60 @@ export class DRO {
       // Arbitrum mainnet: WETH is first
       this.wethFirstInRangeOrderPool = await tokenOrderIsWethFirst(rangeOrderPoolContract)
 
-      // Get the token ID for our position from the position manager contract/NFT.
-      this.tokenId = await currentTokenId(wallet.address)
-
       // We need this in order to find the new range each time.
       this.tickSpacing = await rangeOrderPoolContract.tickSpacing()
 
-      if (this.tokenId === undefined) {
-        console.log(`[${this.rangeWidthTicks}] No existing position NFT`)
+      const p = await currentPosition(wallet.address)
+
+      if (p === undefined) {
+        // Expected when in no-op mode.
       }
       else {
-        console.log(`[${this.rangeWidthTicks}] Token ID: ${this.tokenId}`)
+        this.position = p
+        this.tickLower = p.position.tickLower
+        this.tickUpper = p.position.tickUpper
 
-        // Now get the position from Uniswap for the given token ID.
-        // TODO: Consider combining currentTokenId() and positionByTokenId() on uniswap.ts now that
-        // we're getting the token ID from the chain.
-        const position: Position = await positionByTokenId(this.tokenId, this.wethFirstInRangeOrderPool)
+        // Note that at this point, tickLower and tickUpper are based on the existing position
+        // whereas rangeWidthTicks is from the .env file. The two may not agree!
 
-        if (position) {
-          this.position = position
-          this.tickLower = position.tickLower
-          this.tickUpper = position.tickUpper
+        this.logRangeInUsdcTerms()
+      }
+    }
 
-          // Note that at this point, tickLower and tickUpper are based on the existing position
-          // whereas rangeWidthTicks is from the .env file. The two may not agree!
+    // Refresh our Position and Pool instances from the current state on the chain before we use
+    // them.
+    async reinitMutables() {
+      // We are not in a position when run in no-op mode.
+      if (this.position !== undefined) {
+        // Take note of how the liquidity in the position has changed since we opened the position
+        // (or restarted the dro process). Calling decreaseLiquidity() with a liquidity parameter
+        // that is not equal to the liquidity currently in the position can cause the TX to fail.
+        const liquidityBefore = this.position.position.liquidity
 
-          console.log(`[${this.rangeWidthTicks}] Using existing position NFT: \
-${positionWebUrl(this.tokenId)}`)
+        this.position = await currentPosition(wallet.address)
 
-          this.logRangeInUsdcTerms()
+        if (this.position === undefined) {
+          throw `[${this.rangeWidthTicks}] Position disappeared on reinit.`
         }
-        else {
-          console.error(`No position for token ID ${this.tokenId}`)
-          process.exit(99)
+
+        const liquidityAfter = this.position.position.liquidity
+
+        if (JSBI.notEqual(JSBI.BigInt(liquidityBefore), JSBI.BigInt(liquidityAfter))) {
+          console.log(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
+  ${jsbiFormatted(liquidityBefore)} at opening of position/restarting and is now \
+  ${jsbiFormatted(liquidityAfter)}`)
         }
       }
+
+      const [swapPool, wethFirstInSwapPool] = await useSwapPool()
+
+      this.swapPool = swapPool
+      this.wethFirstInSwapPool = wethFirstInSwapPool
+
+      const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
+
+      this.rangeOrderPool = rangeOrderPool
+      this.wethFirstInRangeOrderPool = wethFirstInRangeOrderPool
     }
   
     outOfRange() {
@@ -222,39 +240,46 @@ ${positionWebUrl(this.tokenId)}`)
     //   function and store the amounts. The interface does similar behavior here
     //   https://github.com/Uniswap/interface/blob/eff512deb8f0ab832eb8d1834f6d1a20219257d0/src/hooks/useV3PositionFees.ts#L32
     async checkUnclaimedFees() {
-      if (!this.position || !this.tokenId) {
-        // This is expected when running in no-op mode. No need to log it.
+      if (this.position === undefined) {
+        // Expected when in no-op mode.
         return
       }
   
       const MAX_UINT128 = 340282366920938463463374607431768211455n // 2^128 - 1
   
-      const tokenIdHexString = ethers.utils.hexValue(this.tokenId)
-  
-      // Contract function: https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol#L309
-      // Function params: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol#L160
-      positionManagerContract.callStatic.collect({
+      const tokenIdHexString = ethers.utils.hexValue(this.position.tokenId)
+
+      const collectParams = {
         tokenId: tokenIdHexString,
         recipient: wallet.address,
         amount0Max: MAX_UINT128, // Solidity type: uint128
         amount1Max: MAX_UINT128, // Solidity type: uint128
-      },
-      { from: wallet.address })
-      .then((results) => {
-        if (results.amount0 === undefined || results.amount1 === undefined) {
-          console.log(`[${this.rangeWidthTicks}] checkUnclaimedFees(): One amount is undefined`)
-          return
-        }
+      }
 
-        if (this.wethFirstInRangeOrderPool) {
-          this.unclaimedFeesWeth = BigInt(results.amount0)
-          this.unclaimedFeesUsdc = BigInt(results.amount1)
-        }
-        else {
-          this.unclaimedFeesUsdc = BigInt(results.amount0)
-          this.unclaimedFeesWeth = BigInt(results.amount1)
-        }
-      })
+      const callOverrides = {
+        from: wallet.address
+      }
+  
+      // Contract function: https://github.com/Uniswap/v3-periphery/blob/main/contracts/NonfungiblePositionManager.sol#L309
+      // Function params: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol#L160
+      // collect() returns Promise<[BigNumber, BigNumber] & { amount0: BigNumber; amount1: BigNumber }
+      // Uniswap interface invocation: https://github.com/Uniswap/interface/blob/main/src/hooks/useV3PositionFees.ts#L33
+      const [amount0, amount1] = await positionManagerContract.callStatic.collect(collectParams,
+        callOverrides)
+
+      if (amount0 === undefined || amount1 === undefined) {
+        console.log(`[${this.rangeWidthTicks}] checkUnclaimedFees(): One amount is undefined`)
+        return
+      }
+
+      if (this.wethFirstInRangeOrderPool) {
+        this.unclaimedFeesWeth = BigInt(amount0)
+        this.unclaimedFeesUsdc = BigInt(amount1)
+      }
+      else {
+        this.unclaimedFeesUsdc = BigInt(amount0)
+        this.unclaimedFeesWeth = BigInt(amount1)
+      }
     }
 
     logUnclaimedFees() {
@@ -293,8 +318,7 @@ ${positionWebUrl(this.tokenId)}`)
         // console.dir(txReceipt)
 
         const stopwatchMillis = (Date.now() - stopwatchStart)
-        console.log(`[${this.rangeWidthTicks}] Transaction took \
-${Math.round(stopwatchMillis / 1_000)}s`)
+        console.log(`${logLinePrefix} Transaction took ${Math.round(stopwatchMillis / 1_000)}s`)
 
         return txReceipt
       }
@@ -316,63 +340,17 @@ ${Math.round(stopwatchMillis / 1_000)}s`)
         throw e
       }
     }
-
-    // Refresh our Position and Pool instances from the current state on the chain before we use
-    // them.
-    async refresh() {
-      // We are not in a position when run in no-op mode.
-      if (this.position != undefined && this.tokenId != undefined) {
-        // Take note of how the liquidity in the position has changed since we opened the position
-        // (or restarted the dro process). Calling decreaseLiquidity() with a liquidity parameter
-        // that is not equal to the liquidity currently in the position can cause the TX to fail.
-        const liquidityBefore = this.position.liquidity
-
-        this.position = await positionByTokenId(this.tokenId, this.wethFirstInRangeOrderPool)
-
-        const liquidityAfter = this.position.liquidity
-
-        if (JSBI.notEqual(JSBI.BigInt(liquidityBefore), JSBI.BigInt(liquidityAfter))) {
-          console.log(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
-  ${jsbiFormatted(liquidityBefore)} at opening of position/restarting and is now \
-  ${jsbiFormatted(liquidityAfter)}`)
-        }
-      }
-
-      const [swapPool, wethFirstInSwapPool] = await useSwapPool()
-
-      this.swapPool = swapPool
-      this.wethFirstInSwapPool = wethFirstInSwapPool
-
-      const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
-
-      this.rangeOrderPool = rangeOrderPool
-      this.wethFirstInRangeOrderPool = wethFirstInRangeOrderPool
-    }
   
     async removeLiquidity() {
-      if (!this.position || !this.tokenId) {
+      if (this.position === undefined) {
         console.error(`[${this.rangeWidthTicks}] Can't remove liquidity. Not in a position yet.`)
         return
       }
 
-      // Take note of how the liquidity in the position has changed since we opened the position
-      // (or restarted the dro process). Calling decreaseLiquidity() with a liquidity parameter
-      // that is not equal to the liquidity currently in the position can cause the TX to fail.
-//       const liquidityBefore = this.position.liquidity
-
-//       this.position = await positionByTokenId(this.tokenId, this.wethFirstInRangeOrderPool)
-
-//       const liquidityAfter = this.position.liquidity
-
-//       if (JSBI.notEqual(JSBI.BigInt(liquidityBefore), JSBI.BigInt(liquidityAfter))) {
-//         console.log(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
-// ${jsbiFormatted(liquidityBefore)} at opening of position/restarting and is now \
-// ${jsbiFormatted(liquidityAfter)}`)
-//       }
-
       const deadline = moment().unix() + DEADLINE_SECONDS
 
-      const calldata = removeCallParameters(this.position, this.tokenId, deadline, wallet.address)
+      const calldata = removeCallParameters(this.position.position, this.position.tokenId,
+        deadline, wallet.address)
   
       const nonce = await wallet.getTransactionCount("latest")
   
@@ -397,8 +375,7 @@ ${Math.round(stopwatchMillis / 1_000)}s`)
       console.log(`[${this.rangeWidthTicks}] removeLiquidity() Total gas cost: \
 ${this.totalGasCost.toFixed(2)}`)
 
-      // Forget our old token ID and position details so that we can move on.
-      this.tokenId = undefined
+      // Forget our old position details so that we can move on.
       this.position = undefined
       this.totalGasCost = 0
 
@@ -406,7 +383,7 @@ ${this.totalGasCost.toFixed(2)}`)
     }
 
     async topUpEth() {
-      if (this.position || this.tokenId)
+      if (this.position !== undefined)
          throw "Refusing to top up ETH. Still in a position. Remove liquidity first."
 
       const [ethBalance, wethBalance] = await Promise.all([
@@ -439,7 +416,7 @@ Unwrapping just enough WETH for the next re-range.`)
     // Use the liquidity maths in Uniswap's calculateRatioAmountIn() function in the
     // smart-order-router repo to swap an optimal amount of the input token.
     async swap() {
-      if (this.position || this.tokenId)
+      if (this.position !== undefined)
          throw "Refusing to swap. Still in a position. Remove liquidity first."
 
       if (this.swapPool == undefined || this.rangeOrderPool == undefined)
@@ -493,7 +470,7 @@ Unwrapping just enough WETH for the next re-range.`)
       else if (ratio > 0.5 && ratio <= 1.5) {
         // This should only be the case when restarting after an error that occured after the swap
         // but before adding liquidity again.
-        console.log(`[${this.rangeWidthTicks}] swapOptimally() We already have\
+        console.log(`[${this.rangeWidthTicks}] swap() We already have\
  fairly even values of USDC and WETH. No need for a swap.`)
 
         return
@@ -563,7 +540,7 @@ Unwrapping just enough WETH for the next re-range.`)
       // Note: Never pass an argument to toFixed() here. If it's less than the decimals on the
       // token, this will fail an invariant. If it's not provided, we just get the decimals on
       // the token, which is what we want anyway.
-      console.log(`[${this.rangeWidthTicks}] swapOptimally() Optimal swap is from\
+      console.log(`[${this.rangeWidthTicks}] swap() Optimal swap is from\
  ${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
 
       // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
@@ -601,14 +578,14 @@ Unwrapping just enough WETH for the next re-range.`)
       }
 
       const txReceipt: TransactionReceipt = await this.sendTx(
-        `[${this.rangeWidthTicks}] swapOptimally()`, txRequest)
+        `[${this.rangeWidthTicks}] swap()`, txRequest)
 
       const gasCost = this.gasCost(txReceipt)
       this.totalGasCost += gasCost
     }
   
     async addLiquidity() {
-      if (this.position || this.tokenId)
+      if (this.position !== undefined)
         throw `[${this.rangeWidthTicks}] Can't add liquidity. Already in a position. Remove \
 liquidity and swap first.`
 
@@ -621,8 +598,6 @@ liquidity and swap first.`
       // Go from native bigint to JSBI via string.
       const availableUsdc = JSBI.BigInt((usdcNative).toString())
       const availableWeth = JSBI.BigInt((wethNative).toString())
-
-      // const [rangeOrderPool, wethFirstInRangeOrderPool] = await useRangeOrderPool()
 
       const amount0 = this.wethFirstInRangeOrderPool ? availableWeth : availableUsdc
       const amount1 = this.wethFirstInRangeOrderPool ? availableUsdc : availableWeth
@@ -705,23 +680,21 @@ spacing of ${this.rangeOrderPool.tickSpacing}. Can't create position.`
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] addLiquidity()`, txRequest)
 
-      this.tokenId = extractTokenId(txReceipt)
-      this.position = position
+      const t = extractTokenId(txReceipt)
 
-      if (this.tokenId) {
-        const webUrl = positionWebUrl(this.tokenId)
-        console.log(`[${this.rangeWidthTicks}] addLiquidity() Position URL: ${webUrl}`)
-      }
-      else {
+      if (t === undefined) {
         console.error(`[${this.rangeWidthTicks}] addLiquidity() No token ID from logs. We won't \
 be able to remove this liquidity.`)
+      }
+      else {
+        this.position = new PositionWithTokenId(position, t)
+
+        const webUrl = positionWebUrl(t)
+        console.log(`[${this.rangeWidthTicks}] addLiquidity() Position URL: ${webUrl}`)
       }
 
       const gasCost = this.gasCost(txReceipt)
       this.totalGasCost += gasCost
-
-      // console.log(`[${this.rangeWidthTicks}] addLiquidity() Starting liquidity: \
-// ${jsbiFormatted(this.position.liquidity)}`)
     }
 
     gasCost(txReceipt: TransactionReceipt): number {
@@ -800,7 +773,7 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         this.logUnclaimedFees()
 
         // Refresh our Position and Pool instances before we use them.
-        await this.refresh()
+        await this.reinitMutables()
 
         // Time our remove/swap/add roundtrip.
         const stopwatchStart = Date.now()
@@ -831,14 +804,6 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         const stopwatchMillis = (Date.now() - stopwatchStart)
         console.log(`[${this.rangeWidthTicks}] Remove/swap/add roundtrip took \
 ${Math.round(stopwatchMillis / 1_000)}s`)
-
-        // Deposit assets and let the protocol swap the optimal size for the liquidity position,
-        // then enter the liquidity position all in one transaction.
-        // Uniswap repo smart-order-router is not ready for production use. Wait for these
-        // blocking bugs to get a response before using it:
-        //   https://github.com/Uniswap/smart-order-router/issues/64
-        //   https://github.com/Uniswap/smart-order-router/issues/65
-        // await this.swapAndAddLiquidity()
 
         // We should now hold as close to zero USDC and WETH as possible.
         await wallet.logBalances()
