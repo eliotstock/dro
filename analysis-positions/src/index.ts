@@ -2,7 +2,7 @@ import { config } from 'dotenv'
 import { getData } from './queries'
 import { logsByTxHash, logsByTokenId, positionsByTokenId, setDirectionAndFilterToOutOfRange,
     setFees, setAddTxLogs, setRangeWidth, setOpeningLiquidity, setOpeningClosingPrices,
-    cleanData, generateCsv, abbreviate
+    cleanData, generateCsv
 } from './functions'
 
 // Read our .env file
