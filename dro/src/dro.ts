@@ -360,7 +360,7 @@ export class DRO {
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: CHAIN_CONFIG.gasPrice,
+        gasPrice: this.gasPriceBid(),
         data: calldata
       }
 
@@ -573,7 +573,7 @@ Unwrapping just enough WETH for the next re-range.`)
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: CHAIN_CONFIG.gasPrice,
+        gasPrice: this.gasPriceBid(),
         data: calldata
       }
 
@@ -673,7 +673,7 @@ spacing of ${this.rangeOrderPool.tickSpacing}. Can't create position.`
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: CHAIN_CONFIG.gasPrice,
+        gasPrice: this.gasPriceBid(),
         data: calldata
       }
 
@@ -720,6 +720,16 @@ be able to remove this liquidity.`)
       // console.log(`TX cost: USD ${f.toFixed(2)}`)
 
       return f
+    }
+
+    gasPriceBid(): bigint {
+      if (gasPrice === undefined) {
+        throw `No gas price yet. Don't know what to bid.`
+      }
+
+      // Bid a little bit higher than the going rate.
+      // To add 10% with integer arithmetic, multiply by 11 and divide by 10.
+      return gasPrice * 11n / 10n
     }
 
     async onPriceChanged() {

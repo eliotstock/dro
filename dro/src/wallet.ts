@@ -169,6 +169,11 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
 
         const nonce = await this.getTransactionCount("latest")
 
+        // Just bid the current gas price.
+        if (gasPrice === undefined) {
+            throw `No gas price yet`
+        }
+
         // No calldata required, just the value.
         const txRequest = {
             from: this.address,
@@ -176,7 +181,7 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
             value: ethers.utils.parseEther(amount),
             nonce: nonce,
             gasLimit: CHAIN_CONFIG.gasLimit,
-            gasPrice: CHAIN_CONFIG.gasPrice,
+            gasPrice: gasPrice,
         }
 
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
@@ -204,6 +209,11 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
         const calldata = wethInterface.encodeFunctionData('withdraw', [a])
         // console.log(`calldata: ${calldata}`)
 
+        // Just bid the current gas price.
+        if (gasPrice === undefined) {
+            throw `No gas price yet`
+        }
+
         // No value required, just the calldata.
         const txRequest = {
             from: this.address,
@@ -211,7 +221,7 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
             value: 0,
             nonce: nonce,
             gasLimit: CHAIN_CONFIG.gasLimit,
-            gasPrice: CHAIN_CONFIG.gasPrice,
+            gasPrice: gasPrice,
             data: calldata
         }
 
@@ -227,20 +237,30 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
 
 export const wallet = EthUsdcWallet.createFromConfig(CHAIN_CONFIG)
 
+const L2_FAKE_GAS_PRICE = ethers.utils.parseUnits("2", "gwei").toBigInt()
+
 // We use the legacy gas price as a reference, just like everybody else seems to be doing. The new
 // EIP-1559 maxFeePerGas seems to come in at about twice the value.
 export async function updateGasPrice() {
-    // These API calls are costly. Avoid them on L2 where we don't care so much about gas.
-    // On Alchemy under the free tier, this causes:
+    // The API call from getFeeData() is costly. Avoid them on L2 where we don't care so much about
+    // gas and just work on the basis that gas is always 2 gwei.
+
+    // On Alchemy under the free tier, calling getFeeData() here causes:
     //   HTTP 429
     //   Your app has exceeded its compute units per second capacity. If you have retries enabled,
     //   you can safely ignore this message. If not, check out
     //   https://docs.alchemyapi.io/guides/rate-limits
     if (CHAIN_CONFIG.isL2) {
+        gasPrice = L2_FAKE_GAS_PRICE
+
         return
     }
 
-    // Legacy gas price.
+    // interface FeeData {
+    //   maxFeePerGas: null | BigNumber
+    //   maxPriorityFeePerGas: null | BigNumber
+    //   gasPrice: null | BigNumber <-- Legacy gas price.
+    // }
     const p = (await useProvider().getFeeData()).gasPrice
 
     // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
