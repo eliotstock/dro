@@ -38,9 +38,19 @@ config()
 // 1. [DONE] From Etherscan provider, get all transactions for this address
 // 2. [DONE] For each tx, get block number
 // 3. [DONE] From Etherscan provider, for each block number, get all tx logs for these blocks only
-// 4. Use analytics-positions code to build Position instances from logs
-// 5. [DONE] Get all token IDs for this account from Uniswap position manager contract
-// 6. Filter Position instances to those that are in set of our own token IDs
+// 4. Get price history for only the period from first tx to last tx timestamp
+// 5. Use analytics-positions code to build Position instances from logs:
+//   a. [WON'T DO] Map of logs keyed by tx hashes (do we need this?)
+//   b. Array of Positions, each with arrays of logs on them
+//      Both add tx and remove tx logs have the token ID in them, in different topics.
+//   d  Filter Position array to those that are in set of our own token IDs
+//   d. Set direction on each Position based on logs
+//   e. Set fees based on logs
+//   f. Set range width based on logs
+//   g. Set opening liquidity based on logs
+//   h. Set opening and closing prices from tx timestamps and price history
+//   i. Set gas cost in ETH based on all txs
+// 6. [DONE] Get all token IDs for this account from Uniswap position manager contract
 // 7. Calc APY% from that set of Position instances
 
 async function main() {
