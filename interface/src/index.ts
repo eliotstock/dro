@@ -5,12 +5,27 @@ import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
 import { Log, TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider'
 import { AlchemyProvider, EtherscanProvider } from '@ethersproject/providers'
+import { formatEther } from '@ethersproject/units'
+import { Position } from './position'
+
+import {
+  ADDR_POSITIONS_NFT,
+  ADDR_TOKEN_WETH,
+  ADDR_TOKEN_USDC,
+  TOPIC_MINT,
+  TOPIC_TRANSFER,
+  TOPIC_DECREASE_LIQUIDITY,
+  INTERFACE_NFT,
+  INTERFACE_WETH,
+  INTERFACE_USDC,
+  TOKEN_USDC,
+  TOKEN_WETH,
+  OUT_DIR,
+  ADDR_POOL
+} from './constants'
 
 // Read our .env file
 config()
-
-// Uniswap v3 positions NFT
-export const ADDR_POSITIONS_NFT = '0xc36442b4a4522e871399cd717abdd847ab11fe88'
 
 // Data required for calculating the APY% of a given position:
 // * Time position was open in days (from timestamp of add and remove txs)
@@ -20,11 +35,11 @@ export const ADDR_POSITIONS_NFT = '0xc36442b4a4522e871399cd717abdd847ab11fe88'
 // * Price history, to get from ETH gas costs to USD gas costs
 
 // Design
-// 1. From Etherscan Provider, get all transactions for this address
-// 2. For each tx, get block number
-// 3. From Etherscan Ethers provider, for each block number, get all tx logs for these blocks only
-// 4. Use analytics-positions code to build Position instance
-// 5. Get all token IDs for this account from Uniswap position manager contract
+// 1. [DONE] From Etherscan provider, get all transactions for this address
+// 2. [DONE] For each tx, get block number
+// 3. [DONE] From Etherscan provider, for each block number, get all tx logs for these blocks only
+// 4. Use analytics-positions code to build Position instances from logs
+// 5. [DONE] Get all token IDs for this account from Uniswap position manager contract
 // 6. Filter Position instances to those that are in set of our own token IDs
 // 7. Calc APY% from that set of Position instances
 
@@ -48,6 +63,8 @@ async function main() {
   }
 
   const PROVIDER = new EtherscanProvider(undefined, process.env.ETHERSCAN_API_KEY)
+
+  // TODO: Now that this has been committed (oops) I need to delete the API key.
   const PROVIDER_ALCHEMY = new AlchemyProvider(undefined, 'NJhHpafwsqTku1zBNDC0N61Q1mTvYjVU')
 
   const positionManagerContract = new ethers.Contract(
@@ -65,7 +82,7 @@ async function main() {
 
   for (let i = 0; i < positionCount; i++) {
     const tokenId = await positionManagerContract.tokenOfOwnerByIndex(address, i)
-    ownTokenIds.push(tokenId)
+    ownTokenIds.push(Number(tokenId))
 
     console.log(`  ${tokenId}`)
   }
@@ -75,82 +92,72 @@ async function main() {
   }
 
   // This is all our transactions, not just add and remove transactions but swaps and unwrapping WETH to ETH.
-  const history = await PROVIDER.getHistory(address)
+  const allTxs = await PROVIDER.getHistory(address)
 
-  console.log(`Transactions from this address: ${history.length}`)
+  console.log(`Transactions from this address: ${allTxs.length}`)
 
   const blockNumbers = Array<number>()
 
-  history.forEach(async function(txResponse: TransactionResponse) {
-    // console.log(`Index: ${index}, block number: ${txResponse.blockNumber}`)
-
+  for (const txResponse of allTxs) {
     if (txResponse.blockNumber === undefined) return
 
     blockNumbers.push(txResponse.blockNumber)
 
-    // console.log(`txResponse:`)
-    // console.dir(txResponse)
-    console.log(`Etherscan link to TX, txReceipt.gasUsed, txReceipt.effectiveGasPrice`)
+    // const txReceipt: TransactionReceipt = await PROVIDER.getTransactionReceipt(txResponse.hash)
 
-    try {
-      // Wait for zero confirmations since these are old blocks anyway.
-      // const txReceipt: TransactionReceipt = await txResponse.wait()
-      const txReceipt: TransactionReceipt = await PROVIDER.getTransactionReceipt(txResponse.hash)
+    // // Note that neither of these are actually large integers.
 
-      // Note that neither of these are actually large integers.
+    // // Corresponds to "Gas Used by Transaction" on Etherscan. Quoted in wei.
+    // const gasUsed = txReceipt.gasUsed.toBigInt()
 
-      // Corresponds to "Gas Used by Transaction" on Etherscan.
-      const gasUsed = txReceipt.gasUsed.toBigInt()
+    // // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei.
+    // const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
 
-      // txReceipt.cumulativeGasUsed: No idea what this is. Ignore it.
+    // const gasPaidInEth = gasUsed * effectiveGasPrice
+    // const gasPaidInEthReadable = formatEther(gasPaidInEth - (gasPaidInEth % 100000000000000n))
 
-      // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei, typically about 0.66 gwei for Arbitrum.
-      const effectiveGasPrice: BigNumber = txReceipt.effectiveGasPrice
-      // const gasPrice = txResponse.gasPrice
+    // console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
+  }
 
-      // if (gasPrice === undefined) {
-      //   console.log(`  Gas used: ${txReceipt.gasUsed} at unknown price`)
-      // }
-      // else {
-      //   // TODO: Why is this often 100_000_000_000 wei?
-      //   // When it's not, typical: 28_127_082_756 (28 gwei)
-      //   console.log(`  Gas used: ${txReceipt.gasUsed} at price: ${gasPrice} wei`)
-      // }
-      console.log(`https://etherscan.io/tx/${txResponse.hash}, ${txReceipt.gasUsed}, ${txReceipt.effectiveGasPrice}`)
+  console.log(`Blocks: ${blockNumbers.length}`)
+
+  if (blockNumbers.length != allTxs.length) {
+    throw `This account transacted in ${blockNumbers.length} blocks but has ${ allTxs.length} transactions. Fatal.`
+  }
+
+  for (const blockNumber of blockNumbers) {
+    // This is all logs for the pool in blocks in which we transacted, not just our logs.
+    const filter = {
+      address: ADDR_POSITIONS_NFT,
+      fromBlock: blockNumber,
+      toBlock: blockNumber
     }
-    catch (e) {
-      // Probably 'TypeError: txResponse.wait is not a function'
-      console.log(`Can't get transaction receipt for tx ${txResponse.hash}.`)
+  
+    const logs: Array<Log> = await PROVIDER.getLogs(filter)
+
+    if (logs.length === 0) {
+      continue
     }
-  })
-
-  // console.log(`Blocks: ${blockNumbers.length}`)
-
-  // blockNumbers.forEach(async function(blockNumber: number) {
-  //   // This is all logs for the pool in blocks in which we transacted, not just our logs.
-  //   const filter = {
-  //     address: ADDR_POSITIONS_NFT,
-  //     fromBlock: blockNumber, // remove TX
-  //     toBlock: blockNumber
-  //   }
   
-  //   const logs: Array<Log> = await PROVIDER.getLogs(filter)
+    console.log(`Uniswap Positions NFT logs for block ${blockNumber}:`)
 
-  //   if (logs.length === 0) {
-  //     return
-  //   }
-  
-  //   console.log(`Positions NFT logs for block ${blockNumber}:`)
+    for (const log of logs) {
+      console.log(`  data: ${log.data}`)
+      console.log(`  topics:`)
 
-  //   logs.forEach(function(log: Log, index: number) {
-  //     console.log(`${index}. data: ${log.data}`)
-  //     console.log(`  topics:`)
+      for (const topic of log.topics) {
+        console.log(`    ${topic}`)
+      }
 
-  //     log.topics.forEach(function(topic: string, index: number, array: string[]) {
-  //       console.log(`  ${topic}`)
-  //     })
-  //   })
-  // })
+      if (log.address != ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
+        // Parse hex string to decimal
+        const tokenId = Number(log.topics[1])
+        const position = new Position(tokenId)
+
+        console.log(`  Position: ${tokenId} is one of ours: ${ownTokenIds.includes(tokenId)}`)
+      }
+    }
+  }
 }
 
 main().catch((e) => {
