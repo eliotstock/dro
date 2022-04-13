@@ -519,6 +519,9 @@ export async function createPoolOnTestnet() {
     const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, mintOptions)
   
     const nonce = await wallet.getTransactionCount("latest")
+
+    // This is a testnet. Low ball the gas price.
+    const gasPriceBid = ethers.utils.parseUnits("2", "gwei").toBigInt()
   
     // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
     const txRequest = {
@@ -527,7 +530,7 @@ export async function createPoolOnTestnet() {
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: CHAIN_CONFIG.gasPrice,
+        gasPrice: gasPriceBid,
         data: calldata
     }
 
