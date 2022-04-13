@@ -6,7 +6,7 @@ import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer";
 import { SigningKey } from "@ethersproject/signing-key";
 import { abi as ERC20ABI } from './abi/erc20.json'
 import { abi as WETHABI } from './abi/weth.json'
-import { useConfig, ChainConfig } from './config'
+import { useConfig, ChainConfig, useProvider } from './config'
 import { price } from './uniswap'
 import JSBI from 'jsbi'
 
@@ -54,16 +54,16 @@ export class EthUsdcWallet extends ethers.Wallet {
         const usdcContract = new ethers.Contract(
             chainConfig.addrTokenUsdc,
             ERC20ABI,
-            chainConfig.provider()
+            useProvider()
         )
 
         const wethContract = new ethers.Contract(
             chainConfig.addrTokenWeth,
             WETHABI,
-            chainConfig.provider()
+            useProvider()
         )
 
-        let w = new EthUsdcWallet(usdcContract, wethContract, s.privateKey, chainConfig.provider())
+        let w = new EthUsdcWallet(usdcContract, wethContract, s.privateKey, useProvider())
 
         // Contracts need to be connected to a signer, not just a provider, in order to call
         // approve() on them. connect() returns a connected wallet but has no effect on the
@@ -241,7 +241,7 @@ export async function updateGasPrice() {
     }
 
     // Legacy gas price.
-    const p = (await CHAIN_CONFIG.provider().getFeeData()).gasPrice
+    const p = (await useProvider().getFeeData()).gasPrice
 
     // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
     // const maxFeePerGas = (await CHAIN_CONFIG.provider().getFeeData()).maxFeePerGas
