@@ -57,6 +57,28 @@ config()
 // 6. [DONE] Get all token IDs for this account from Uniswap position manager contract
 // 7. Calc APY% from that set of Position instances
 
+// No good. Looks like the address is required in the filter.
+//   result: '{"status":"0","message":"NOTOK","result":"Error!"}'
+async function getLogsForTx(provider: Provider, txResponse: TransactionResponse): Promise<Array<Log> | undefined> {
+  if (txResponse.blockNumber === undefined) return undefined
+
+  const filter = {
+    fromBlock: txResponse.blockNumber,
+    toBlock: txResponse.blockNumber
+  }
+
+  const allLogsForBlock = await provider.getLogs(filter)
+  const logsForTx = new Array<Log>()
+  
+  for (const log of allLogsForBlock) {
+    if (log.transactionHash == txResponse.hash) {
+      logsForTx.push(log)
+    }
+  }
+
+  return logsForTx
+}
+
 async function createPositionsWithLogs(provider: Provider, blockNumbers: Array<number>,
   ownTokenIds: Array<number>): Promise<Map<number, Position>> {
   const positions = new Map<number, Position>()
@@ -361,21 +383,29 @@ async function main() {
 
     blockNumbers.push(txResponse.blockNumber)
 
-    // const txReceipt: TransactionReceipt = await PROVIDER.getTransactionReceipt(txResponse.hash)
+    // const logsForTx = await getLogsForTx(PROVIDER, txResponse)
 
-    // // Note that neither of these are actually large integers.
+    // console.log(`Got ${logsForTx?.length} logs for TX ${txResponse.hash}`)
 
-    // // Corresponds to "Gas Used by Transaction" on Etherscan. Quoted in wei.
-    // const gasUsed = txReceipt.gasUsed.toBigInt()
+    const txReceipt: TransactionReceipt = await PROVIDER.getTransactionReceipt(txResponse.hash)
 
-    // // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei.
-    // const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
+    console.log(`Got ${txReceipt.logs.length} logs for TX ${txReceipt.transactionHash}`)
 
-    // const gasPaidInEth = gasUsed * effectiveGasPrice
-    // const gasPaidInEthReadable = formatEther(gasPaidInEth - (gasPaidInEth % 100000000000000n))
+    // Note that neither of these are actually large integers.
 
-    // console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
+    // Corresponds to "Gas Used by Transaction" on Etherscan. Quoted in wei.
+    const gasUsed = txReceipt.gasUsed.toBigInt()
+
+    // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei.
+    const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
+
+    const gasPaidInEth = gasUsed * effectiveGasPrice
+    const gasPaidInEthReadable = formatEther(gasPaidInEth - (gasPaidInEth % 100000000000000n))
+
+    console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
   }
+
+  if (blockNumbers.length > 0) process.exit(0)
 
   console.log(`Blocks: ${blockNumbers.length}`)
 
