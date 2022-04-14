@@ -14,11 +14,11 @@ export const ADDR_POSITIONS_NFT_FOR_FILTER = '0xc36442b4a4522e871399cd717abdd847
 // Logs from provider have the case mostly, but not all, in caps (checksum case?)
 export const ADDR_POSITIONS_NFT_FOR_LOGS = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88'
 
-// WETH
-export const ADDR_TOKEN_WETH = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
+// WETH (checksum case)
+export const ADDR_TOKEN_WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 
-// USDC
-export const ADDR_TOKEN_USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+// USDC (checksum case)
+export const ADDR_TOKEN_USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 
 // Topics. Logs from provider have these all in lower case.
 export const TOPIC_MINT = '0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde'

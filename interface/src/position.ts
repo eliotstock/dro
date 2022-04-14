@@ -5,7 +5,8 @@ const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
 
 export enum Direction {
     Up = 'up',
-    Down = 'down'
+    Down = 'down',
+    Sideways = 'sideways'
 }
 
 export class Position {
@@ -39,9 +40,8 @@ export class Position {
 
             return (BigInt(this.withdrawnWeth) - BigInt(this.closingLiquidityWeth))
         }
-        else {
-            throw `Traded up, so use feesWeth property instead: ${this.tokenId}`
-        }
+            
+        throw `Didn't trade down: ${this.tokenId}`
     }
 
     feesUsdcCalculated(): bigint {
@@ -50,9 +50,8 @@ export class Position {
 
             return (BigInt(this.withdrawnUsdc) - BigInt(this.closingLiquidityUsdc))
         }
-        else {
-            throw `Traded down, so use feesUsdc property instead: ${this.tokenId}`
-        }
+
+        throw `Didn't trade up: ${this.tokenId}`
     }
 
     feesLog(): string {
@@ -86,6 +85,10 @@ export class Position {
             // }
 
             return BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees
+        }
+        else if (this.traded == Direction.Sideways) {
+            // We don't currently support any calculations on positions that we closed when still in range.
+            return BigInt(0)
         }
 
         throw `No direction: ${this.tokenId}`

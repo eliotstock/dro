@@ -57,103 +57,50 @@ config()
 // 6. [DONE] Get all token IDs for this account from Uniswap position manager contract
 // 7. Calc APY% from that set of Position instances
 
-// No good. Looks like the address is required in the filter.
-//   result: '{"status":"0","message":"NOTOK","result":"Error!"}'
-async function getLogsForTx(provider: Provider, txResponse: TransactionResponse): Promise<Array<Log> | undefined> {
-  if (txResponse.blockNumber === undefined) return undefined
-
-  const filter = {
-    fromBlock: txResponse.blockNumber,
-    toBlock: txResponse.blockNumber
-  }
-
-  const allLogsForBlock = await provider.getLogs(filter)
-  const logsForTx = new Array<Log>()
-  
-  for (const log of allLogsForBlock) {
-    if (log.transactionHash == txResponse.hash) {
-      logsForTx.push(log)
-    }
-  }
-
-  return logsForTx
-}
-
-async function createPositionsWithLogs(provider: Provider, blockNumbers: Array<number>,
-  ownTokenIds: Array<number>): Promise<Map<number, Position>> {
+function createPositionsWithLogs(logss: Array<Array<Log>>): Map<number, Position> {
   const positions = new Map<number, Position>()
 
-  // The provider can't simply give us the logs for a transaction. We can only filter by address
-  // and block range.
-  const emittingAddresses = [ADDR_POSITIONS_NFT_FOR_FILTER,
-    ADDR_TOKEN_WETH,
-    ADDR_TOKEN_USDC]
-  
-  // This is all logs emitted by these contracts in blocks in which we transacted, not just our own
-  // logs.
-  for (const emittingAddress of emittingAddresses) {
-    for (const blockNumber of blockNumbers) {
-      const filter = {
-        address: emittingAddress,
-        fromBlock: blockNumber,
-        toBlock: blockNumber
-      }
-    
-      console.log(`Getting logs emitted by ${emittingAddress}`)
+  for (const logs of logss) {
+    if (logs.length === 0) continue
 
-      const logs: Array<Log> = await provider.getLogs(filter)
+    for (const log of logs) {
+      // console.log(`  data: ${log.data}`)
+      // console.log(`  topics:`)
 
-      if (logs.length === 0) {
-        continue
-      }
-    
-      // console.log(`Uniswap Positions NFT logs for block ${blockNumber}:`)
+      // for (const topic of log.topics) {
+      //   console.log(`    ${topic}`)
+      // }
 
-      for (const log of logs) {
-        // console.log(`  data: ${log.data}`)
-        // console.log(`  topics:`)
+      if (log.address != ADDR_POSITIONS_NFT_FOR_FILTER) {
 
-        for (const topic of log.topics) {
-          // console.log(`    ${topic}`)
+        if (log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
+          // These are the logs for the 'remove' transaction.
+          // Parse hex string to decimal.
+          const tokenId = Number(log.topics[1])
+          let position = positions.get(tokenId)
+
+          if (position === undefined) {
+            position = new Position(tokenId)
+          }
+
+          // position.removeTxLogs.push(...logs)
+          position.removeTxLogs = logs
+          positions.set(tokenId, position)
         }
 
-        if (log.address != ADDR_POSITIONS_NFT_FOR_FILTER) {
+        if (log.topics[0] == TOPIC_INCREASE_LIQUIDITY) {
+          // These are the logs for the 'add' transaction.
+          // Parse hex string to decimal.
+          const tokenId = Number(log.topics[1])
+          let position = positions.get(tokenId)
 
-          if (log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
-            // These are the logs for the 'remove' transaction.
-            // Parse hex string to decimal.
-            const tokenId = Number(log.topics[1])
-
-            if (ownTokenIds.includes(tokenId)) {
-              // This is one of our positions.
-              let position = positions.get(tokenId)
-
-              if (position === undefined) {
-                position = new Position(tokenId)
-              }
-
-              position.removeTxLogs.push(...logs)
-              positions.set(tokenId, position)
-            }
+          if (position === undefined) {
+            position = new Position(tokenId)
           }
 
-          if (log.topics[0] == TOPIC_INCREASE_LIQUIDITY) {
-            // These are the logs for the 'add' transaction.
-            // Parse hex string to decimal.
-            const tokenId = Number(log.topics[1])
-
-            if (ownTokenIds.includes(tokenId)) {
-              // This is one of our positions.
-              let position = positions.get(tokenId)
-
-              if (position === undefined) {
-                position = new Position(tokenId)
-              }
-
-              position.addTxLogs.push(...logs)
-              positions.set(tokenId, position)
-            }
-          }
+          // position.addTxLogs.push(...logs)
+          position.addTxLogs = logs
+          positions.set(tokenId, position)
         }
       }
     }
@@ -176,16 +123,16 @@ async function setDirection(positions: Map<number, Position>) {
         const amount1: number = parsedLog.args['amount1']
 
         if (amount0 == 0) {
-            // Position closed out of range and the market traded down into WETH.
-            p.traded = Direction.Down
+          // Position closed out of range and the market traded down into WETH.
+          p.traded = Direction.Down
         }
         else if (amount1 == 0) {
-            // Position closed out of range and the market traded up into USDC.
-            p.traded = Direction.Up
+          // Position closed out of range and the market traded up into USDC.
+          p.traded = Direction.Up
         }
         else {
-          // TODO: Handle positions closed in-range. Revisit fee calcs.
-          console.log(`  Position(${p.tokenId}) closed in-range. amount0: ${amount0}, amount1: ${amount1}`)
+          // We don't currently support any calculations on positions that we closed when still in range.
+          p.traded = Direction.Sideways
         }
 
         positions.set(p.tokenId, p)
@@ -360,28 +307,31 @@ async function main() {
 
   console.log(`Positions (closed and open): ${positionCount}.`)
 
-  const ownTokenIds = Array<number>()
+  // const ownTokenIds = Array<number>()
 
-  for (let i = 0; i < positionCount; i++) {
-    const tokenId = await positionManagerContract.tokenOfOwnerByIndex(address, i)
-    ownTokenIds.push(Number(tokenId))
-  }
+  // for (let i = 0; i < positionCount; i++) {
+  //   const tokenId = await positionManagerContract.tokenOfOwnerByIndex(address, i)
+  //   ownTokenIds.push(Number(tokenId))
+  // }
 
-  if (ownTokenIds.length != positionCount) {
-    throw `This account has ${positionCount} positions but ${ownTokenIds.length} token IDs. Fatal.`
-  }
+  // if (ownTokenIds.length != positionCount) {
+  //   throw `This account has ${positionCount} positions but ${ownTokenIds.length} token IDs. Fatal.`
+  // }
 
   // This is all our transactions, not just add and remove transactions but swaps and unwrapping WETH to ETH.
   const allTxs = await PROVIDER.getHistory(address)
 
   console.log(`Transactions from this address: ${allTxs.length}`)
 
-  const blockNumbers = Array<number>()
+  // const blockNumbers = Array<number>()
+  const allLogs = Array<Array<Log>>()
+
+  let totalGasPaidInEth = 0n
 
   for (const txResponse of allTxs) {
-    if (txResponse.blockNumber === undefined) return
+    // if (txResponse.blockNumber === undefined) return
 
-    blockNumbers.push(txResponse.blockNumber)
+    // blockNumbers.push(txResponse.blockNumber)
 
     // const logsForTx = await getLogsForTx(PROVIDER, txResponse)
 
@@ -390,6 +340,8 @@ async function main() {
     const txReceipt: TransactionReceipt = await PROVIDER.getTransactionReceipt(txResponse.hash)
 
     console.log(`Got ${txReceipt.logs.length} logs for TX ${txReceipt.transactionHash}`)
+
+    allLogs.push(txReceipt.logs)
 
     // Note that neither of these are actually large integers.
 
@@ -402,26 +354,33 @@ async function main() {
     const gasPaidInEth = gasUsed * effectiveGasPrice
     const gasPaidInEthReadable = formatEther(gasPaidInEth - (gasPaidInEth % 100000000000000n))
 
-    console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
+    // console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
+
+    totalGasPaidInEth += gasPaidInEth
   }
 
-  if (blockNumbers.length > 0) process.exit(0)
+  const totalGasPaidInEthReadable = formatEther(totalGasPaidInEth - (totalGasPaidInEth % 100000000000000n))
+  console.log(`Total gas paid in ETH: ${totalGasPaidInEthReadable}`)
 
-  console.log(`Blocks: ${blockNumbers.length}`)
+  // if (blockNumbers.length > 0) process.exit(0)
 
-  if (blockNumbers.length != allTxs.length) {
-    throw `This account transacted in ${blockNumbers.length} blocks but has ${allTxs.length} transactions. Fatal.`
-  }
+  // console.log(`Blocks: ${blockNumbers.length}`)
 
-  const positions = await createPositionsWithLogs(PROVIDER, blockNumbers, ownTokenIds)
-
-  // for (const p of positions.values()) {
-  //   console.log(`  Position(${p.tokenId}) with ${p.addTxLogs?.length} add tx logs and ${p.removeTxLogs?.length} remove tx logs`)
+  // if (blockNumbers.length != allTxs.length) {
+  //   throw `This account transacted in ${blockNumbers.length} blocks but has ${allTxs.length} transactions. Fatal.`
   // }
 
-  if (ownTokenIds.length != positions.size) {
-    throw `This account has ${ownTokenIds.length} positions but we could only find logs for ${positions.size}. Fatal.`
+  const positions = createPositionsWithLogs(allLogs)
+
+  // console.log(`Positions from logs: ${positions.size}`)
+
+  for (const p of positions.values()) {
+    console.log(`  Position(${p.tokenId}) with ${p.addTxLogs?.length} add tx logs and ${p.removeTxLogs?.length} remove tx logs`)
   }
+
+  // if (ownTokenIds.length != positions.size) {
+  //   throw `This account has ${ownTokenIds.length} positions but we could only find logs for ${positions.size}. Fatal.`
+  // }
 
   // Set direction on each position
   setDirection(positions)
@@ -433,10 +392,18 @@ async function main() {
   // Set fees on each position
   setFees(positions)
 
+  let totalFeesWeth: bigint = 0n
+  let totalFeesUsdc: bigint = 0n
+
   for (const p of positions.values()) {
     console.log(`  Position(${p.tokenId}): fees WETH: ${p.feesWeth}, fees USDC: ${p.feesUsdc}`)
+
+    totalFeesWeth = BigInt(totalFeesWeth) + BigInt(p.feesWeth)
+    totalFeesUsdc = BigInt(totalFeesUsdc) + BigInt(p.feesUsdc)
   }
 
+  console.log(`Total fees: USDC: ${totalFeesUsdc.toLocaleString()}, WETH: ${totalFeesWeth.toLocaleString()}`)
+  
   // Set the range width based on the tick upper and lower from the logs.
   setRangeWidth(positions)
 }
