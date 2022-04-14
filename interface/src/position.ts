@@ -10,8 +10,8 @@ export enum Direction {
 
 export class Position {
     tokenId: number
-    removeTxLogs?: Log[]
-    addTxLogs?: Log[]
+    removeTxLogs: Array<Log>
+    addTxLogs: Array<Log>
     traded?: Direction
     openedTimestamp?: string
     closedTimestamp?: string
@@ -29,6 +29,8 @@ export class Position {
 
     constructor(_tokenId: number) {
         this.tokenId = _tokenId
+        this.removeTxLogs = new Array<Log>()
+        this.addTxLogs = new Array<Log>()
     }
 
     feesWethCalculated(): bigint {
