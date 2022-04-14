@@ -42,15 +42,15 @@ config()
 // 1. [DONE] From Etherscan provider, get all transactions for this address (swaps, adds, removes, unwraps)
 // 2. [DONE] For each tx, get block number
 // 3. [DONE] From Etherscan provider, for each block number, get all tx logs from the positions NFT address for these blocks only
-// 4. Get price history for only the period from first tx to last tx timestamp
+// 4. Get price history for only the period from first tx to last tx timestamp. Or only blocks in which we transacted, ideally.
 // 5. Use analytics-positions code to build Position instances from logs:
 //   a. [WON'T DO] Map of logs keyed by tx hashes (do we need this?)
 //   b. [DONE] Map of Positions, each with arrays of logs on them
 //      Both add tx and remove tx logs have the token ID in them, in different topics.
 //   d  [DONE] Filter Position array to those that are in set of our own token IDs (or look for our address as sender in the logs?)
 //   d. [MOSTLY DONE] Set direction on each Position based on logs
-//   e. [TESTING] Set fees based on logs
-//   f. Set range width based on logs
+//   e. [DONE] Set fees based on logs
+//   f. [DONE] Set range width based on logs
 //   g. Set opening liquidity based on logs
 //   h. Set opening and closing prices from tx timestamps and price history
 //   i. Set gas cost in ETH based on all txs
