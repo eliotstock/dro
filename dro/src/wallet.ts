@@ -241,7 +241,7 @@ const L2_FAKE_GAS_PRICE = ethers.utils.parseUnits("2", "gwei").toBigInt()
 
 // We use the legacy gas price as a reference, just like everybody else seems to be doing. The new
 // EIP-1559 maxFeePerGas seems to come in at about twice the value.
-export async function updateGasPrice() {
+export async function updateGasPrice(force: boolean) {
     // The API call from getFeeData() is costly. Avoid them on L2 where we don't care so much about
     // gas and just work on the basis that gas is always 2 gwei.
 
@@ -250,7 +250,7 @@ export async function updateGasPrice() {
     //   Your app has exceeded its compute units per second capacity. If you have retries enabled,
     //   you can safely ignore this message. If not, check out
     //   https://docs.alchemyapi.io/guides/rate-limits
-    if (CHAIN_CONFIG.isL2) {
+    if (CHAIN_CONFIG.isL2 && !force) {
         gasPrice = L2_FAKE_GAS_PRICE
 
         return
@@ -261,7 +261,14 @@ export async function updateGasPrice() {
     //   maxPriorityFeePerGas: null | BigNumber
     //   gasPrice: null | BigNumber <-- Legacy gas price.
     // }
-    const p = (await useProvider().getFeeData()).gasPrice
+    const feeData = await useProvider().getFeeData()
+    const p = feeData.gasPrice
+
+    // Let 'force' have the side-effect of increased logging so that we can learn about
+    // post-EIP-1559 gas prices.
+    console.log(`maxFeePerGas: ${feeData.maxFeePerGas.div(1e9).toNumber()} gwei, \
+maxPriorityFeePerGas: ${feeData.maxPriorityFeePerGas.div(1e9).toNumber()} gwei, \
+gasPrice: ${feeData.gasPrice.div(1e9).toNumber()} gwei`)
 
     // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
     // const maxFeePerGas = (await CHAIN_CONFIG.provider().getFeeData()).maxFeePerGas

@@ -8,7 +8,7 @@ import {
 } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig, useProvider } from './config'
-import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
+import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted, updateGasPrice } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 
 import {
@@ -152,6 +152,9 @@ export class DRO {
 
       this.rangeOrderPool = rangeOrderPool
       this.wethFirstInRangeOrderPool = wethFirstInRangeOrderPool
+
+      // Force a gas price update and logging, even on L2.
+      updateGasPrice(true)
     }
   
     outOfRange() {
