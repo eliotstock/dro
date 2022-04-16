@@ -265,17 +265,17 @@ export async function updateGasPrice(force: boolean) {
     const feeData = await useProvider().getFeeData()
     const p = feeData.gasPrice
 
-    const maxFeePerGas: string = feeData.maxFeePerGas === undefined ? 'unknown'
+    const maxFeePerGas: string = feeData.maxFeePerGas == null ? 'unknown'
         : formatUnits(feeData.maxFeePerGas, 'gwei')
-    const maxPriorityFeePerGas: string = feeData.maxPriorityFeePerGas === undefined ? 'unknown'
+    const maxPriorityFeePerGas: string = feeData.maxPriorityFeePerGas == null ? 'unknown'
         : formatUnits(feeData.maxPriorityFeePerGas, 'gwei')
-    const gasPrice: string = feeData.gasPrice === undefined ? 'unknown'
+    const gasPriceForLogs: string = feeData.gasPrice == null ? 'unknown'
         : formatUnits(feeData.gasPrice, 'gwei')
 
     // Let 'force' have the side-effect of increased logging so that we can learn about
     // post-EIP-1559 gas prices.
     console.log(`maxFeePerGas: ${maxFeePerGas} gwei, \
-maxPriorityFeePerGas: ${maxPriorityFeePerGas} gwei, gasPrice: ${gasPrice} gwei`)
+maxPriorityFeePerGas: ${maxPriorityFeePerGas} gwei, gasPrice: ${gasPriceForLogs} gwei`)
 
     // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
     // const maxFeePerGas = (await CHAIN_CONFIG.provider().getFeeData()).maxFeePerGas
