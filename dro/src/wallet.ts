@@ -9,6 +9,7 @@ import { abi as WETHABI } from './abi/weth.json'
 import { useConfig, ChainConfig, useProvider } from './config'
 import { price } from './uniswap'
 import JSBI from 'jsbi'
+import { formatUnits } from 'ethers/lib/utils';
 
 // Read our .env file
 config()
@@ -266,9 +267,9 @@ export async function updateGasPrice(force: boolean) {
 
     // Let 'force' have the side-effect of increased logging so that we can learn about
     // post-EIP-1559 gas prices.
-    console.log(`maxFeePerGas: ${feeData.maxFeePerGas.div(1e9).toNumber()} gwei, \
-maxPriorityFeePerGas: ${feeData.maxPriorityFeePerGas.div(1e9).toNumber()} gwei, \
-gasPrice: ${feeData.gasPrice.div(1e9).toNumber()} gwei`)
+    console.log(`maxFeePerGas: ${formatUnits(feeData.maxFeePerGas, 'gwei')} gwei, \
+maxPriorityFeePerGas: ${formatUnits(feeData.maxPriorityFeePerGas, 'gwei')} gwei, \
+gasPrice: ${formatUnits(feeData.gasPrice, 'gwei')} gwei`)
 
     // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
     // const maxFeePerGas = (await CHAIN_CONFIG.provider().getFeeData()).maxFeePerGas
