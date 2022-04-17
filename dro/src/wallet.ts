@@ -265,28 +265,23 @@ export async function updateGasPrice(force: boolean) {
     const feeData = await useProvider().getFeeData()
     const p = feeData.gasPrice
 
-    const maxFeePerGas: string = feeData.maxFeePerGas == null ? 'unknown'
-        : formatUnits(feeData.maxFeePerGas, 'gwei')
-    const maxPriorityFeePerGas: string = feeData.maxPriorityFeePerGas == null ? 'unknown'
-        : formatUnits(feeData.maxPriorityFeePerGas, 'gwei')
-    const gasPriceForLogs: string = feeData.gasPrice == null ? 'unknown'
-        : formatUnits(feeData.gasPrice, 'gwei')
+    if (force) {
+        const maxFeePerGas: string = feeData.maxFeePerGas == null ? 'unknown'
+            : formatUnits(feeData.maxFeePerGas, 'gwei')
+        const maxPriorityFeePerGas: string = feeData.maxPriorityFeePerGas == null ? 'unknown'
+            : formatUnits(feeData.maxPriorityFeePerGas, 'gwei')
+        const gasPriceForLogs: string = feeData.gasPrice == null ? 'unknown'
+            : formatUnits(feeData.gasPrice, 'gwei')
 
-    // Let 'force' have the side-effect of increased logging so that we can learn about
-    // post-EIP-1559 gas prices.
-    console.log(`maxFeePerGas: ${maxFeePerGas} gwei, \
+        // Let 'force' have the side-effect of increased logging so that we can learn about
+        // post-EIP-1559 gas prices.
+        // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of
+        // them)
+        console.log(`maxFeePerGas: ${maxFeePerGas} gwei, \
 maxPriorityFeePerGas: ${maxPriorityFeePerGas} gwei, gasPrice: ${gasPriceForLogs} gwei`)
-
-    // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
-    // const maxFeePerGas = (await CHAIN_CONFIG.provider().getFeeData()).maxFeePerGas
+    }
 
     if (!p) return
-
-    // console.log(`Gas prices: legacy: ${gasPrice}, EIP-1559: ${maxFeePerGas}`)
-
-    // gasPriceInGwei = gasPrice.div(1e9).toNumber()
-
-    // console.log(`  Gas price in gwei: ${gasPriceInGwei}`)
 
     gasPrice = p.toBigInt()
 }
