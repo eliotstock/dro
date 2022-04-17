@@ -51,6 +51,7 @@ import {
   Trade
 } from '@uniswap/v3-sdk'
 import { AlphaRouter } from '@uniswap/smart-order-router'
+import { formatUnits } from 'ethers/lib/utils'
 
 const OUT_DIR = './out'
 
@@ -320,8 +321,12 @@ export class DRO {
         const txReceipt: TransactionReceipt = await txResponse.wait()
         // console.dir(txReceipt)
 
+        const gasPriceReadable = txRequest.gasPrice === undefined ? 'unknown' :
+          formatUnits(txRequest.gasPrice, 'gwei')
+
         const stopwatchMillis = (Date.now() - stopwatchStart)
-        console.log(`${logLinePrefix} Transaction took ${Math.round(stopwatchMillis / 1_000)}s`)
+        console.log(`${logLinePrefix} Transaction took ${Math.round(stopwatchMillis / 1_000)}s \
+at gas price ${gasPriceReadable} gwei bid`)
 
         return txReceipt
       }
