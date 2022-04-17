@@ -238,7 +238,7 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
 
 export const wallet = EthUsdcWallet.createFromConfig(CHAIN_CONFIG)
 
-const L2_FAKE_GAS_PRICE = ethers.utils.parseUnits("2", "gwei").toBigInt()
+const L2_FAKE_GAS_PRICE = ethers.utils.parseUnits("1", "gwei").toBigInt()
 
 // We use the legacy gas price as a reference, just like everybody else seems to be doing. The new
 // EIP-1559 maxFeePerGas seems to come in at about twice the value.
@@ -251,10 +251,8 @@ export async function updateGasPrice(force: boolean) {
     //   Your app has exceeded its compute units per second capacity. If you have retries enabled,
     //   you can safely ignore this message. If not, check out
     //   https://docs.alchemyapi.io/guides/rate-limits
-    if (CHAIN_CONFIG.isL2 && !force) {
-        gasPrice = L2_FAKE_GAS_PRICE
-
-        return
+    if (CHAIN_CONFIG.isL2 && !force && gasPrice === undefined) {
+        return L2_FAKE_GAS_PRICE
     }
 
     // interface FeeData {
