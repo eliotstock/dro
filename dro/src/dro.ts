@@ -732,7 +732,14 @@ be able to remove this liquidity.`)
 
     gasPriceBid(): bigint {
       if (gasPrice === undefined) {
-        throw `No gas price yet. Don't know what to bid.`
+        console.error(`No gas price yet. Don't know what to bid. Defaulting to a safe high bid.`)
+
+        if (CHAIN_CONFIG.isL2) {
+          return ethers.utils.parseUnits("1", "gwei").toBigInt()
+        }
+        else {
+          return ethers.utils.parseUnits("80", "gwei").toBigInt()
+        }
       }
 
       if (CHAIN_CONFIG.isL2) {
