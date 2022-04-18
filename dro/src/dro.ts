@@ -735,6 +735,12 @@ be able to remove this liquidity.`)
         throw `No gas price yet. Don't know what to bid.`
       }
 
+      if (CHAIN_CONFIG.isL2) {
+        // Bid well under (75% of) the going rate. See how low we can go without having a tx fail
+        // or take hours.
+        return gasPrice * 75n / 100n
+      }
+
       // Bid a little bit higher than the going rate.
       // To add 10% with integer arithmetic, multiply by 11 and divide by 10.
       return gasPrice * 11n / 10n
