@@ -755,9 +755,9 @@ be able to remove this liquidity.`)
       // Bidding a high factor on maxFeePerGas is probably safer.
 
       // Bid a little bit higher than the going rate.
-      // 110%: > 30 mins for remove tx. Can easily priced out of the gas market on a big move.
-      // 120%: testing now
-      return gasPrice * 12n / 10n
+      // 110%: > 60 mins for remove tx. Can easily priced out of the gas market on a big move.
+      // 130%: testing now
+      return gasPrice * 13n / 10n
     }
 
     async onPriceChanged() {
