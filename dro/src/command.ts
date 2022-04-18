@@ -63,7 +63,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
   }
 
   // `--speedup` means speed up the given transaction by increasing the gas price on it.
-  if (argv.speedUp !== undefined) {
+  if (argv.speedUp != '') {
     console.log(`Speeding up transaction ${argv.speedUp} only.`)
 
     await speedUpPendingTx(argv.speedUp)
