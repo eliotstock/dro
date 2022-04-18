@@ -743,9 +743,10 @@ be able to remove this liquidity.`)
       }
 
       if (CHAIN_CONFIG.isL2) {
+        // 95%: Remove/swap/add roundtrip took 14s. See if we can go slower.
+        // 85%: testing now
         // 75%: 'gas price too low' error
-        // 95%: testing now
-        return gasPrice * 95n / 100n
+        return gasPrice * 85n / 100n
       }
 
       // Bid a little bit higher than the going rate.
