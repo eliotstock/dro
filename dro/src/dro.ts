@@ -736,16 +736,15 @@ be able to remove this liquidity.`)
       }
 
       if (CHAIN_CONFIG.isL2) {
-        // Bid well under (75% of) the going rate. See how low we can go without having a tx fail
-        // or take hours.
         // 75%: 'gas price too low' error
         // 95%: testing now
         return gasPrice * 95n / 100n
       }
 
       // Bid a little bit higher than the going rate.
-      // To add 10% with integer arithmetic, multiply by 11 and divide by 10.
-      return gasPrice * 11n / 10n
+      // 110%: > 15 mins for remove tx
+      // 120%: testing now
+      return gasPrice * 12n / 10n
     }
 
     async onPriceChanged() {
