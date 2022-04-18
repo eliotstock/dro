@@ -738,7 +738,9 @@ be able to remove this liquidity.`)
       if (CHAIN_CONFIG.isL2) {
         // Bid well under (75% of) the going rate. See how low we can go without having a tx fail
         // or take hours.
-        return gasPrice * 75n / 100n
+        // 75%: 'gas price too low' error
+        // 95%: testing now
+        return gasPrice * 95n / 100n
       }
 
       // Bid a little bit higher than the going rate.
