@@ -749,8 +749,13 @@ be able to remove this liquidity.`)
         return gasPrice * 85n / 100n
       }
 
+      // TODO: On L1 consider specifying the maxFeePerGas instead of the gasPrice.
+      // maxFeePerGas is often double the gasPrice:
+      //   maxFeePerGas: 36.301396484 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 17.987767833 gwei
+      // Bidding a high factor on maxFeePerGas is probably safer.
+
       // Bid a little bit higher than the going rate.
-      // 110%: > 15 mins for remove tx
+      // 110%: > 30 mins for remove tx. Can easily priced out of the gas market on a big move.
       // 120%: testing now
       return gasPrice * 12n / 10n
     }

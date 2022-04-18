@@ -298,6 +298,54 @@ export function gasPriceFormatted(): string {
     return `${g.toFixed(1)} gwei`
 }
 
+export async function speedUpPendingTx(txHash: string) {
+    const nonce = await wallet.getTransactionCount("pending")
+
+    const pendingTx: TransactionResponse = await useProvider().getTransaction(txHash)
+
+    console.log(`Pending TX response:`)
+    console.dir(pendingTx)
+
+    console.log(`Pending tx nonce: ${pendingTx.nonce}, pending nonce: ${nonce}`)
+
+    const gasPriceBidNow = ethers.utils.parseUnits("40", "gwei").toBigInt()
+
+    const newTxRequest = {
+        from: wallet.address,
+        to: pendingTx.to,
+        value: pendingTx.value,
+        nonce: pendingTx.nonce,
+        gasLimit: pendingTx.gasLimit,
+        gasPrice: gasPriceBidNow,
+        data: pendingTx.data
+    }
+
+    try {
+        const txResponse: TransactionResponse = await wallet.sendTransaction(newTxRequest)
+        console.log(`TX hash: ${txResponse.hash}`)
+        console.dir(txResponse)
+
+        const txReceipt: TransactionReceipt = await txResponse.wait()
+        console.dir(txReceipt)
+    }
+    catch (e: unknown) {
+        // TODO: Log:
+        // * HTTP status code and message
+        // * Alchemy's status code (eg. -32000)
+        // * Alchemy's message
+        // * The retry-after header, although by the time Ethers.js throws an error, this may no
+        //   longer be interesting.
+        if (e instanceof Error) {
+            console.error(`Error message: ${e.message}`)
+        }
+        else {
+            console.error(`Error: ${e}`)
+        }
+
+        throw e
+    }
+}
+
 export function jsbiFormatted(n: JSBI): string {
     const native = BigInt(n.toString())
     return native.toLocaleString()

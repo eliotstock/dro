@@ -1,6 +1,6 @@
 import yargs from 'yargs/yargs'
 import { useConfig, ChainConfig } from './config'
-import { wallet } from './wallet'
+import { speedUpPendingTx, wallet } from './wallet'
 import { updateTick, createPoolOnTestnet } from './uniswap'
 import { DRO } from './dro'
 
@@ -15,6 +15,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
     balances: { type: 'boolean', default: false },
     approve: { type: 'boolean', default: false },
     privateKey: { type: 'boolean', default: false },
+    speedUp: { type: 'string', default: '' },
     testnetCreatePool: { type: 'boolean', default: false },
     wrapEth: { type: 'boolean', default: false },
   }).parseSync()
@@ -57,6 +58,15 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
     // Approve the swap routers to spend our tokens.
     await wallet.approveAll(CHAIN_CONFIG.addrSwapRouter)
     await wallet.approveAll(CHAIN_CONFIG.addrSwapRouter2)
+
+    return [noops, true]
+  }
+
+  // `--speedup` means speed up the given transaction by increasing the gas price on it.
+  if (argv.speedUp !== undefined) {
+    console.log(`Speeding up transaction ${argv.speedUp} only.`)
+
+    await speedUpPendingTx(argv.speedUp)
 
     return [noops, true]
   }
