@@ -751,14 +751,17 @@ be able to remove this liquidity.`)
 
       // TODO: On L1 consider specifying the maxFeePerGas instead of the gasPrice.
       // maxFeePerGas is often double the gasPrice:
-      //   maxFeePerGas: 36.301396484 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 17.987767833 gwei
-      // Bidding a high factor on maxFeePerGas is probably safer.
+      //   1. maxFeePerGas: 36.301396484 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 17.987767833 gwei
+      //   2. maxFeePerGas: 63.332724206 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 31.416362103 gwei
+      // Using maxFeePerGas is probably safer than using gasPrice.
 
       // Bid a little bit higher than the going rate.
       // 110%: > 60 mins for remove tx. Can easily priced out of the gas market on a big move (bad)
       // 130%: testing now:
-      //       Remove/swap/add roundtrip took 117s
-      //       TX costs: remove: 21.92, swap: 11.90, add: 49.96, total: 83.78 (good)
+      //       1. Remove/swap/add roundtrip took 117s
+      //          TX costs: remove: 21.92, swap: 11.90, add: 49.96, total: 83.78 (good)
+      //       2. Remove/swap/add roundtrip took 61s
+      //          TX costs: remove: 23.10, swap: 14.01, add: 58.83, total: 95.94 (good)
       return gasPrice * 13n / 10n
     }
 
