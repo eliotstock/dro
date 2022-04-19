@@ -37,7 +37,7 @@ async function onBlock(...args: Array<any>) {
   // JSON RPC API call: eth_call().
   await updateTick()
 
-  await updateGasPrice()
+  await updateGasPrice(false)
 
   // Log the timestamp, block number and gas price (if we're checking it) first. Only log anything
   // when the price changes.

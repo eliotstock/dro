@@ -9,6 +9,7 @@ import { abi as WETHABI } from './abi/weth.json'
 import { useConfig, ChainConfig, useProvider } from './config'
 import { price } from './uniswap'
 import JSBI from 'jsbi'
+import { formatUnits } from 'ethers/lib/utils';
 
 // Read our .env file
 config()
@@ -169,6 +170,11 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
 
         const nonce = await this.getTransactionCount("latest")
 
+        // Just bid the current gas price.
+        if (gasPrice === undefined) {
+            throw `No gas price yet`
+        }
+
         // No calldata required, just the value.
         const txRequest = {
             from: this.address,
@@ -176,7 +182,7 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
             value: ethers.utils.parseEther(amount),
             nonce: nonce,
             gasLimit: CHAIN_CONFIG.gasLimit,
-            gasPrice: CHAIN_CONFIG.gasPrice,
+            gasPrice: gasPrice,
         }
 
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
@@ -204,6 +210,11 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
         const calldata = wethInterface.encodeFunctionData('withdraw', [a])
         // console.log(`calldata: ${calldata}`)
 
+        // Just bid the current gas price.
+        if (gasPrice === undefined) {
+            throw `No gas price yet`
+        }
+
         // No value required, just the calldata.
         const txRequest = {
             from: this.address,
@@ -211,7 +222,7 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
             value: 0,
             nonce: nonce,
             gasLimit: CHAIN_CONFIG.gasLimit,
-            gasPrice: CHAIN_CONFIG.gasPrice,
+            gasPrice: gasPrice,
             data: calldata
         }
 
@@ -227,32 +238,48 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
 
 export const wallet = EthUsdcWallet.createFromConfig(CHAIN_CONFIG)
 
+const L2_FAKE_GAS_PRICE = ethers.utils.parseUnits("1", "gwei").toBigInt()
+
 // We use the legacy gas price as a reference, just like everybody else seems to be doing. The new
 // EIP-1559 maxFeePerGas seems to come in at about twice the value.
-export async function updateGasPrice() {
-    // These API calls are costly. Avoid them on L2 where we don't care so much about gas.
-    // On Alchemy under the free tier, this causes:
+export async function updateGasPrice(force: boolean) {
+    // The API call from getFeeData() is costly. Avoid them on L2 where we don't care so much about
+    // gas and just work on the basis that gas is always 2 gwei.
+
+    // On Alchemy under the free tier, calling getFeeData() here causes:
     //   HTTP 429
     //   Your app has exceeded its compute units per second capacity. If you have retries enabled,
     //   you can safely ignore this message. If not, check out
     //   https://docs.alchemyapi.io/guides/rate-limits
-    if (CHAIN_CONFIG.isL2) {
-        return
+    if (CHAIN_CONFIG.isL2 && !force && gasPrice === undefined) {
+        return L2_FAKE_GAS_PRICE
     }
 
-    // Legacy gas price.
-    const p = (await useProvider().getFeeData()).gasPrice
+    // interface FeeData {
+    //   maxFeePerGas: null | BigNumber
+    //   maxPriorityFeePerGas: null | BigNumber
+    //   gasPrice: null | BigNumber <-- Legacy gas price.
+    // }
+    const feeData = await useProvider().getFeeData()
+    const p = feeData.gasPrice
 
-    // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of them)
-    // const maxFeePerGas = (await CHAIN_CONFIG.provider().getFeeData()).maxFeePerGas
+    if (force) {
+        const maxFeePerGas: string = feeData.maxFeePerGas == null ? 'unknown'
+            : formatUnits(feeData.maxFeePerGas, 'gwei')
+        const maxPriorityFeePerGas: string = feeData.maxPriorityFeePerGas == null ? 'unknown'
+            : formatUnits(feeData.maxPriorityFeePerGas, 'gwei')
+        const gasPriceForLogs: string = feeData.gasPrice == null ? 'unknown'
+            : formatUnits(feeData.gasPrice, 'gwei')
+
+        // Let 'force' have the side-effect of increased logging so that we can learn about
+        // post-EIP-1559 gas prices.
+        // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of
+        // them)
+        console.log(`maxFeePerGas: ${maxFeePerGas} gwei, \
+maxPriorityFeePerGas: ${maxPriorityFeePerGas} gwei, gasPrice: ${gasPriceForLogs} gwei`)
+    }
 
     if (!p) return
-
-    // console.log(`Gas prices: legacy: ${gasPrice}, EIP-1559: ${maxFeePerGas}`)
-
-    // gasPriceInGwei = gasPrice.div(1e9).toNumber()
-
-    // console.log(`  Gas price in gwei: ${gasPriceInGwei}`)
 
     gasPrice = p.toBigInt()
 }
@@ -269,6 +296,54 @@ export function gasPriceFormatted(): string {
     const g = Number(gasPrice * 10n / 1_000_000_000n) / 10
     
     return `${g.toFixed(1)} gwei`
+}
+
+export async function speedUpPendingTx(txHash: string) {
+    const nonce = await wallet.getTransactionCount("pending")
+
+    const pendingTx: TransactionResponse = await useProvider().getTransaction(txHash)
+
+    console.log(`Pending TX response:`)
+    console.dir(pendingTx)
+
+    console.log(`Pending tx nonce: ${pendingTx.nonce}, pending nonce: ${nonce}`)
+
+    const gasPriceBidNow = ethers.utils.parseUnits("40", "gwei").toBigInt()
+
+    const newTxRequest = {
+        from: wallet.address,
+        to: pendingTx.to,
+        value: pendingTx.value,
+        nonce: pendingTx.nonce,
+        gasLimit: pendingTx.gasLimit,
+        gasPrice: gasPriceBidNow,
+        data: pendingTx.data
+    }
+
+    try {
+        const txResponse: TransactionResponse = await wallet.sendTransaction(newTxRequest)
+        console.log(`TX hash: ${txResponse.hash}`)
+        console.dir(txResponse)
+
+        const txReceipt: TransactionReceipt = await txResponse.wait()
+        console.dir(txReceipt)
+    }
+    catch (e: unknown) {
+        // TODO: Log:
+        // * HTTP status code and message
+        // * Alchemy's status code (eg. -32000)
+        // * Alchemy's message
+        // * The retry-after header, although by the time Ethers.js throws an error, this may no
+        //   longer be interesting.
+        if (e instanceof Error) {
+            console.error(`Error message: ${e.message}`)
+        }
+        else {
+            console.error(`Error: ${e}`)
+        }
+
+        throw e
+    }
 }
 
 export function jsbiFormatted(n: JSBI): string {

@@ -8,7 +8,7 @@ import {
 } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
 import { useConfig, ChainConfig, useProvider } from './config'
-import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted } from './wallet'
+import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted, updateGasPrice } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
 
 import {
@@ -51,6 +51,7 @@ import {
   Trade
 } from '@uniswap/v3-sdk'
 import { AlphaRouter } from '@uniswap/smart-order-router'
+import { formatUnits } from 'ethers/lib/utils'
 
 const OUT_DIR = './out'
 
@@ -152,6 +153,9 @@ export class DRO {
 
       this.rangeOrderPool = rangeOrderPool
       this.wethFirstInRangeOrderPool = wethFirstInRangeOrderPool
+
+      // Force a gas price update and logging, even on L2.
+      updateGasPrice(true)
     }
   
     outOfRange() {
@@ -317,8 +321,12 @@ export class DRO {
         const txReceipt: TransactionReceipt = await txResponse.wait()
         // console.dir(txReceipt)
 
+        const gasPriceReadable = txRequest.gasPrice === undefined ? 'unknown' :
+          formatUnits(txRequest.gasPrice, 'gwei')
+
         const stopwatchMillis = (Date.now() - stopwatchStart)
-        console.log(`${logLinePrefix} Transaction took ${Math.round(stopwatchMillis / 1_000)}s`)
+        console.log(`${logLinePrefix} Transaction took ${Math.round(stopwatchMillis / 1_000)}s \
+at gas price ${gasPriceReadable} gwei bid`)
 
         return txReceipt
       }
@@ -360,7 +368,7 @@ export class DRO {
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: CHAIN_CONFIG.gasPrice,
+        gasPrice: this.gasPriceBid(),
         data: calldata
       }
 
@@ -573,7 +581,7 @@ Unwrapping just enough WETH for the next re-range.`)
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: CHAIN_CONFIG.gasPrice,
+        gasPrice: this.gasPriceBid(),
         data: calldata
       }
 
@@ -673,7 +681,7 @@ spacing of ${this.rangeOrderPool.tickSpacing}. Can't create position.`
         value: VALUE_ZERO_ETHER,
         nonce: nonce,
         gasLimit: CHAIN_CONFIG.gasLimit,
-        gasPrice: CHAIN_CONFIG.gasPrice,
+        gasPrice: this.gasPriceBid(),
         data: calldata
       }
 
@@ -720,6 +728,41 @@ be able to remove this liquidity.`)
       // console.log(`TX cost: USD ${f.toFixed(2)}`)
 
       return f
+    }
+
+    gasPriceBid(): bigint {
+      if (gasPrice === undefined) {
+        console.error(`No gas price yet. Don't know what to bid. Defaulting to a safe high bid.`)
+
+        if (CHAIN_CONFIG.isL2) {
+          return ethers.utils.parseUnits("1", "gwei").toBigInt()
+        }
+        else {
+          return ethers.utils.parseUnits("80", "gwei").toBigInt()
+        }
+      }
+
+      if (CHAIN_CONFIG.isL2) {
+        // 95%: Remove/swap/add roundtrip took 14s. See if we can go slower.
+        // 85%: testing now
+        // 75%: 'gas price too low' error
+        return gasPrice * 85n / 100n
+      }
+
+      // TODO: On L1 consider specifying the maxFeePerGas instead of the gasPrice.
+      // maxFeePerGas is often double the gasPrice:
+      //   1. maxFeePerGas: 36.301396484 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 17.987767833 gwei
+      //   2. maxFeePerGas: 63.332724206 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 31.416362103 gwei
+      // Using maxFeePerGas is probably safer than using gasPrice.
+
+      // Bid a little bit higher than the going rate.
+      // 110%: > 60 mins for remove tx. Can easily priced out of the gas market on a big move (bad)
+      // 130%: testing now:
+      //       1. Remove/swap/add roundtrip took 117s
+      //          TX costs: remove: 21.92, swap: 11.90, add: 49.96, total: 83.78 (good)
+      //       2. Remove/swap/add roundtrip took 61s
+      //          TX costs: remove: 23.10, swap: 14.01, add: 58.83, total: 95.94 (good)
+      return gasPrice * 13n / 10n
     }
 
     async onPriceChanged() {
