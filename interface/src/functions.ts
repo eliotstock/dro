@@ -109,8 +109,14 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
         let blockOffset = 0
         let price = 0n
 
-        while (price == 0n && blockOffset < 10) {
+        // console.log(`Block ${blockNumber}`)
+
+        // If there was no swap event in this block, look forward a few blocks until we find one.
+        while (price == 0n && blockOffset < 5) {
+            // console.log(`  Offset ${blockOffset}`)
+
             const block = blockNumber + blockOffset
+            blockOffset++
 
             const filter = {
                 address: ADDR_POOL,
@@ -119,18 +125,27 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
             }
 
             const logs = await provider.getLogs(filter)
+            let logIndex = -1
 
             for (const log of logs) {
+                logIndex++
+                // console.log(`    Log ${logIndex}`)
+
                 try {
                     const parsedLog = INTERFACE_POOL.parseLog({topics: log.topics, data: log.data})
                     const tick = parsedLog.args['tick']
         
+                    // Try the next log
                     if (tick === undefined) continue
         
                     price = tickToNativePrice(tick)
                     poolPrices.set(log.blockNumber, price)
         
-                    console.log(`Tick: ${tick}, price: ${price} found at offset ${blockOffset}`)
+                    // console.log(`    Tick: ${tick}, price: ${price}`)
+                    console.log(`Block: ${blockNumber}, offset: ${blockOffset}, tick: ${tick}, price: ${price}`)
+
+                    // Move on to the next block number arg.
+                    if (price != 0n) break
                 }
                 catch (e) {
                     console.log(e)
