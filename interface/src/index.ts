@@ -7,7 +7,7 @@ import { EtherscanProvider } from '@ethersproject/providers'
 import { formatEther } from '@ethersproject/units'
 import { ADDR_POSITIONS_NFT_FOR_FILTER } from './constants'
 import {
-  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setAddRemoveTxReceipts, setGasPaid
+  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid
 } from './functions'
 
 // Read our .env file
@@ -153,9 +153,7 @@ async function main() {
   // Set the opening liquidity based on the token transfers from the logs.
   setOpeningLiquidity(positions)
 
-  setAddRemoveTxReceipts(positions, PROVIDER)
-
-  setGasPaid(positions)
+  setGasPaid(positions, PROVIDER)
 
 
 }

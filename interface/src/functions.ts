@@ -283,62 +283,40 @@ export function setOpeningLiquidity(positions: Map<number, Position>) {
     }
 }
 
-export async function setAddRemoveTxReceipts(positions: Map<number, Position>, provider: Provider) {
+export async function setGasPaid(positions: Map<number, Position>, provider: Provider) {
     for (let [tokenId, position] of positions) {
-        if (position.addTxLogs.length === 0) continue
+        if (position.addTxLogs.length > 0) {
+            const addTxHash = position.addTxLogs[0].transactionHash
 
-        const addTxHash = position.addTxLogs[0].transactionHash
+            position.addTxReceipt = await provider.getTransactionReceipt(addTxHash)
 
-        const addTxReceipt: TransactionReceipt = await provider.getTransactionReceipt(addTxHash)
+            // Corresponds to "Gas Used by Transaction" on Etherscan. Quoted in wei.
+            const addTxGasUsed = position.addTxReceipt.gasUsed.toBigInt()
 
-        position.addTxReceipt = addTxReceipt
+            // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei.
+            const addEffectiveGasPrice = position.addTxReceipt.effectiveGasPrice.toBigInt()
 
-        // console.log(`Position ${position.tokenId}: addTxHash: ${addTxHash}, addTxReceipt: ${addTxReceipt}`)
+            if (addTxGasUsed === undefined || addEffectiveGasPrice === undefined) continue
+
+            position.addTxGasPaid = addTxGasUsed * addEffectiveGasPrice
+        }
+
+        if (position.removeTxLogs.length > 0) {
+            const removeTxHash = position.removeTxLogs[0].transactionHash
+
+            position.removeTxReceipt = await provider.getTransactionReceipt(removeTxHash)
+
+            const removeTxGasUsed = position.removeTxReceipt.gasUsed.toBigInt()
+
+            const removeEffectiveGasPrice = position.removeTxReceipt.effectiveGasPrice.toBigInt()
+
+            if (removeTxGasUsed === undefined || removeEffectiveGasPrice === undefined) continue
+
+            position.removeTxGasPaid = removeTxGasUsed * removeEffectiveGasPrice
+        }
     }
 
-    for (let [tokenId, position] of positions) {
-        if (position.removeTxLogs.length === 0) continue
-
-        const removeTxHash = position.removeTxLogs[0].transactionHash
-
-        const removeTxReceipt: TransactionReceipt = await provider.getTransactionReceipt(removeTxHash)
-
-        position.removeTxReceipt = removeTxReceipt
-
-        // console.log(`Position ${position.tokenId}: removeTxHash: ${removeTxHash}, removeTxReceipt: ${removeTxReceipt}`)
-    }
-}
-
-export function setGasPaid(positions: Map<number, Position>) {
-    for (let [tokenId, position] of positions) {
-        // Note that neither of these are actually large integers.
-
-        console.log(`Position ${position.tokenId}: addTxReceipt: ${position.addTxReceipt}`)
-
-        // Corresponds to "Gas Used by Transaction" on Etherscan. Quoted in wei.
-        const addTxGasUsed = position.addTxReceipt?.gasUsed.toBigInt()
-
-        // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei.
-        const addEffectiveGasPrice = position.addTxReceipt?.effectiveGasPrice.toBigInt()
-
-        if (addTxGasUsed === undefined || addEffectiveGasPrice === undefined) continue
-
-        position.addTxGasPaid = addTxGasUsed * addEffectiveGasPrice
-    }
-
-    for (let [tokenId, position] of positions) {
-        console.log(`Position ${position.tokenId}: removeTxReceipt: ${position.removeTxReceipt}`)
-
-        const removeTxGasUsed = position.removeTxReceipt?.gasUsed.toBigInt()
-
-        const removeEffectiveGasPrice = position.removeTxReceipt?.effectiveGasPrice.toBigInt()
-
-        if (removeTxGasUsed === undefined || removeEffectiveGasPrice === undefined) continue
-
-        position.removeTxGasPaid = removeTxGasUsed * removeEffectiveGasPrice
-    }
-
-    for (let [tokenId, position] of positions) {
-        console.log(`Position ${position.tokenId} gas paid: add: ${position.addTxGasPaid}, remove: ${position.removeTxGasPaid}`)
-    }
+    // for (let [tokenId, position] of positions) {
+    //     console.log(`Position ${position.tokenId} gas paid: add: ${position.addTxGasPaid}, remove: ${position.removeTxGasPaid}`)
+    // }
 }
