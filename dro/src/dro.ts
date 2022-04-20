@@ -753,16 +753,22 @@ be able to remove this liquidity.`)
       // maxFeePerGas is often double the gasPrice:
       //   1. maxFeePerGas: 36.301396484 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 17.987767833 gwei
       //   2. maxFeePerGas: 63.332724206 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 31.416362103 gwei
+      //   3. maxFeePerGas: 82.020751718 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 40.760375859 gwei
+      //   4. maxFeePerGas: 325.271465568 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 162.483922785 gwei
       // Using maxFeePerGas is probably safer than using gasPrice.
 
       // Bid a little bit higher than the going rate.
       // 110%: > 60 mins for remove tx. Can easily priced out of the gas market on a big move (bad)
-      // 130%: testing now:
-      //       1. Remove/swap/add roundtrip took 117s
-      //          TX costs: remove: 21.92, swap: 11.90, add: 49.96, total: 83.78 (good)
+      // 130%: 1. Remove/swap/add roundtrip took 117s
+      //          21.92 + 11.90 + 49.96 = 83.78 (good)
       //       2. Remove/swap/add roundtrip took 61s
-      //          TX costs: remove: 23.10, swap: 14.01, add: 58.83, total: 95.94 (good)
-      return gasPrice * 13n / 10n
+      //          23.10 + 14.01 + 58.83 = 95.94 (good)
+      //       3. Remove/swap/add roundtrip took 73s
+      //          30.38 + 20.92 + 68.10 = 119.40 (ok)
+      //       4. Remove/swap/add roundtrip took 52s
+      //          121.00 + 92.00 + 341.61 = 554.61 (terrible)
+      // 125%: testing now
+      return gasPrice * 125n / 100n
     }
 
     async onPriceChanged() {
