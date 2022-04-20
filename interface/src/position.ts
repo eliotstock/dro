@@ -11,8 +11,10 @@ export enum Direction {
 
 export class Position {
     tokenId: number
-    removeTxLogs: Array<Log>
     addTxLogs: Array<Log>
+    removeTxLogs: Array<Log>
+    addTxReceipt?: TransactionReceipt
+    removeTxReceipt?: TransactionReceipt
     traded?: Direction
     openedTimestamp?: string
     closedTimestamp?: string
@@ -27,6 +29,8 @@ export class Position {
     closingLiquidityUsdc?: bigint
     priceAtOpening?: bigint // Quoted in USDC
     priceAtClosing?: bigint // Quoted in USDC
+    addTxGasPaid?: bigint
+    removeTxGasPaid?: bigint
 
     constructor(_tokenId: number) {
         this.tokenId = _tokenId
