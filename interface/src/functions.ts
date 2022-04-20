@@ -17,7 +17,8 @@ import {
     INTERFACE_WETH,
     INTERFACE_USDC,
     TOKEN_USDC,
-    TOKEN_WETH
+    TOKEN_WETH,
+    ADDR_POOL
 } from './constants'
 
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
@@ -100,27 +101,46 @@ export function createPositionsWithLogs(logss: Array<Array<Log>>): Map<number, P
     return positions
 }
 
-export async function getPrices(fromBlock: number, toBlock: number, provider: Provider) {
-    const filter = {
-        address: ADDR_POSITIONS_NFT_FOR_FILTER,
-        fromBlock: fromBlock,
-        toBlock: toBlock
-    }
-
-    console.log(`Logs between blocks ${fromBlock} and ${toBlock}...`)
-
-    const logs = await provider.getLogs(filter)
-
-    console.log(`... ${logs.length}`)
-
+export async function getPrices(blockNumbers: Array<number>, provider: Provider) {
     // Keys: block numbers, value: prices in USDC atoms.
     const poolPrices = new Map<number, bigint>()
 
-    for (const log of logs) {
-        const parsedLog = INTERFACE_POOL.parseLog({topics: log.topics, data: log.data})
-        const price = tickToNativePrice(parsedLog.args['tick'])
-        poolPrices.set(log.blockNumber, price)
+    for (const blockNumber of blockNumbers) {
+        let blockOffset = 0
+        let price = 0n
+
+        while (price == 0n && blockOffset < 10) {
+            const block = blockNumber + blockOffset
+
+            const filter = {
+                address: ADDR_POOL,
+                fromBlock: block,
+                toBlock: block
+            }
+
+            const logs = await provider.getLogs(filter)
+
+            for (const log of logs) {
+                try {
+                    const parsedLog = INTERFACE_POOL.parseLog({topics: log.topics, data: log.data})
+                    const tick = parsedLog.args['tick']
+        
+                    if (tick === undefined) continue
+        
+                    price = tickToNativePrice(tick)
+                    poolPrices.set(log.blockNumber, price)
+        
+                    console.log(`Tick: ${tick}, price: ${price} found at offset ${blockOffset}`)
+                }
+                catch (e) {
+                    console.log(e)
+                    continue
+                }
+            }
+        }
     }
+
+    console.log(`Got ${poolPrices.size} prices from ${blockNumbers.length} blocks`)
 
     return poolPrices
 }

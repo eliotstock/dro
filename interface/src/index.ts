@@ -76,7 +76,7 @@ async function main() {
 
   console.log(`Transactions from this address: ${allTxs.length}`)
 
-  // const blockNumbers = Array<number>()
+  const blockNumbers = Array<number>()
   const allLogs = Array<Array<Log>>()
 
   let totalGasPaidInEth = 0n
@@ -84,9 +84,9 @@ async function main() {
   let lastBlockNumber = 0
 
   for (const txResponse of allTxs) {
-    // if (txResponse.blockNumber === undefined) return
+    if (txResponse.blockNumber === undefined) return
 
-    // blockNumbers.push(txResponse.blockNumber)
+    blockNumbers.push(txResponse.blockNumber)
 
     // const logsForTx = await getLogsForTx(PROVIDER, txResponse)
 
@@ -122,8 +122,8 @@ async function main() {
   const totalGasPaidInEthReadable = formatEther(totalGasPaidInEth - (totalGasPaidInEth % 100000000000000n))
   console.log(`Total gas paid in ETH: ${totalGasPaidInEthReadable}`)
 
-  // Start getting prices now.
-  const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(firstBlockNumber, lastBlockNumber, PROVIDER)
+  // Start getting prices from the pool event logs now.
+  const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER)
 
   // if (blockNumbers.length > 0) process.exit(0)
 
