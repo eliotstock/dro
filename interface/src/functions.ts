@@ -1,5 +1,7 @@
 import yargs from 'yargs/yargs'
+import { ethers } from 'ethers'
 import { tickToPrice } from '@uniswap/v3-sdk'
+import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
 import { Log, Provider, TransactionReceipt } from '@ethersproject/abstract-provider'
 import { Position, Direction } from './position'
 import {
@@ -17,6 +19,8 @@ import {
     TOKEN_USDC,
     TOKEN_WETH
 } from './constants'
+
+const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
 export function getArgsOrDie(): [string, string] {
     const argv = yargs(process.argv.slice(2)).options({
@@ -94,6 +98,31 @@ export function createPositionsWithLogs(logss: Array<Array<Log>>): Map<number, P
     // }
   
     return positions
+}
+
+export async function getPrices(fromBlock: number, toBlock: number, provider: Provider) {
+    const filter = {
+        address: ADDR_POSITIONS_NFT_FOR_FILTER,
+        fromBlock: fromBlock,
+        toBlock: toBlock
+    }
+
+    console.log(`Logs between blocks ${fromBlock} and ${toBlock}...`)
+
+    const logs = await provider.getLogs(filter)
+
+    console.log(`... ${logs.length}`)
+
+    // Keys: block numbers, value: prices in USDC atoms.
+    const poolPrices = new Map<number, bigint>()
+
+    for (const log of logs) {
+        const parsedLog = INTERFACE_POOL.parseLog({topics: log.topics, data: log.data})
+        const price = tickToNativePrice(parsedLog.args['tick'])
+        poolPrices.set(log.blockNumber, price)
+    }
+
+    return poolPrices
 }
   
 export async function setDirection(positions: Map<number, Position>) {
@@ -255,7 +284,7 @@ export function setRangeWidth(positions: Map<number, Position>) {
                 }
                 catch (e) {
                     // Probably: 'Error: Invariant failed: TICK'
-                    // Skip outlier positions.
+                    // Skip outlier positions. Not going to occur on our own positions.
                     console.error(e)
                     positions.delete(tokenId)
                 }
@@ -296,9 +325,9 @@ export async function setGasPaid(positions: Map<number, Position>, provider: Pro
             // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei.
             const addEffectiveGasPrice = position.addTxReceipt.effectiveGasPrice.toBigInt()
 
-            if (addTxGasUsed === undefined || addEffectiveGasPrice === undefined) continue
-
-            position.addTxGasPaid = addTxGasUsed * addEffectiveGasPrice
+            if (addTxGasUsed !== undefined && addEffectiveGasPrice !== undefined) {
+                position.addTxGasPaid = addTxGasUsed * addEffectiveGasPrice
+            }
         }
 
         if (position.removeTxLogs.length > 0) {
@@ -310,13 +339,9 @@ export async function setGasPaid(positions: Map<number, Position>, provider: Pro
 
             const removeEffectiveGasPrice = position.removeTxReceipt.effectiveGasPrice.toBigInt()
 
-            if (removeTxGasUsed === undefined || removeEffectiveGasPrice === undefined) continue
-
-            position.removeTxGasPaid = removeTxGasUsed * removeEffectiveGasPrice
+            if (removeTxGasUsed !== undefined && removeEffectiveGasPrice !== undefined) {
+                position.removeTxGasPaid = removeTxGasUsed * removeEffectiveGasPrice
+            }
         }
     }
-
-    // for (let [tokenId, position] of positions) {
-    //     console.log(`Position ${position.tokenId} gas paid: add: ${position.addTxGasPaid}, remove: ${position.removeTxGasPaid}`)
-    // }
 }

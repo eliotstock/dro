@@ -7,7 +7,7 @@ import { EtherscanProvider } from '@ethersproject/providers'
 import { formatEther } from '@ethersproject/units'
 import { ADDR_POSITIONS_NFT_FOR_FILTER } from './constants'
 import {
-  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid
+  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices
 } from './functions'
 
 // Read our .env file
@@ -80,6 +80,8 @@ async function main() {
   const allLogs = Array<Array<Log>>()
 
   let totalGasPaidInEth = 0n
+  let firstBlockNumber = 0
+  let lastBlockNumber = 0
 
   for (const txResponse of allTxs) {
     // if (txResponse.blockNumber === undefined) return
@@ -110,10 +112,18 @@ async function main() {
     // console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
 
     totalGasPaidInEth += gasPaidInEth
+
+    if (txResponse.blockNumber) {
+        if (firstBlockNumber == 0) firstBlockNumber = txResponse.blockNumber
+        lastBlockNumber = txResponse.blockNumber
+    }
   }
 
   const totalGasPaidInEthReadable = formatEther(totalGasPaidInEth - (totalGasPaidInEth % 100000000000000n))
   console.log(`Total gas paid in ETH: ${totalGasPaidInEthReadable}`)
+
+  // Start getting prices now.
+  const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(firstBlockNumber, lastBlockNumber, PROVIDER)
 
   // if (blockNumbers.length > 0) process.exit(0)
 
@@ -155,7 +165,8 @@ async function main() {
 
   setGasPaid(positions, PROVIDER)
 
-
+  // Block till we've got our prices.
+  const poolPrices = await poolPricesPromise
 }
 
 main().catch((e) => {
