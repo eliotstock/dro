@@ -59,7 +59,8 @@ const ETHEREUM_MAINNET: ChainConfig = {
     // gasPrice: ethers.utils.parseUnits("100", "gwei").toBigInt(),
 
     // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
-    gasLimit: ethers.utils.hexlify(450_000), // Sensible: 450_000
+    // Mark's DRO had a bunch of failed 'add' txs out of gas at 450_000.
+    gasLimit: ethers.utils.hexlify(550_000),
 
     // Above what gas price, in gwei, are we unwilling to re-range?
     // At 100, we could be waiting a day or two
