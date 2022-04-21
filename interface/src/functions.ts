@@ -2,7 +2,7 @@ import yargs from 'yargs/yargs'
 import { ethers } from 'ethers'
 import { tickToPrice } from '@uniswap/v3-sdk'
 import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
-import { Log, Provider, TransactionReceipt } from '@ethersproject/abstract-provider'
+import { Log, Provider, TransactionResponse } from '@ethersproject/abstract-provider'
 import { Position, Direction } from './position'
 import {
     ADDR_POSITIONS_NFT_FOR_FILTER,
@@ -18,7 +18,8 @@ import {
     INTERFACE_USDC,
     TOKEN_USDC,
     TOKEN_WETH,
-    ADDR_POOL
+    ADDR_POOL,
+    ADDR_ROUTER
 } from './constants'
 
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
@@ -49,49 +50,49 @@ export function createPositionsWithLogs(logss: Array<Array<Log>>): Map<number, P
     const positions = new Map<number, Position>()
   
     for (const logs of logss) {
-      if (logs.length === 0) continue
-  
-      for (const log of logs) {
-        // console.log(`  data: ${log.data}`)
-        // console.log(`  topics:`)
-  
-        // for (const topic of log.topics) {
-        //   console.log(`    ${topic}`)
-        // }
-  
-        if (log.address != ADDR_POSITIONS_NFT_FOR_FILTER) {
-  
-          if (log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
-            // These are the logs for the 'remove' transaction.
-            // Parse hex string to decimal.
-            const tokenId = Number(log.topics[1])
-            let position = positions.get(tokenId)
-  
-            if (position === undefined) {
-              position = new Position(tokenId)
+        if (logs.length === 0) continue
+    
+        for (const log of logs) {
+            // console.log(`  data: ${log.data}`)
+            // console.log(`  topics:`)
+    
+            // for (const topic of log.topics) {
+            //   console.log(`    ${topic}`)
+            // }
+    
+            if (log.address != ADDR_POSITIONS_NFT_FOR_FILTER) {
+    
+                if (log.topics[0] == TOPIC_DECREASE_LIQUIDITY) {
+                    // These are the logs for the 'remove' transaction.
+                    // Parse hex string to decimal.
+                    const tokenId = Number(log.topics[1])
+                    let position = positions.get(tokenId)
+        
+                    if (position === undefined) {
+                        position = new Position(tokenId)
+                    }
+        
+                    // position.removeTxLogs.push(...logs)
+                    position.removeTxLogs = logs
+                    positions.set(tokenId, position)
+                }
+        
+                if (log.topics[0] == TOPIC_INCREASE_LIQUIDITY) {
+                    // These are the logs for the 'add' transaction.
+                    // Parse hex string to decimal.
+                    const tokenId = Number(log.topics[1])
+                    let position = positions.get(tokenId)
+        
+                    if (position === undefined) {
+                        position = new Position(tokenId)
+                    }
+        
+                    // position.addTxLogs.push(...logs)
+                    position.addTxLogs = logs
+                    positions.set(tokenId, position)
+                }
             }
-  
-            // position.removeTxLogs.push(...logs)
-            position.removeTxLogs = logs
-            positions.set(tokenId, position)
-          }
-  
-          if (log.topics[0] == TOPIC_INCREASE_LIQUIDITY) {
-            // These are the logs for the 'add' transaction.
-            // Parse hex string to decimal.
-            const tokenId = Number(log.topics[1])
-            let position = positions.get(tokenId)
-  
-            if (position === undefined) {
-              position = new Position(tokenId)
-            }
-  
-            // position.addTxLogs.push(...logs)
-            position.addTxLogs = logs
-            positions.set(tokenId, position)
-          }
         }
-      }
     }
 
     // for (const p of positions.values()) {
@@ -112,7 +113,7 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
         // console.log(`Block ${blockNumber}`)
 
         // If there was no swap event in this block, look forward a few blocks until we find one.
-        while (price == 0n && blockOffset < 5) {
+        while (price == 0n && blockOffset < 10) {
             // console.log(`  Offset ${blockOffset}`)
 
             const block = blockNumber + blockOffset
@@ -142,7 +143,7 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
                     poolPrices.set(log.blockNumber, price)
         
                     // console.log(`    Tick: ${tick}, price: ${price}`)
-                    console.log(`Block: ${blockNumber}, offset: ${blockOffset}, tick: ${tick}, price: ${price}`)
+                    console.log(`Block: ${blockNumber}, offset: ${blockOffset - 1}, tick: ${tick}, price: ${price}`)
 
                     // Move on to the next block number arg.
                     if (price != 0n) break
@@ -160,7 +161,7 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
     return poolPrices
 }
   
-export async function setDirection(positions: Map<number, Position>) {
+export function setDirection(positions: Map<number, Position>) {
     for (const p of positions.values()) {
       // Skip the current position, which is still open and has no remove TX logs.
       if (p.removeTxLogs === undefined) continue
@@ -347,13 +348,115 @@ export function setOpeningLiquidity(positions: Map<number, Position>) {
     }
 }
 
-export async function setGasPaid(positions: Map<number, Position>, provider: Provider) {
+export function setOpeningClosingPrices(positions: Map<number, Position>,
+    prices: Map<number, bigint>) {
+    for (let [tokenId, position] of positions) {
+        const openedBlockNumber = position.addTxReceipt?.blockNumber
+
+        if (openedBlockNumber === undefined) {
+            console.error(`No opened block number`)
+        }
+        else {
+            position.priceAtOpening = prices.get(openedBlockNumber)
+
+            if (position.priceAtOpening === undefined) {
+                console.error(`No price at opening block number ${openedBlockNumber}`)
+            }
+        }
+
+        const closedBlockNumber = position.removeTxReceipt?.blockNumber
+
+        if (closedBlockNumber === undefined) {
+            console.log(`No closed block number. Position still open?`)
+        }
+        else {
+            position.priceAtClosing = prices.get(closedBlockNumber)
+
+            if (position.priceAtClosing === undefined) {
+                console.error(`No price at closing block number ${closedBlockNumber}`)
+            }
+        }
+    }
+}
+
+export async function setAddRemoveTxReceipts(positions: Map<number, Position>, provider: Provider) {
     for (let [tokenId, position] of positions) {
         if (position.addTxLogs.length > 0) {
             const addTxHash = position.addTxLogs[0].transactionHash
 
             position.addTxReceipt = await provider.getTransactionReceipt(addTxHash)
+        }
 
+        if (position.removeTxLogs.length > 0) {
+            const removeTxHash = position.removeTxLogs[0].transactionHash
+
+            position.removeTxReceipt = await provider.getTransactionReceipt(removeTxHash)
+        }
+    }
+}
+
+export async function setSwapTx(positions: Map<number, Position>,
+    allTxs: Array<TransactionResponse>, provider: Provider) {
+
+    for (let [tokenId, position] of positions) {
+        if (position.addTxReceipt === undefined) {
+            console.log(`Skipping position ${tokenId} with no add tx receipt`)
+            continue
+        }
+
+        const addTxHash = position.addTxReceipt?.transactionHash
+
+        // console.log(`Add tx hash: ${addTxHash}`)
+
+        allTxsLoop:
+        for (const [index, txResponse] of allTxs.entries()) {
+            // console.log(`${index} add tx hash: ${addTxHash} c.f. txResponse.hash: ${txResponse.hash}`)
+
+            // The swap tx is not always the one that immediately preceeded the 'add' tx, because
+            // we often unwrap after the swap. We also have some failed transactions.
+            if (addTxHash == txResponse.hash) {
+                let offsetBefore = 1
+
+                while (offsetBefore < 5) {
+                    if (index - offsetBefore < 0) {
+                        console.log(`No swap tx before first add tx`)
+                        break   
+                    }
+
+                    const priorTx = allTxs[index - offsetBefore]
+
+                    // console.log(`Tx ${offsetBefore} txs before add tx was to: ${priorTx.to}`)
+
+                    // Swap transactions go to the Uniswap router.
+                    if (priorTx.to == ADDR_ROUTER) {
+                        // Not strictly necessary since a failed TX will always be followed with a
+                        // successfult one.
+                        if (priorTx.confirmations == 0) {
+                            console.log(`No confirmations for tx ${priorTx.hash}. Failed tx?`)
+                            continue
+                        }
+
+                        position.swapTxReceipt = await provider.getTransactionReceipt(priorTx.hash)
+                        position.swapTxLogs = position.swapTxReceipt.logs
+        
+                        // console.log(`  Position ${tokenId}'s swap TX: https://etherscan.io/tx/${priorTx.hash}`)
+                        break allTxsLoop
+                    }
+
+                    offsetBefore++
+                }
+            }
+        }
+    }
+}
+
+export async function setGasPaid(positions: Map<number, Position>, provider: Provider) {
+    for (let [tokenId, position] of positions) {
+        // Gas paid for 'add' tx
+        if (position.addTxReceipt === undefined) {
+            console.log(`Skipping position ${tokenId} with no add tx receipt`)
+        }
+        else {
             // Corresponds to "Gas Used by Transaction" on Etherscan. Quoted in wei.
             const addTxGasUsed = position.addTxReceipt.gasUsed.toBigInt()
 
@@ -365,11 +468,11 @@ export async function setGasPaid(positions: Map<number, Position>, provider: Pro
             }
         }
 
-        if (position.removeTxLogs.length > 0) {
-            const removeTxHash = position.removeTxLogs[0].transactionHash
-
-            position.removeTxReceipt = await provider.getTransactionReceipt(removeTxHash)
-
+        // Gas paid for 'remove' tx
+        if (position.removeTxReceipt === undefined) {
+            console.log(`Skipping position ${tokenId} with no remove tx receipt`)
+        }
+        else {
             const removeTxGasUsed = position.removeTxReceipt.gasUsed.toBigInt()
 
             const removeEffectiveGasPrice = position.removeTxReceipt.effectiveGasPrice.toBigInt()
@@ -378,5 +481,21 @@ export async function setGasPaid(positions: Map<number, Position>, provider: Pro
                 position.removeTxGasPaid = removeTxGasUsed * removeEffectiveGasPrice
             }
         }
+
+        // Gas paid for 'swap' tx
+        if (position.swapTxReceipt === undefined) {
+            console.log(`Skipping position ${tokenId} with no swap tx receipt`)
+        }
+        else {
+            const swapTxGasUsed = position.swapTxReceipt.gasUsed.toBigInt()
+
+            const swapEffectiveGasPrice = position.swapTxReceipt.effectiveGasPrice.toBigInt()
+
+            if (swapTxGasUsed !== undefined && swapEffectiveGasPrice !== undefined) {
+                position.swapTxGasPaid = swapTxGasUsed * swapEffectiveGasPrice
+            }
+        }
+
+        console.log(`Position ${tokenId} total gas paid: ${position.totalGasPaidInEth()} wei`)
     }
 }

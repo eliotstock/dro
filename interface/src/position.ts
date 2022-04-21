@@ -13,11 +13,13 @@ export class Position {
     tokenId: number
     addTxLogs: Array<Log>
     removeTxLogs: Array<Log>
+    swapTxReceipt?: TransactionReceipt
+    swapTxLogs: Array<Log>
     addTxReceipt?: TransactionReceipt
     removeTxReceipt?: TransactionReceipt
     traded?: Direction
-    openedTimestamp?: string
-    closedTimestamp?: string
+    // openedTimestamp?: string
+    // closedTimestamp?: string
     rangeWidthInBps?: number
     feesWeth: bigint = 0n
     feesUsdc: bigint = 0n
@@ -31,11 +33,13 @@ export class Position {
     priceAtClosing?: bigint // Quoted in USDC
     addTxGasPaid?: bigint
     removeTxGasPaid?: bigint
+    swapTxGasPaid?: bigint
 
     constructor(_tokenId: number) {
         this.tokenId = _tokenId
         this.removeTxLogs = new Array<Log>()
         this.addTxLogs = new Array<Log>()
+        this.swapTxLogs = new Array<Log>()
     }
 
     feesWethCalculated(): bigint {
@@ -106,6 +110,16 @@ export class Position {
         return BigInt(this.openingLiquidityUsdc) + usdcValueOfWethLiquidity
     }
 
+    totalGasPaidInEth(): bigint | undefined {
+        if (this.addTxGasPaid === undefined || this.removeTxGasPaid === undefined
+            || this.swapTxGasPaid === undefined) return undefined
+
+        // As of 2022-04-21:
+        // Max: 0.075_621_200 ETH (232 USD)
+        // Min: 0.028_806_315 ETH (86 USD)
+        return this.addTxGasPaid + this.removeTxGasPaid + this.swapTxGasPaid
+    }
+
     // Total fees claimed as a proportion of opening liquidity, in percent.
     // This completely ignores execution cost and time in range.
     grossYieldInPercent(): number {
@@ -119,15 +133,24 @@ export class Position {
         return Number(this.feesTotalInUsdc() * 10_000n / this.openingLiquidityTotalInUsdc()) / 100
     }
 
-    timeOpenInDays(): number {
-        if (this.openedTimestamp == undefined || this.closedTimestamp == undefined) {
-            throw `Missing opened/closed timestamps: ${this.tokenId}`
-        }
+    // TODO: Waiting on: https://github.com/ethers-io/ethers.js/discussions/2561
+    // openedTimestamp(): string | undefined {
+    //     if (this.addTxLogs == undefined || this.addTxLogs.length == 0) {
+    //         return undefined
+    //     }
 
-        const opened = moment(this.openedTimestamp)
-        const closed = moment(this.closedTimestamp)
-        const timeInRange = moment.duration(closed.diff(opened), 'milliseconds')
+    //     return this.addTxLogs[0].
+    // }
 
-        return timeInRange.asDays()
-    }
+    // timeOpenInDays(): number {
+    //     if (this.openedTimestamp == undefined || this.closedTimestamp == undefined) {
+    //         throw `Missing opened/closed timestamps: ${this.tokenId}`
+    //     }
+
+    //     const opened = moment(this.openedTimestamp)
+    //     const closed = moment(this.closedTimestamp)
+    //     const timeInRange = moment.duration(closed.diff(opened), 'milliseconds')
+
+    //     return timeInRange.asDays()
+    // }
 }

@@ -14,6 +14,10 @@ export const ADDR_POSITIONS_NFT_FOR_FILTER = '0xc36442b4a4522e871399cd717abdd847
 // Logs from provider have the case mostly, but not all, in caps (checksum case?)
 export const ADDR_POSITIONS_NFT_FOR_LOGS = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88'
 
+// Uniswap router.
+// TransactionResponse from provider has these in checksum case.
+export const ADDR_ROUTER = '0xE592427A0AEce92De3Edee1F18E0157C05861564'
+
 // WETH (checksum case)
 export const ADDR_TOKEN_WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 

@@ -2,12 +2,12 @@ import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
-import { Log, TransactionReceipt } from '@ethersproject/abstract-provider'
+import { Log, TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider'
 import { EtherscanProvider } from '@ethersproject/providers'
 import { formatEther } from '@ethersproject/units'
 import { ADDR_POSITIONS_NFT_FOR_FILTER } from './constants'
 import {
-  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices
+  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts
 } from './functions'
 
 // Read our .env file
@@ -24,7 +24,7 @@ config()
 // 1. [DONE] From Etherscan provider, get all transactions for this address (swaps, adds, removes, unwraps)
 // 2. [DONE] For each tx, get block number
 // 3. [DONE] From Etherscan provider, for each block number, get all tx logs from the positions NFT address for these blocks only
-// 4. Get price history for only the period from first tx to last tx timestamp. Or only blocks in which we transacted, ideally.
+// 4. [DONE] Get price history for only the period from first tx to last tx timestamp. Or only blocks in which we transacted, ideally.
 // 5. Use analytics-positions code to build Position instances from logs:
 //   a. [WON'T DO] Map of logs keyed by tx hashes (do we need this?)
 //   b. [DONE] Map of Positions, each with arrays of logs on them
@@ -34,10 +34,10 @@ config()
 //   e. [DONE] Set fees based on logs
 //   f. [DONE] Set range width based on logs
 //   g. [DONE] Set opening liquidity based on logs
-//   h. Set opening and closing prices from tx timestamps and price history
+//   h. [DONE] Set opening and closing prices from tx timestamps and price history
 //   i. [DONE] Set gas cost in ETH based on all txs
-//   j. Find the swap transaction receipt that preceeded each add tx and add it to the position.
-//   k. Find the swap tx logs and add them to the position.
+//   j. [DONE] Find the swap transaction receipt that preceeded each add tx and add it to the position.
+//   k. [DONE] Find the swap tx logs and add them to the position.
 // 6. [DONE] Get all token IDs for this account from Uniswap position manager contract
 // 7. Calc APY% from that set of Position instances
 
@@ -72,7 +72,7 @@ async function main() {
   // }
 
   // This is all our transactions, not just add and remove transactions but swaps and unwrapping WETH to ETH.
-  const allTxs = await PROVIDER.getHistory(address)
+  const allTxs: Array<TransactionResponse> = await PROVIDER.getHistory(address)
 
   console.log(`Transactions from this address: ${allTxs.length}`)
 
@@ -80,8 +80,6 @@ async function main() {
   const allLogs = Array<Array<Log>>()
 
   let totalGasPaidInEth = 0n
-  let firstBlockNumber = 0
-  let lastBlockNumber = 0
 
   for (const txResponse of allTxs) {
     if (txResponse.blockNumber === undefined) return
@@ -112,11 +110,6 @@ async function main() {
     // console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
 
     totalGasPaidInEth += gasPaidInEth
-
-    if (txResponse.blockNumber) {
-        if (firstBlockNumber == 0) firstBlockNumber = txResponse.blockNumber
-        lastBlockNumber = txResponse.blockNumber
-    }
   }
 
   const totalGasPaidInEthReadable = formatEther(totalGasPaidInEth - (totalGasPaidInEth % 100000000000000n))
@@ -163,10 +156,17 @@ async function main() {
   // Set the opening liquidity based on the token transfers from the logs.
   setOpeningLiquidity(positions)
 
-  setGasPaid(positions, PROVIDER)
+  await setAddRemoveTxReceipts(positions, PROVIDER)
+
+  await setSwapTx(positions, allTxs, PROVIDER)
+
+  await setGasPaid(positions, PROVIDER)
 
   // Block till we've got our prices.
-  const poolPrices = await poolPricesPromise
+  const poolPrices: Map<number, bigint> = await poolPricesPromise
+
+  // Find prices at the blocks when we opened and closed each position.
+  setOpeningClosingPrices(positions, poolPrices)
 }
 
 main().catch((e) => {
