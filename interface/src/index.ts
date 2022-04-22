@@ -3,11 +3,11 @@ import { ethers } from 'ethers'
 import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
 import { Log, TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider'
-import { EtherscanProvider } from '@ethersproject/providers'
+import { AlchemyProvider, EtherscanProvider } from '@ethersproject/providers'
 import { formatEther } from '@ethersproject/units'
 import { ADDR_POSITIONS_NFT_FOR_FILTER } from './constants'
 import {
-  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts
+  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts, getWethBalanceAtBlockHash, getWethBalanceAtBlockNumber, setTimestamps
 } from './functions'
 
 // Read our .env file
@@ -42,6 +42,8 @@ config()
 // 7. Calc APY% from that set of Position instances
 
 async function main() {
+  const stopwatchStart = Date.now()
+
   const [address, etherscanApiKey] = getArgsOrDie()
 
   const PROVIDER = new EtherscanProvider(undefined, etherscanApiKey)
@@ -77,6 +79,7 @@ async function main() {
   console.log(`Transactions from this address: ${allTxs.length}`)
 
   const blockNumbers = Array<number>()
+  const blockHashes = Array<string>()
   const allLogs = Array<Array<Log>>()
 
   let totalGasPaidInEth = 0n
@@ -85,6 +88,7 @@ async function main() {
     if (txResponse.blockNumber === undefined) return
 
     blockNumbers.push(txResponse.blockNumber)
+    if (txResponse.blockHash != undefined) blockHashes.push(txResponse.blockHash)
 
     // const logsForTx = await getLogsForTx(PROVIDER, txResponse)
 
@@ -114,6 +118,14 @@ async function main() {
 
   const totalGasPaidInEthReadable = formatEther(totalGasPaidInEth - (totalGasPaidInEth % 100000000000000n))
   console.log(`Total gas paid in ETH: ${totalGasPaidInEthReadable}`)
+
+  // TODO: Remove when tested:
+  // Waiting on Alchemy support Discord
+  // Etherscan Pro API:
+  //   https://docs.etherscan.io/api-pro/api-pro#get-historical-erc20-token-account-balance-for-tokencontractaddress-by-blockno
+  // const PROVIDER_ALCHEMY = new AlchemyProvider(undefined, 'NJhHpafwsqTku1zBNDC0N61Q1mTvYjVU')
+  // const wethBalanceAtFirstBlock = await getWethBalanceAtBlockNumber(address, blockNumbers[0], PROVIDER_ALCHEMY)
+  // console.log(`WETH balance at block ${blockHashes[0]}: ${wethBalanceAtFirstBlock}}`)
 
   // Start getting prices from the pool event logs now.
   const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER)
@@ -166,7 +178,36 @@ async function main() {
   const poolPrices: Map<number, bigint> = await poolPricesPromise
 
   // Find prices at the blocks when we opened and closed each position.
+  // TODO: Why are we missing prices for five blocks, and are these blocks we really need prices
+  // for (add and remove blocks)?
   setOpeningClosingPrices(positions, poolPrices)
+
+  // Find the timestamps for opening and closing the position.
+  await setTimestamps(positions, PROVIDER)
+
+  let totalNetYieldInEth = 0n
+
+  console.log(`Token ID: feesTotalInEth - totalGasPaidInEth = netYieldInEth over timeOpenInDays`)
+
+  for (let [tokenId, position] of positions) {
+    try {
+      console.log(`${tokenId}: ${position.feesTotalInEth()} - ${position.totalGasPaidInEth()} = \
+${position.netYieldInEth()} ETH over ${position.timeOpenInDays()} days`)
+
+      totalNetYieldInEth += position.netYieldInEth()
+    }
+    catch (e) {
+      console.log(`${tokenId}: ${e}`)
+    }
+  }
+
+  // 1_218_833_422_061_322_521
+  const formatted = ethers.utils.formatEther(totalNetYieldInEth)
+
+  console.log(`Total net yeild: ${formatted} ETH`)
+
+  const stopwatchMillis = (Date.now() - stopwatchStart)
+  console.log(`Done in ${Math.round(stopwatchMillis / 1_000 / 60)} mins`)
 }
 
 main().catch((e) => {

@@ -21,6 +21,7 @@ import {
     ADDR_POOL,
     ADDR_ROUTER
 } from './constants'
+import { abi as WethABI } from './abi/weth.json'
 
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
@@ -498,4 +499,40 @@ export async function setGasPaid(positions: Map<number, Position>, provider: Pro
 
         console.log(`Position ${tokenId} total gas paid: ${position.totalGasPaidInEth()} wei`)
     }
+}
+
+export async function setTimestamps(positions: Map<number, Position>, provider: Provider) {
+    for (let [tokenId, position] of positions) {
+        if (position.addTxReceipt === undefined) {
+            console.log(`Can't get opening timestamp for position ${tokenId}. No add tx receipt.`)
+        }
+        else {
+            const openedBlock = await provider.getBlock(position.addTxReceipt.blockNumber)
+            position.openedTimestamp = openedBlock.timestamp
+        }
+
+        if (position.removeTxReceipt === undefined) {
+            console.log(`Can't get closing timestamp for position ${tokenId}. No remove tx receipt.`)
+        }
+        else {
+            const closedBlock = await provider.getBlock(position.removeTxReceipt.blockNumber)
+            position.closedTimestamp = closedBlock.timestamp
+        }
+    }
+}
+
+export async function getWethBalanceAtBlockNumber(address: string, blocknumber: number,
+    provider: Provider): Promise<bigint> {
+    const contract =  new ethers.Contract(address, WethABI, provider)
+    const wethBalance = await contract.balanceOf(address, {blocknumber})
+
+    return wethBalance
+}
+
+export async function getWethBalanceAtBlockHash(address: string, blockHash: string,
+    provider: Provider): Promise<bigint> {
+    const contract =  new ethers.Contract(address, WethABI, provider)
+    const wethBalance = await contract.balanceOf(address, {blockHash})
+
+    return wethBalance
 }

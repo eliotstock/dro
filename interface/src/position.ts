@@ -11,29 +11,39 @@ export enum Direction {
 
 export class Position {
     tokenId: number
+
+    swapTxLogs: Array<Log>
     addTxLogs: Array<Log>
     removeTxLogs: Array<Log>
+    
     swapTxReceipt?: TransactionReceipt
-    swapTxLogs: Array<Log>
     addTxReceipt?: TransactionReceipt
     removeTxReceipt?: TransactionReceipt
+
     traded?: Direction
-    // openedTimestamp?: string
-    // closedTimestamp?: string
+
+    openedTimestamp?: number
+    closedTimestamp?: number
+
     rangeWidthInBps?: number
+
     feesWeth: bigint = 0n
     feesUsdc: bigint = 0n
+
     withdrawnWeth: bigint = 0n
     withdrawnUsdc: bigint = 0n
+
     openingLiquidityWeth: bigint = 0n
     openingLiquidityUsdc: bigint = 0n
     closingLiquidityWeth?: bigint
     closingLiquidityUsdc?: bigint
+
     priceAtOpening?: bigint // Quoted in USDC
     priceAtClosing?: bigint // Quoted in USDC
+
+    swapTxGasPaid?: bigint
     addTxGasPaid?: bigint
     removeTxGasPaid?: bigint
-    swapTxGasPaid?: bigint
 
     constructor(_tokenId: number) {
         this.tokenId = _tokenId
@@ -84,15 +94,28 @@ export class Position {
         else if (this.traded == Direction.Up) {
             const usdcValueOfWethFees = BigInt(this.feesWeth) * BigInt(this.priceAtClosing) / N_10_TO_THE_18
 
-            // if (this.tokenId == 139631 || this.tokenId == 139633) {
-            //     console.log(`${this.tokenId} feesWeth: ${this.feesWeth}`)
-
-            //     // usdcValueOfWethFees: 35_632_575, feesUsdcCalculated: 33_825_603, feesTotalInUsdc: 69_458_178
-            //     // usdcValueOfWethFees: 84_958_130, feesUsdcCalculated: 74_994_683, feesTotalInUsdc: 159_952_813
-            //     console.log(`${this.tokenId} usdcValueOfWethFees: ${usdcValueOfWethFees}, feesUsdcCalculated: ${this.feesUsdcCalculated()}, feesTotalInUsdc: ${BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees}`)
-            // }
-
             return BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees
+        }
+        else if (this.traded == Direction.Sideways) {
+            // We don't currently support any calculations on positions that we closed when still in range.
+            return BigInt(0)
+        }
+
+        throw `No direction: ${this.tokenId}`
+    }
+
+    feesTotalInEth(): bigint {
+        if (this.priceAtClosing == undefined) throw `No price at closing: ${this.tokenId}`
+
+        if (this.traded == Direction.Down) {
+            const wethValueOfUsdcFees = BigInt(this.feesUsdc) / BigInt(this.priceAtClosing) * N_10_TO_THE_18
+
+            return BigInt(this.feesUsdcCalculated()) + wethValueOfUsdcFees
+        }
+        else if (this.traded == Direction.Up) {
+            const wethValueOfUsdcFees = BigInt(this.feesUsdcCalculated()) / BigInt(this.priceAtClosing) * N_10_TO_THE_18
+
+            return BigInt(this.feesUsdc) + wethValueOfUsdcFees
         }
         else if (this.traded == Direction.Sideways) {
             // We don't currently support any calculations on positions that we closed when still in range.
@@ -120,37 +143,33 @@ export class Position {
         return this.addTxGasPaid + this.removeTxGasPaid + this.swapTxGasPaid
     }
 
+    netYieldInEth(): bigint {
+        const gasPaid = this.totalGasPaidInEth()
+
+        if (gasPaid == undefined) {
+            return 0n
+        }
+
+        return this.feesTotalInEth() + gasPaid
+    }
+
     // Total fees claimed as a proportion of opening liquidity, in percent.
     // This completely ignores execution cost and time in range.
     grossYieldInPercent(): number {
-        // if (this.tokenId == 139631 || this.tokenId == 139633) {
-        //     // Fees total USDC: 69.46, opening liquidity USDC: 2,540.94
-        //     // Fees total USDC: 159.95, opening liquidity USDC: 4,320.65
-        //     console.log(`Fees total USDC: ${this.feesTotalInUsdc()}, opening liquidity USDC: ${this.openingLiquidityTotalInUsdc()}`)
-        // }
-
         // The old 'decimal value from dividing two bigints' trick.
         return Number(this.feesTotalInUsdc() * 10_000n / this.openingLiquidityTotalInUsdc()) / 100
     }
 
-    // TODO: Waiting on: https://github.com/ethers-io/ethers.js/discussions/2561
-    // openedTimestamp(): string | undefined {
-    //     if (this.addTxLogs == undefined || this.addTxLogs.length == 0) {
-    //         return undefined
-    //     }
+    timeOpenInDays(): number {
+        if (this.openedTimestamp == undefined || this.closedTimestamp == undefined) {
+            throw `Missing opened/closed timestamps: ${this.tokenId}`
+        }
 
-    //     return this.addTxLogs[0].
-    // }
+        // Seconds since the Unix epoch.
+        const opened = moment.unix(this.openedTimestamp)
+        const closed = moment.unix(this.closedTimestamp)
+        const timeInRange = moment.duration(closed.diff(opened), 'seconds')
 
-    // timeOpenInDays(): number {
-    //     if (this.openedTimestamp == undefined || this.closedTimestamp == undefined) {
-    //         throw `Missing opened/closed timestamps: ${this.tokenId}`
-    //     }
-
-    //     const opened = moment(this.openedTimestamp)
-    //     const closed = moment(this.closedTimestamp)
-    //     const timeInRange = moment.duration(closed.diff(opened), 'milliseconds')
-
-    //     return timeInRange.asDays()
-    // }
+        return timeInRange.asDays()
+    }
 }
