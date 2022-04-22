@@ -21,6 +21,7 @@ import {
     ADDR_POOL,
     ADDR_ROUTER
 } from './constants'
+import { formatUnits } from '@ethersproject/units'
 
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
@@ -526,13 +527,29 @@ export async function setTimestamps(positions: Map<number, Position>, provider: 
 }
 
 export async function getBalanceInEthAtBlockNumber(address: string, blockTag: number,
-    contractWeth: Contract, contractUsdc: Contract, provider: Provider): Promise<bigint> {
-    const wethBalance = await contractWeth.balanceOf(address, {blockTag})
-    const usdcBalance = await contractUsdc.balanceOf(address, {blockTag})
-    const ethBalance = await provider.getBalance(address, blockTag)
+    contractWeth: Contract, contractUsdc: Contract, poolPrices: Map<number, bigint>,
+    provider: Provider): Promise<bigint> {
+    const [ethBalance, wethBalance, usdcBalance] = await Promise.all([
+        provider.getBalance(address, blockTag),
+        contractWeth.balanceOf(address, {blockTag}),
+        contractUsdc.balanceOf(address, {blockTag})
+    ])
 
-    // TODO: pass in prices and find the ETH value of the USDC balance.
-    console.log(`At block ${blockTag}, account had ${wethBalance} WETH, ${usdcBalance} USDC, and ${ethBalance} ETH`)
+    let usdcPrice = poolPrices.get(blockTag)
 
-    return ethBalance.toBigInt()
+    if (usdcPrice === undefined) {
+        console.error(`No price at block ${blockTag}`)
+        return 0n
+    }
+
+    // console.log(`Pool price at this block: ${usdcPrice}`)
+
+    const ethValueOfUsdcBalance = usdcBalance / usdcPrice
+
+    const ethValue = ethBalance + wethBalance + ethValueOfUsdcBalance
+
+    console.log(`At block ${blockTag}: ${formatUnits(ethBalance)} ETH + \
+${formatUnits(wethBalance)} WETH + ${formatUnits(usdcBalance, '12')} USDC = ${formatUnits(ethValue)} ETH`)
+
+    return ethValue
 }

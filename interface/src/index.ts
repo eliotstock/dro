@@ -54,11 +54,8 @@ async function main() {
   const PROVIDER_ALCHEMY = new AlchemyProvider(undefined, alchemyApiKey)
   const PROVIDER_ETHERSCAN = new EtherscanProvider(undefined, etherscanApiKey)
 
-  // First block in which this account had a WETH balance.
-  // const blockNumber = 14414258
-
-  const contractWeth =  new ethers.Contract(ADDR_TOKEN_WETH, WethABI, PROVIDER_ALCHEMY)
-  const contractUsdc =  new ethers.Contract(ADDR_TOKEN_USDC, Erc20ABI, PROVIDER_ALCHEMY)
+  const contractWeth = new ethers.Contract(ADDR_TOKEN_WETH, WethABI, PROVIDER_ALCHEMY)
+  const contractUsdc = new ethers.Contract(ADDR_TOKEN_USDC, Erc20ABI, PROVIDER_ALCHEMY)
 
   const contractPositionManager = new ethers.Contract(
     ADDR_POSITIONS_NFT_FOR_FILTER,
@@ -91,80 +88,29 @@ async function main() {
   const blockHashes = Array<string>()
   const allLogs = Array<Array<Log>>()
 
-  let totalGasPaidInEth = 0n
-
   for (const txResponse of allTxs) {
     if (txResponse.blockNumber === undefined) return
 
     blockNumbers.push(txResponse.blockNumber)
     if (txResponse.blockHash != undefined) blockHashes.push(txResponse.blockHash)
 
-    // const logsForTx = await getLogsForTx(PROVIDER, txResponse)
-
-    // console.log(`Got ${logsForTx?.length} logs for TX ${txResponse.hash}`)
-
     const txReceipt: TransactionReceipt = await PROVIDER_ETHERSCAN.getTransactionReceipt(txResponse.hash)
 
     console.log(`Got ${txReceipt.logs.length} logs for TX ${txReceipt.transactionHash}`)
 
     allLogs.push(txReceipt.logs)
-
-    // Note that neither of these are actually large integers.
-
-    // Corresponds to "Gas Used by Transaction" on Etherscan. Quoted in wei.
-    const gasUsed = txReceipt.gasUsed.toBigInt()
-
-    // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei.
-    const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
-
-    const gasPaidInEth = gasUsed * effectiveGasPrice
-    const gasPaidInEthReadable = formatEther(gasPaidInEth - (gasPaidInEth % 100000000000000n))
-
-    // console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
-
-    totalGasPaidInEth += gasPaidInEth
-
-    const ethBalanceAtBlock = await getBalanceInEthAtBlockNumber(address, txResponse.blockNumber,
-      contractWeth, contractUsdc, PROVIDER_ALCHEMY)
   }
-
-  const totalGasPaidInEthReadable = formatEther(totalGasPaidInEth - (totalGasPaidInEth % 100000000000000n))
-  console.log(`Total gas paid in ETH: ${totalGasPaidInEthReadable}`)
 
   // Start getting prices from the pool event logs now.
   const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER_ETHERSCAN)
 
-  // if (blockNumbers.length > 0) process.exit(0)
-
-  // console.log(`Blocks: ${blockNumbers.length}`)
-
-  // if (blockNumbers.length != allTxs.length) {
-  //   throw `This account transacted in ${blockNumbers.length} blocks but has ${allTxs.length} transactions. Fatal.`
-  // }
-
   const positions = createPositionsWithLogs(allLogs)
-
-  // if (ownTokenIds.length != positions.size) {
-  //   throw `This account has ${ownTokenIds.length} positions but we could only find logs for ${positions.size}. Fatal.`
-  // }
 
   // Set direction on each position
   setDirection(positions)
 
   // Set fees earned on each position
   setFees(positions)
-
-  let totalFeesWeth: bigint = 0n
-  let totalFeesUsdc: bigint = 0n
-
-  for (const p of positions.values()) {
-    console.log(`  Position(${p.tokenId}): fees WETH: ${p.feesWeth}, fees USDC: ${p.feesUsdc}`)
-
-    totalFeesWeth = BigInt(totalFeesWeth) + BigInt(p.feesWeth)
-    totalFeesUsdc = BigInt(totalFeesUsdc) + BigInt(p.feesUsdc)
-  }
-
-  console.log(`Total fees: USDC: ${totalFeesUsdc.toLocaleString()}, WETH: ${totalFeesWeth.toLocaleString()}`)
   
   // Set the range width based on the tick upper and lower from the logs.
   setRangeWidth(positions)
@@ -181,34 +127,39 @@ async function main() {
   // Block till we've got our prices.
   const poolPrices: Map<number, bigint> = await poolPricesPromise
 
-  // Find prices at the blocks when we opened and closed each position.
-  // TODO: Why are we missing prices for five blocks, and are these blocks we really need prices
-  // for (add and remove blocks)?
-  setOpeningClosingPrices(positions, poolPrices)
-
-  // Find the timestamps for opening and closing the position.
-  await setTimestamps(positions, PROVIDER_ETHERSCAN)
-
-  let totalNetYieldInEth = 0n
-
-  console.log(`Token ID: feesTotalInEth - totalGasPaidInEth = netYieldInEth over timeOpenInDays`)
-
-  for (let [tokenId, position] of positions) {
-    try {
-      console.log(`${tokenId}: ${position.feesTotalInEth()} - ${position.totalGasPaidInEth()} = \
-${position.netYieldInEth()} ETH over ${position.timeOpenInDays()} days`)
-
-      totalNetYieldInEth += position.netYieldInEth()
-    }
-    catch (e) {
-      console.log(`${tokenId}: ${e}`)
-    }
+  for (const blockNumber of blockNumbers) {
+    const balanceInEth = await getBalanceInEthAtBlockNumber(address, blockNumber,
+      contractWeth, contractUsdc, poolPrices, PROVIDER_ALCHEMY)
   }
 
-  // 1.2 ETH
-  const formatted = ethers.utils.formatEther(totalNetYieldInEth)
+//   // Find prices at the blocks when we opened and closed each position.
+//   // TODO: Why are we missing prices for five blocks, and are these blocks we really need prices
+//   // for (add and remove blocks)?
+//   setOpeningClosingPrices(positions, poolPrices)
 
-  console.log(`Total net yeild: ${formatted} ETH`)
+//   // Find the timestamps for opening and closing the position.
+//   await setTimestamps(positions, PROVIDER_ETHERSCAN)
+
+//   let totalNetYieldInEth = 0n
+
+//   console.log(`Token ID: feesTotalInEth - totalGasPaidInEth = netYieldInEth over timeOpenInDays`)
+
+//   for (let [tokenId, position] of positions) {
+//     try {
+//       console.log(`${tokenId}: ${position.feesTotalInEth()} - ${position.totalGasPaidInEth()} = \
+// ${position.netYieldInEth()} ETH over ${position.timeOpenInDays()} days`)
+
+//       totalNetYieldInEth += position.netYieldInEth()
+//     }
+//     catch (e) {
+//       console.log(`${tokenId}: ${e}`)
+//     }
+//   }
+
+//   // 1.2 ETH
+//   const formatted = ethers.utils.formatEther(totalNetYieldInEth)
+
+//   console.log(`Total net yeild: ${formatted} ETH`)
 
   const stopwatchMillis = (Date.now() - stopwatchStart)
   console.log(`Done in ${Math.round(stopwatchMillis / 1_000 / 60)} mins`)
