@@ -1,5 +1,5 @@
 import yargs from 'yargs/yargs'
-import { ethers } from 'ethers'
+import { Contract, ethers } from 'ethers'
 import { tickToPrice } from '@uniswap/v3-sdk'
 import { abi as IUniswapV3PoolABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
 import { Log, Provider, TransactionResponse } from '@ethersproject/abstract-provider'
@@ -21,11 +21,10 @@ import {
     ADDR_POOL,
     ADDR_ROUTER
 } from './constants'
-import { abi as WethABI } from './abi/weth.json'
 
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
-export function getArgsOrDie(): [string, string] {
+export function getArgsOrDie(): [string, string, string] {
     const argv = yargs(process.argv.slice(2)).options({
         address: { type: 'string' },
       }).parseSync()
@@ -44,7 +43,12 @@ export function getArgsOrDie(): [string, string] {
         process.exit(1)
     }
 
-    return [address, process.env.ETHERSCAN_API_KEY]
+    if (process.env.ALCHEMY_API_KEY === undefined) {
+        console.log('Missing ALCHEMY_API_KEY from .env file, or .env file itself')
+        process.exit(1)
+    }
+
+    return [address, process.env.ETHERSCAN_API_KEY, process.env.ALCHEMY_API_KEY]
 }
 
 export function createPositionsWithLogs(logss: Array<Array<Log>>): Map<number, Position> {
@@ -521,18 +525,14 @@ export async function setTimestamps(positions: Map<number, Position>, provider: 
     }
 }
 
-export async function getWethBalanceAtBlockNumber(address: string, blocknumber: number,
-    provider: Provider): Promise<bigint> {
-    const contract =  new ethers.Contract(address, WethABI, provider)
-    const wethBalance = await contract.balanceOf(address, {blocknumber})
+export async function getBalanceInEthAtBlockNumber(address: string, blockTag: number,
+    contractWeth: Contract, contractUsdc: Contract, provider: Provider): Promise<bigint> {
+    const wethBalance = await contractWeth.balanceOf(address, {blockTag})
+    const usdcBalance = await contractUsdc.balanceOf(address, {blockTag})
+    const ethBalance = await provider.getBalance(address, blockTag)
 
-    return wethBalance
-}
+    // TODO: pass in prices and find the ETH value of the USDC balance.
+    console.log(`At block ${blockTag}, account had ${wethBalance} WETH, ${usdcBalance} USDC, and ${ethBalance} ETH`)
 
-export async function getWethBalanceAtBlockHash(address: string, blockHash: string,
-    provider: Provider): Promise<bigint> {
-    const contract =  new ethers.Contract(address, WethABI, provider)
-    const wethBalance = await contract.balanceOf(address, {blockHash})
-
-    return wethBalance
+    return ethBalance.toBigInt()
 }

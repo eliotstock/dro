@@ -5,9 +5,11 @@ import { abi as NonfungiblePositionManagerABI }
 import { Log, TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider'
 import { AlchemyProvider, EtherscanProvider } from '@ethersproject/providers'
 import { formatEther } from '@ethersproject/units'
-import { ADDR_POSITIONS_NFT_FOR_FILTER } from './constants'
+import { ADDR_POSITIONS_NFT_FOR_FILTER, ADDR_TOKEN_USDC, ADDR_TOKEN_WETH } from './constants'
+import { abi as WethABI } from './abi/weth.json'
+import { abi as Erc20ABI } from './abi/erc20.json'
 import {
-  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts, getWethBalanceAtBlockHash, getWethBalanceAtBlockNumber, setTimestamps
+  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts, setTimestamps, getBalanceInEthAtBlockNumber
 } from './functions'
 
 // Read our .env file
@@ -44,21 +46,28 @@ config()
 async function main() {
   const stopwatchStart = Date.now()
 
-  const [address, etherscanApiKey] = getArgsOrDie()
+  const [address, etherscanApiKey, alchemyApiKey] = getArgsOrDie()
 
-  const PROVIDER = new EtherscanProvider(undefined, etherscanApiKey)
+  // Use Alchemy to get historical ETH and ERC-20 balances.
+  // Use Etherscan for everything else.
+  // Both require an API key. Neither require a paid tier account.
+  const PROVIDER_ALCHEMY = new AlchemyProvider(undefined, alchemyApiKey)
+  const PROVIDER_ETHERSCAN = new EtherscanProvider(undefined, etherscanApiKey)
 
-  // TODO: Now that this has been committed (oops) I need to delete the API key.
-  // const PROVIDER_ALCHEMY = new AlchemyProvider(undefined, 'NJhHpafwsqTku1zBNDC0N61Q1mTvYjVU')
+  // First block in which this account had a WETH balance.
+  // const blockNumber = 14414258
 
-  const positionManagerContract = new ethers.Contract(
+  const contractWeth =  new ethers.Contract(ADDR_TOKEN_WETH, WethABI, PROVIDER_ALCHEMY)
+  const contractUsdc =  new ethers.Contract(ADDR_TOKEN_USDC, Erc20ABI, PROVIDER_ALCHEMY)
+
+  const contractPositionManager = new ethers.Contract(
     ADDR_POSITIONS_NFT_FOR_FILTER,
     NonfungiblePositionManagerABI,
-    PROVIDER
+    PROVIDER_ETHERSCAN
   )
 
   // This count includes all the closed positions.
-  const positionCount = await positionManagerContract.balanceOf(address)
+  const positionCount = await contractPositionManager.balanceOf(address)
 
   console.log(`Positions (closed and open): ${positionCount}.`)
 
@@ -74,7 +83,7 @@ async function main() {
   // }
 
   // This is all our transactions, not just add and remove transactions but swaps and unwrapping WETH to ETH.
-  const allTxs: Array<TransactionResponse> = await PROVIDER.getHistory(address)
+  const allTxs: Array<TransactionResponse> = await PROVIDER_ETHERSCAN.getHistory(address)
 
   console.log(`Transactions from this address: ${allTxs.length}`)
 
@@ -94,7 +103,7 @@ async function main() {
 
     // console.log(`Got ${logsForTx?.length} logs for TX ${txResponse.hash}`)
 
-    const txReceipt: TransactionReceipt = await PROVIDER.getTransactionReceipt(txResponse.hash)
+    const txReceipt: TransactionReceipt = await PROVIDER_ETHERSCAN.getTransactionReceipt(txResponse.hash)
 
     console.log(`Got ${txReceipt.logs.length} logs for TX ${txReceipt.transactionHash}`)
 
@@ -114,21 +123,16 @@ async function main() {
     // console.log(`${txResponse.hash} gas paid: ${gasPaidInEthReadable} ETH`)
 
     totalGasPaidInEth += gasPaidInEth
+
+    const ethBalanceAtBlock = await getBalanceInEthAtBlockNumber(address, txResponse.blockNumber,
+      contractWeth, contractUsdc, PROVIDER_ALCHEMY)
   }
 
   const totalGasPaidInEthReadable = formatEther(totalGasPaidInEth - (totalGasPaidInEth % 100000000000000n))
   console.log(`Total gas paid in ETH: ${totalGasPaidInEthReadable}`)
 
-  // TODO: Remove when tested:
-  // Waiting on Alchemy support Discord
-  // Etherscan Pro API:
-  //   https://docs.etherscan.io/api-pro/api-pro#get-historical-erc20-token-account-balance-for-tokencontractaddress-by-blockno
-  // const PROVIDER_ALCHEMY = new AlchemyProvider(undefined, 'NJhHpafwsqTku1zBNDC0N61Q1mTvYjVU')
-  // const wethBalanceAtFirstBlock = await getWethBalanceAtBlockNumber(address, blockNumbers[0], PROVIDER_ALCHEMY)
-  // console.log(`WETH balance at block ${blockHashes[0]}: ${wethBalanceAtFirstBlock}}`)
-
   // Start getting prices from the pool event logs now.
-  const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER)
+  const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER_ETHERSCAN)
 
   // if (blockNumbers.length > 0) process.exit(0)
 
@@ -168,11 +172,11 @@ async function main() {
   // Set the opening liquidity based on the token transfers from the logs.
   setOpeningLiquidity(positions)
 
-  await setAddRemoveTxReceipts(positions, PROVIDER)
+  await setAddRemoveTxReceipts(positions, PROVIDER_ETHERSCAN)
 
-  await setSwapTx(positions, allTxs, PROVIDER)
+  await setSwapTx(positions, allTxs, PROVIDER_ETHERSCAN)
 
-  await setGasPaid(positions, PROVIDER)
+  await setGasPaid(positions, PROVIDER_ETHERSCAN)
 
   // Block till we've got our prices.
   const poolPrices: Map<number, bigint> = await poolPricesPromise
@@ -183,7 +187,7 @@ async function main() {
   setOpeningClosingPrices(positions, poolPrices)
 
   // Find the timestamps for opening and closing the position.
-  await setTimestamps(positions, PROVIDER)
+  await setTimestamps(positions, PROVIDER_ETHERSCAN)
 
   let totalNetYieldInEth = 0n
 
@@ -201,7 +205,7 @@ ${position.netYieldInEth()} ETH over ${position.timeOpenInDays()} days`)
     }
   }
 
-  // 1_218_833_422_061_322_521
+  // 1.2 ETH
   const formatted = ethers.utils.formatEther(totalNetYieldInEth)
 
   console.log(`Total net yeild: ${formatted} ETH`)
