@@ -536,13 +536,14 @@ export async function setTimestamps(positions: Map<number, Position>, provider: 
 export async function getBalanceInEthAtBlockNumber(address: string, blockTag: number,
     contractWeth: Contract, contractUsdc: Contract, poolPrices: Map<number, bigint>,
     provider: Provider): Promise<bigint> {
+    // Passing the blockTag here requires an archive node. Alchemy provides this.
     const [ethBalance, wethBalance, usdcBalance] = await Promise.all([
         provider.getBalance(address, blockTag),
         contractWeth.balanceOf(address, {blockTag}),
         contractUsdc.balanceOf(address, {blockTag})
     ])
 
-    const ethBalanceTyped = ethBalance.toBigInt()
+    const ethBalanceNative = ethBalance.toBigInt()
 
     let usdcPrice = poolPrices.get(blockTag)
 
@@ -551,13 +552,13 @@ export async function getBalanceInEthAtBlockNumber(address: string, blockTag: nu
         return 0n
     }
 
-    // console.log(`Pool price at this block: ${usdcPrice}`)
+    const ethValueOfUsdcBalance: bigint = BigInt(usdcBalance) * N_10_TO_THE_18 / BigInt(usdcPrice)
 
-    const ethValueOfUsdcBalance: bigint = BigInt(usdcBalance) / BigInt(usdcPrice) * N_10_TO_THE_18
+    // console.log(`usdcBalance: ${usdcBalance.toString()}, usdcPrice: ${usdcPrice.toString()}, \
+    // ethValueOfUsdcBalance: ${ethValueOfUsdcBalance.toString()}`)
 
-    console.log(`usdcBalance: ${usdcBalance.toString()}, usdcPrice: ${usdcPrice.toString()}, ethValueOfUsdcBalance: ${ethValueOfUsdcBalance.toString()}`)
-
-    const ethValue: bigint = BigInt(ethBalanceTyped) + BigInt(wethBalance) + BigInt(ethValueOfUsdcBalance)
+    const ethValue: bigint = BigInt(ethBalanceNative) + BigInt(wethBalance)
+        + BigInt(ethValueOfUsdcBalance)
 
     console.log(`At block ${blockTag}: ${formatUnits(ethBalance)} ETH + \
 ${formatUnits(wethBalance)} WETH + ${formatUnits(usdcBalance, '6')} USDC = ${formatUnits(ethValue)} ETH`)

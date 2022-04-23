@@ -108,12 +108,12 @@ export class Position {
         if (this.priceAtClosing == undefined) throw `No price at closing: ${this.tokenId}`
 
         if (this.traded == Direction.Down) {
-            const wethValueOfUsdcFees = BigInt(this.feesUsdc) / BigInt(this.priceAtClosing) * N_10_TO_THE_18
+            const wethValueOfUsdcFees = BigInt(this.feesUsdc) * N_10_TO_THE_18 / BigInt(this.priceAtClosing)
 
             return BigInt(this.feesUsdcCalculated()) + wethValueOfUsdcFees
         }
         else if (this.traded == Direction.Up) {
-            const wethValueOfUsdcFees = BigInt(this.feesUsdcCalculated()) / BigInt(this.priceAtClosing) * N_10_TO_THE_18
+            const wethValueOfUsdcFees = BigInt(this.feesUsdcCalculated()) * N_10_TO_THE_18 / BigInt(this.priceAtClosing)
 
             return BigInt(this.feesUsdc) + wethValueOfUsdcFees
         }
@@ -171,5 +171,11 @@ export class Position {
         const timeInRange = moment.duration(closed.diff(opened), 'seconds')
 
         return timeInRange.asDays()
+    }
+
+    closingBlockNumber(): number {
+        if (this.removeTxReceipt === undefined) return 0
+
+        return this.removeTxReceipt.blockNumber
     }
 }

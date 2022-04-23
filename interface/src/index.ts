@@ -4,13 +4,14 @@ import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
 import { Log, TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider'
 import { AlchemyProvider, EtherscanProvider } from '@ethersproject/providers'
-import { formatEther } from '@ethersproject/units'
 import { ADDR_POSITIONS_NFT_FOR_FILTER, ADDR_TOKEN_USDC, ADDR_TOKEN_WETH } from './constants'
 import { abi as WethABI } from './abi/weth.json'
 import { abi as Erc20ABI } from './abi/erc20.json'
 import {
   createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts, setTimestamps, getBalanceInEthAtBlockNumber
 } from './functions'
+import moment from 'moment'
+import { formatEther } from '@ethersproject/units'
 
 // Read our .env file
 config()
@@ -45,6 +46,20 @@ config()
 
 async function main() {
   const stopwatchStart = Date.now()
+
+  // const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
+
+  // // 217 USDC
+  // const usdcBalance = 217_947_375n
+
+  // // USDC 3,000 to 1 ETH
+  // const usdcPrice = 3_000_000_000n
+
+  // // 0.072_649_125_000_000_000
+  // const ethValueOfUsdcBalance: bigint = BigInt(usdcBalance) * N_10_TO_THE_18 / BigInt(usdcPrice)
+
+  // // usdcBalance: 3000000000, usdcPrice: 3000000000, ethValueOfUsdcBalance: 1_000_000_000_000_000_000
+  // console.log(`usdcBalance: ${usdcBalance.toString()}, usdcPrice: ${usdcPrice.toString()}, ethValueOfUsdcBalance: ${ethValueOfUsdcBalance.toString()}`)
 
   const [address, etherscanApiKey, alchemyApiKey] = getArgsOrDie()
 
@@ -129,16 +144,23 @@ async function main() {
   // Block till we've got our prices.
   const poolPrices: Map<number, bigint> = await poolPricesPromise
 
-  for (const blockNumber of blockNumbers) {
-    const balanceInEth = await getBalanceInEthAtBlockNumber(address, blockNumber,
+  // Find prices at the blocks when we opened and closed each position.
+  setOpeningClosingPrices(positions, poolPrices)
+
+  // Find the timestamps for opening and closing the position.
+  await setTimestamps(positions, PROVIDER_ETHERSCAN)
+
+  for (let [tokenId, position] of positions) {
+    if (position.closedTimestamp === undefined) continue
+
+    const closingTimestamp = moment.unix(position.closedTimestamp).toISOString()
+    const closingBlockNumber = position.closingBlockNumber()
+
+    const balanceInEth = await getBalanceInEthAtBlockNumber(address, closingBlockNumber,
       contractWeth, contractUsdc, poolPrices, PROVIDER_ALCHEMY)
+
+    console.log(`${closingTimestamp}: ${formatEther(balanceInEth)}`)
   }
-
-//   // Find prices at the blocks when we opened and closed each position.
-//   setOpeningClosingPrices(positions, poolPrices)
-
-//   // Find the timestamps for opening and closing the position.
-//   await setTimestamps(positions, PROVIDER_ETHERSCAN)
 
 //   let totalNetYieldInEth = 0n
 
