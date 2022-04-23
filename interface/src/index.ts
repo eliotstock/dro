@@ -102,6 +102,8 @@ async function main() {
   }
 
   // Start getting prices from the pool event logs now.
+  // TODO: Why are we missing prices for five blocks, and are these blocks we really need prices
+  // for (add and remove blocks)?
   const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER_ETHERSCAN)
 
   const positions = createPositionsWithLogs(allLogs)
@@ -133,8 +135,6 @@ async function main() {
   }
 
 //   // Find prices at the blocks when we opened and closed each position.
-//   // TODO: Why are we missing prices for five blocks, and are these blocks we really need prices
-//   // for (add and remove blocks)?
 //   setOpeningClosingPrices(positions, poolPrices)
 
 //   // Find the timestamps for opening and closing the position.

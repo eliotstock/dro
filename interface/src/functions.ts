@@ -25,6 +25,8 @@ import { formatUnits } from '@ethersproject/units'
 
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
+const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
+
 export function getArgsOrDie(): [string, string, string] {
     const argv = yargs(process.argv.slice(2)).options({
         address: { type: 'string' },
@@ -112,6 +114,7 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
     // Keys: block numbers, value: prices in USDC atoms.
     const poolPrices = new Map<number, bigint>()
 
+    blockNumberLoop:
     for (const blockNumber of blockNumbers) {
         let blockOffset = 0
         let price = 0n
@@ -125,6 +128,8 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
             const block = blockNumber + blockOffset
             blockOffset++
 
+            if (blockOffset > 5) console.log(`No swaps within ${blockOffset - 1} blocks of block ${blockNumber}`)
+
             const filter = {
                 address: ADDR_POOL,
                 fromBlock: block,
@@ -132,15 +137,17 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
             }
 
             const logs = await provider.getLogs(filter)
-            let logIndex = -1
+            // let logIndex = -1
 
             for (const log of logs) {
-                logIndex++
+                // logIndex++
                 // console.log(`    Log ${logIndex}`)
 
                 try {
                     const parsedLog = INTERFACE_POOL.parseLog({topics: log.topics, data: log.data})
                     const tick = parsedLog.args['tick']
+
+                    console.log(`Block: ${blockNumber}, offset: ${blockOffset - 1}, logs count: ${logs.length}, tick: ${tick}`)
         
                     // Try the next log
                     if (tick === undefined) continue
@@ -149,10 +156,10 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
                     poolPrices.set(log.blockNumber, price)
         
                     // console.log(`    Tick: ${tick}, price: ${price}`)
-                    console.log(`Block: ${blockNumber}, offset: ${blockOffset - 1}, tick: ${tick}, price: ${price}`)
+                    console.log(`  price: ${price}`)
 
                     // Move on to the next block number arg.
-                    if (price != 0n) break
+                    if (price != 0n) continue blockNumberLoop
                 }
                 catch (e) {
                     console.log(e)
@@ -535,6 +542,8 @@ export async function getBalanceInEthAtBlockNumber(address: string, blockTag: nu
         contractUsdc.balanceOf(address, {blockTag})
     ])
 
+    const ethBalanceTyped = ethBalance.toBigInt()
+
     let usdcPrice = poolPrices.get(blockTag)
 
     if (usdcPrice === undefined) {
@@ -544,12 +553,14 @@ export async function getBalanceInEthAtBlockNumber(address: string, blockTag: nu
 
     // console.log(`Pool price at this block: ${usdcPrice}`)
 
-    const ethValueOfUsdcBalance = usdcBalance / usdcPrice
+    const ethValueOfUsdcBalance: bigint = BigInt(usdcBalance) / BigInt(usdcPrice) * N_10_TO_THE_18
 
-    const ethValue = ethBalance + wethBalance + ethValueOfUsdcBalance
+    console.log(`usdcBalance: ${usdcBalance.toString()}, usdcPrice: ${usdcPrice.toString()}, ethValueOfUsdcBalance: ${ethValueOfUsdcBalance.toString()}`)
+
+    const ethValue: bigint = BigInt(ethBalanceTyped) + BigInt(wethBalance) + BigInt(ethValueOfUsdcBalance)
 
     console.log(`At block ${blockTag}: ${formatUnits(ethBalance)} ETH + \
-${formatUnits(wethBalance)} WETH + ${formatUnits(usdcBalance, '12')} USDC = ${formatUnits(ethValue)} ETH`)
+${formatUnits(wethBalance)} WETH + ${formatUnits(usdcBalance, '6')} USDC = ${formatUnits(ethValue)} ETH`)
 
     return ethValue
 }
