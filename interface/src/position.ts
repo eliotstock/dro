@@ -168,9 +168,10 @@ export class Position {
         // Seconds since the Unix epoch.
         const opened = moment.unix(this.openedTimestamp)
         const closed = moment.unix(this.closedTimestamp)
-        const timeInRange = moment.duration(closed.diff(opened, 'seconds', true))
+        const diffInSeconds: number = closed.diff(opened, 'seconds', true)
+        const timeInRange = moment.duration(diffInSeconds, 'seconds')
 
-        // console.log(`Opened: ${opened.toString()}, closed: ${closed.toString()}, time in rage: ${closed.diff(opened, 'hours', true)} hours`)
+        // console.log(`Opened: ${opened.toString()}, closed: ${closed.toString()}, diffInSeconds: ${diffInSeconds} seconds`)
 
         return timeInRange
     }
