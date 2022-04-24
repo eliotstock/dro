@@ -150,6 +150,8 @@ async function main() {
   // Find the timestamps for opening and closing the position.
   await setTimestamps(positions, PROVIDER_ETHERSCAN)
 
+  console.log(`Closing timestamp, direction, time open in days, balance after remove`)
+
   for (let [tokenId, position] of positions) {
     if (position.closedTimestamp === undefined) continue
 
@@ -159,7 +161,9 @@ async function main() {
     const balanceInEth = await getBalanceInEthAtBlockNumber(address, closingBlockNumber,
       contractWeth, contractUsdc, poolPrices, PROVIDER_ALCHEMY)
 
-    console.log(`${closingTimestamp}: ${formatEther(balanceInEth)}`)
+    const readableTimeOpen = position.timeOpen().humanize()
+
+    console.log(`${closingTimestamp}, ${position.traded}, ${readableTimeOpen}, ${formatEther(balanceInEth)} ETH`)
   }
 
 //   let totalNetYieldInEth = 0n

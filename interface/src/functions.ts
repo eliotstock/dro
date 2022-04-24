@@ -560,8 +560,8 @@ export async function getBalanceInEthAtBlockNumber(address: string, blockTag: nu
     const ethValue: bigint = BigInt(ethBalanceNative) + BigInt(wethBalance)
         + BigInt(ethValueOfUsdcBalance)
 
-    console.log(`At block ${blockTag}: ${formatUnits(ethBalance)} ETH + \
-${formatUnits(wethBalance)} WETH + ${formatUnits(usdcBalance, '6')} USDC = ${formatUnits(ethValue)} ETH`)
+//     console.log(`At block ${blockTag}: ${formatUnits(ethBalance)} ETH + \
+// ${formatUnits(wethBalance)} WETH + ${formatUnits(usdcBalance, '6')} USDC = ${formatUnits(ethValue)} ETH`)
 
     return ethValue
 }

@@ -160,7 +160,7 @@ export class Position {
         return Number(this.feesTotalInUsdc() * 10_000n / this.openingLiquidityTotalInUsdc()) / 100
     }
 
-    timeOpenInDays(): number {
+    timeOpen(): moment.Duration {
         if (this.openedTimestamp == undefined || this.closedTimestamp == undefined) {
             throw `Missing opened/closed timestamps: ${this.tokenId}`
         }
@@ -168,9 +168,11 @@ export class Position {
         // Seconds since the Unix epoch.
         const opened = moment.unix(this.openedTimestamp)
         const closed = moment.unix(this.closedTimestamp)
-        const timeInRange = moment.duration(closed.diff(opened), 'seconds')
+        const timeInRange = moment.duration(closed.diff(opened, 'seconds', true))
 
-        return timeInRange.asDays()
+        // console.log(`Opened: ${opened.toString()}, closed: ${closed.toString()}, time in rage: ${closed.diff(opened, 'hours', true)} hours`)
+
+        return timeInRange
     }
 
     closingBlockNumber(): number {
