@@ -117,18 +117,14 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
     blockNumberLoop:
     for (const blockNumber of blockNumbers) {
         let blockOffset = 0
-        let price = 0n
+        // let price = 0n
 
-        // console.log(`Block ${blockNumber}`)
-
-        // If there was no swap event in this block, look forward a few blocks until we find one.
-        while (price == 0n && blockOffset < 10) {
-            // console.log(`  Offset ${blockOffset}`)
-
-            const block = blockNumber + blockOffset
-            blockOffset++
-
-            if (blockOffset > 5) console.log(`No swaps within ${blockOffset - 1} blocks of block ${blockNumber}`)
+        // If there was no swap event in this block, look backward a few blocks until we find one.
+        // Because we transact when the price moves, swaps tend to have happened *before* we
+        // transact. We've never needed the offset to go over 2 blocks.
+        while (blockOffset < 5) {
+            const block = blockNumber - blockOffset
+            // console.log(`Block ${blockNumber} - offset ${blockOffset} = block ${block}`)
 
             const filter = {
                 address: ADDR_POOL,
@@ -141,35 +137,35 @@ export async function getPrices(blockNumbers: Array<number>, provider: Provider)
 
             for (const log of logs) {
                 // logIndex++
-                // console.log(`    Log ${logIndex}`)
 
-                try {
-                    const parsedLog = INTERFACE_POOL.parseLog({topics: log.topics, data: log.data})
-                    const tick = parsedLog.args['tick']
+                const parsedLog = INTERFACE_POOL.parseLog({topics: log.topics, data: log.data})
+                const tick = parsedLog.args['tick']
 
-                    console.log(`Block: ${blockNumber}, offset: ${blockOffset - 1}, logs count: ${logs.length}, tick: ${tick}`)
-        
-                    // Try the next log
-                    if (tick === undefined) continue
-        
-                    price = tickToNativePrice(tick)
-                    poolPrices.set(log.blockNumber, price)
-        
-                    // console.log(`    Tick: ${tick}, price: ${price}`)
-                    console.log(`  price: ${price}`)
+                // console.log(`  Log index: ${logIndex}, tick: ${tick}`)
+    
+                // No swap in this log. Try the next one.
+                if (tick === undefined) continue
+    
+                const price = tickToNativePrice(tick)
 
-                    // Move on to the next block number arg.
-                    if (price != 0n) continue blockNumberLoop
-                }
-                catch (e) {
-                    console.log(e)
-                    continue
-                }
+                // When we look up prices later, they're going to be for the block numbers
+                // passed in, NOT the blocks in which we finally found swaps after offsetting.
+                poolPrices.set(blockNumber, price)
+    
+                // console.log(`  price: ${price}`)
+
+                // Move on to the next block number arg.
+                continue blockNumberLoop
             }
+
+            // No swaps in any of these logs. Try the next block back.
+            blockOffset++
         }
+
+        console.log(`No swaps within ${blockOffset} blocks of block ${blockNumber}`)
     }
 
-    console.log(`Got ${poolPrices.size} prices from ${blockNumbers.length} blocks`)
+    console.log(`Got ${poolPrices.size} prices at or near ${blockNumbers.length} blocks`)
 
     return poolPrices
 }
