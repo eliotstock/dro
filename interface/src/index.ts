@@ -8,10 +8,12 @@ import { ADDR_POSITIONS_NFT_FOR_FILTER, ADDR_TOKEN_USDC, ADDR_TOKEN_WETH } from 
 import { abi as WethABI } from './abi/weth.json'
 import { abi as Erc20ABI } from './abi/erc20.json'
 import {
-  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie, setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts, setTimestamps, getBalanceInEthAtBlockNumber
+  createPositionsWithLogs, setDirection, setFees, setRangeWidth, setOpeningLiquidity, getArgsOrDie,
+  setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts, setTimestamps,
+  getBalanceAtBlockNumber
 } from './functions'
 import moment from 'moment'
-import { formatEther } from '@ethersproject/units'
+import { formatEther, formatUnits } from '@ethersproject/units'
 
 // Read our .env file
 config()
@@ -21,45 +23,11 @@ config()
 // * Opening liquidity (in WETH and USDC, from add tx logs)
 // * Fees claimed (in WETH and USDC, from remove tx logs)
 // * Gas cost (in WETH and in USDC terms) from add, remove and swap txs
+// * Impermanent loss calculation, from opening liquidity and range width
 // * Price history, to get from ETH gas costs to USD gas costs
-
-// Design
-// 1. [DONE] From Etherscan provider, get all transactions for this address (swaps, adds, removes, unwraps)
-// 2. [DONE] For each tx, get block number
-// 3. [DONE] From Etherscan provider, for each block number, get all tx logs from the positions NFT address for these blocks only
-// 4. [DONE] Get price history for only the period from first tx to last tx timestamp. Or only blocks in which we transacted, ideally.
-// 5. Use analytics-positions code to build Position instances from logs:
-//   a. [WON'T DO] Map of logs keyed by tx hashes (do we need this?)
-//   b. [DONE] Map of Positions, each with arrays of logs on them
-//      Both add tx and remove tx logs have the token ID in them, in different topics.
-//   d  [DONE] Filter Position array to those that are in set of our own token IDs (or look for our address as sender in the logs?)
-//   d. [MOSTLY DONE] Set direction on each Position based on logs
-//   e. [DONE] Set fees based on logs
-//   f. [DONE] Set range width based on logs
-//   g. [DONE] Set opening liquidity based on logs
-//   h. [DONE] Set opening and closing prices from tx timestamps and price history
-//   i. [DONE] Set gas cost in ETH based on all txs
-//   j. [DONE] Find the swap transaction receipt that preceeded each add tx and add it to the position.
-//   k. [DONE] Find the swap tx logs and add them to the position.
-// 6. [DONE] Get all token IDs for this account from Uniswap position manager contract
-// 7. Calc APY% from that set of Position instances
 
 async function main() {
   const stopwatchStart = Date.now()
-
-  // const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
-
-  // // 217 USDC
-  // const usdcBalance = 217_947_375n
-
-  // // USDC 3,000 to 1 ETH
-  // const usdcPrice = 3_000_000_000n
-
-  // // 0.072_649_125_000_000_000
-  // const ethValueOfUsdcBalance: bigint = BigInt(usdcBalance) * N_10_TO_THE_18 / BigInt(usdcPrice)
-
-  // // usdcBalance: 3000000000, usdcPrice: 3000000000, ethValueOfUsdcBalance: 1_000_000_000_000_000_000
-  // console.log(`usdcBalance: ${usdcBalance.toString()}, usdcPrice: ${usdcPrice.toString()}, ethValueOfUsdcBalance: ${ethValueOfUsdcBalance.toString()}`)
 
   const [address, etherscanApiKey, alchemyApiKey] = getArgsOrDie()
 
@@ -116,9 +84,7 @@ async function main() {
     allLogs.push(txReceipt.logs)
   }
 
-  // Start getting prices from the pool event logs now.
-  // TODO: Why are we missing prices for five blocks, and are these blocks we really need prices
-  // for (add and remove blocks)?
+  // Start getting prices from the pool event logs now, in parallel to the work below.
   const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER_ETHERSCAN)
 
   const positions = createPositionsWithLogs(allLogs)
@@ -150,20 +116,22 @@ async function main() {
   // Find the timestamps for opening and closing the position.
   await setTimestamps(positions, PROVIDER_ETHERSCAN)
 
-  console.log(`Closing timestamp, direction, time open in days, balance after remove`)
+  console.log(`Closing timestamp, closing ETH/USDC price, direction, time open in hours, ETH balance after remove tx, USDC balance after remove tx`)
 
   for (let [tokenId, position] of positions) {
     if (position.closedTimestamp === undefined) continue
 
     const closingTimestamp = moment.unix(position.closedTimestamp).toISOString()
     const closingBlockNumber = position.closingBlockNumber()
+    const closingPrice = position.priceAtClosing != null ? position.priceAtClosing : 0n
 
-    const balanceInEth = await getBalanceInEthAtBlockNumber(address, closingBlockNumber,
-      contractWeth, contractUsdc, poolPrices, PROVIDER_ALCHEMY)
+    const [balanceInEth, balanceInUsdc] = await getBalanceAtBlockNumber(address,
+      closingBlockNumber, contractWeth, contractUsdc, poolPrices, PROVIDER_ALCHEMY)
 
-    const readableTimeOpen = position.timeOpen().humanize()
+    const timeOpenInHours = position.timeOpen().asHours()
 
-    console.log(`${closingTimestamp}, ${position.traded}, ${readableTimeOpen}, ${formatEther(balanceInEth)} ETH`)
+    console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${position.traded}, \
+${timeOpenInHours}, ${formatEther(balanceInEth)}, ${formatUnits(balanceInUsdc, 6)}`)
   }
 
 //   let totalNetYieldInEth = 0n
