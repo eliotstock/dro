@@ -136,6 +136,59 @@ const ARBITRUM_MAINNET: ChainConfig = {
     ethBalanceMin: ethers.utils.parseUnits("0.015", "ether").toBigInt()
 }
 
+// Block explorer: https://optimistic.etherscan.io/.
+const OPTIMISM_MAINNET: ChainConfig = {
+    name: 'Optimism Mainnet',
+
+    chainId: 10,
+
+    isTestnet: false,
+
+    isL2: true,
+
+    // Checksum case: 0x7F5c764cBc14f9669B88837ca1490cCa17c31607
+    addrTokenUsdc: '0x7f5c764cbc14f9669b88837ca1490cca17c31607',
+
+    addrTokenWeth: '0x4200000000000000000000000000000000000006',
+
+    // USDC/ETH pool with 0.05% fee
+    addrPoolRangeOrder: '0x85149247691df622eaf1a8bd0cafd40bc45154a9',
+
+    // USDC/ETH pool with 0.05% fee
+    addrPoolSwaps: '0x85149247691df622eaf1a8bd0cafd40bc45154a9',
+
+    slippageTolerance: new Percent(10, 1_000), // 1.0%
+
+    // Units: wei. Ignored for EIP-1559 txs and will be set to null regardless of what we
+    // specify here. Typical range: 0.5 - 20 gwei.
+    // gasPrice: ethers.utils.parseUnits("2", "gwei").toBigInt(),
+
+    // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
+    // For the combined "swap and add liquidity" transaction, this could be twice that.
+    gasLimit: ethers.utils.hexlify(2_000_000), // TX created, but fails: 2_000_000.
+
+    // Above what gas price, in gwei, are we unwilling to re-range?
+    // Gas on Optimism is very rarely so high that we'd want to wait to re-range, in practice.
+    gasPriceMax: ethers.utils.parseUnits("20", "gwei").toBigInt(),
+
+    gasPriceMaxFormatted() {
+        return `${Number(this.gasPriceMax / 1_000_000_000n)} gwei`
+    },
+
+    // These are all at the same address as on Ethereum Mainnet.
+    addrPositionManager: ETHEREUM_MAINNET.addrPositionManager,
+
+    addrQuoter: ETHEREUM_MAINNET.addrQuoter,
+
+    addrSwapRouter: ETHEREUM_MAINNET.addrSwapRouter,
+
+    addrSwapRouter2: ETHEREUM_MAINNET.addrSwapRouter2,
+
+    // The most I've ever paid in gas for a set of three re-ranging transactions on Arbitrum (not
+    // Optimism) is 0.010 ETH. 0.015 is a safe margin over that.
+    ethBalanceMin: ethers.utils.parseUnits("0.015", "ether").toBigInt()
+}
+
 const ETHEREUM_KOVAN: ChainConfig = {
     name: "Ethereum Kovan",
 
@@ -188,7 +241,8 @@ const ETHEREUM_KOVAN: ChainConfig = {
 const CHAIN_CONFIGS = {
     'ethereumMainnet': ETHEREUM_MAINNET,
     'ethereumKovan': ETHEREUM_KOVAN,
-    'arbitrumMainnet': ARBITRUM_MAINNET
+    'arbitrumMainnet': ARBITRUM_MAINNET,
+    'optimismMainnet': OPTIMISM_MAINNET
 }
 
 export function useConfig(): ChainConfig {
