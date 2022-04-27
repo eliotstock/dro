@@ -376,10 +376,10 @@ at gas price ${gasPriceReadable} gwei bid`)
         `[${this.rangeWidthTicks}] removeLiquidity()`, txRequest)
 
       const gasCost = this.gasCost(txReceipt)
+      if (gasCost != undefined) this.totalGasCost += gasCost
 
       // Removing liquidity is the last tx in the set of three. We're interested in the total gas
       // cost of the roundtrip position.
-      this.totalGasCost += gasCost
       console.log(`[${this.rangeWidthTicks}] removeLiquidity() Total gas cost: \
 ${this.totalGasCost.toFixed(2)}`)
 
@@ -588,8 +588,8 @@ Unwrapping just enough WETH for the next re-range.`)
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] swap()`, txRequest)
 
-      const gasCost = this.gasCost(txReceipt)
-      this.totalGasCost += gasCost
+        const gasCost = this.gasCost(txReceipt)
+        if (gasCost != undefined) this.totalGasCost += gasCost
     }
   
     async addLiquidity() {
@@ -702,10 +702,10 @@ be able to remove this liquidity.`)
       }
 
       const gasCost = this.gasCost(txReceipt)
-      this.totalGasCost += gasCost
+      if (gasCost != undefined) this.totalGasCost += gasCost
     }
 
-    gasCost(txReceipt: TransactionReceipt): number {
+    gasCost(txReceipt: TransactionReceipt): number | undefined {
       // What did we just sepnd on gas? None of these are actually large integers.
 
       // Corresponds to "Gas Used by Transaction" on Etherscan
@@ -714,8 +714,11 @@ be able to remove this liquidity.`)
 
       // txReceipt.cumulativeGasUsed: No idea what this is. Ignore it.
 
-      // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei, typically about 0.66 gwei for Arbitrum.
-      // TODO: effectiveGasPrice property is undefined on Optimism.
+      // effectiveGasPrice corresponds to "Gas Price Paid" on Etherscan. Quoted in wei, typically
+      // about 0.66 gwei for Arbitrum.
+      // effectiveGasPrice property is undefined on Optimism.
+      if (txReceipt.effectiveGasPrice == undefined) return undefined
+
       const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
       // console.log(`Effective gas price: ${effectiveGasPrice}`)
 
@@ -751,6 +754,7 @@ be able to remove this liquidity.`)
       }
 
       // TODO: On L1 consider specifying the maxFeePerGas instead of the gasPrice.
+      // See: https://docs.alchemy.com/alchemy/guides/eip-1559/send-tx-eip-1559
       // maxFeePerGas is often double the gasPrice:
       //   1. maxFeePerGas: 36.301396484 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 17.987767833 gwei
       //   2. maxFeePerGas: 63.332724206 gwei, maxPriorityFeePerGas: 2.5 gwei, gasPrice: 31.416362103 gwei
