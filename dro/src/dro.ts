@@ -739,7 +739,10 @@ be able to remove this liquidity.`)
         console.error(`No gas price yet. Don't know what to bid. Defaulting to a safe high bid.`)
 
         if (CHAIN_CONFIG.isL2) {
-          return ethers.utils.parseUnits("1", "gwei").toBigInt()
+          // Optimism gas price dashboard:
+          //   https://public-grafana.optimism.io/d/9hkhMxn7z/public-dashboard?orgId=1&refresh=5m
+          // Gas price is pinned to 0.001 gwei as of 2022-04.
+          return ethers.utils.parseUnits("0.001", "gwei").toBigInt()
         }
         else {
           return ethers.utils.parseUnits("80", "gwei").toBigInt()
@@ -747,10 +750,16 @@ be able to remove this liquidity.`)
       }
 
       if (CHAIN_CONFIG.isL2) {
-        // 95%: Remove/swap/add roundtrip took 14s. See if we can go slower.
-        // 85%: testing now
-        // 75%: 'gas price too low' error
-        return gasPrice * 85n / 100n
+        // Arbitrum:
+        //   95%: Remove/swap/add roundtrip took 14s. See if we can go slower.
+        //   85%: testing now
+        //   75%: 'gas price too low' error
+        // return gasPrice * 85n / 100n
+        
+        // Optimism gas price dashboard:
+        //   https://public-grafana.optimism.io/d/9hkhMxn7z/public-dashboard?orgId=1&refresh=5m
+        // Gas price is pinned to 0.001 gwei as of 2022-04.
+        return ethers.utils.parseUnits("0.001", "gwei").toBigInt()
       }
 
       // TODO: On L1 consider specifying the maxFeePerGas instead of the gasPrice.
