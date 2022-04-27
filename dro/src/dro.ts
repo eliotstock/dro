@@ -715,6 +715,7 @@ be able to remove this liquidity.`)
       // txReceipt.cumulativeGasUsed: No idea what this is. Ignore it.
 
       // Corresponds to "Gas Price Paid" on Etherscan. Quoted in wei, typically about 0.66 gwei for Arbitrum.
+      // TODO: effectiveGasPrice property is undefined on Optimism.
       const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
       // console.log(`Effective gas price: ${effectiveGasPrice}`)
 

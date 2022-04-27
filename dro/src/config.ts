@@ -110,9 +110,7 @@ const ARBITRUM_MAINNET: ChainConfig = {
     // specify here. Typical range: 0.5 - 20 gwei.
     // gasPrice: ethers.utils.parseUnits("2", "gwei").toBigInt(),
 
-    // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
-    // For the combined "swap and add liquidity" transaction, this could be twice that.
-    gasLimit: ethers.utils.hexlify(2_000_000), // TX created, but fails: 2_000_000.
+    gasLimit: ETHEREUM_MAINNET.gasLimit,
 
     // Above what gas price, in gwei, are we unwilling to re-range?
     // Gas on Arbitrum is very rarely so high that we'd want to wait to re-range, in practice.
@@ -163,9 +161,7 @@ const OPTIMISM_MAINNET: ChainConfig = {
     // specify here. Typical range: 0.5 - 20 gwei.
     // gasPrice: ethers.utils.parseUnits("2", "gwei").toBigInt(),
 
-    // The highest gas I've ever spent on a Uniswap v3 tx was an add liquidity tx at 405,000.
-    // For the combined "swap and add liquidity" transaction, this could be twice that.
-    gasLimit: ethers.utils.hexlify(2_000_000), // TX created, but fails: 2_000_000.
+    gasLimit: ETHEREUM_MAINNET.gasLimit,
 
     // Above what gas price, in gwei, are we unwilling to re-range?
     // Gas on Optimism is very rarely so high that we'd want to wait to re-range, in practice.
