@@ -42,11 +42,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
 
   // `--private-key` means just log the private key for the account.
   if (argv.privateKey) {
-<<<<<<< Updated upstream
-    console.log(`Private key: ${wallet.privateKey}`)
-=======
     log.info(`Private key for Hardhat .env file: ${wallet.privateKey}`)
->>>>>>> Stashed changes
 
     return [noops, true]
   }
