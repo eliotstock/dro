@@ -1,5 +1,7 @@
 import { config } from 'dotenv'
 import moment from 'moment'
+import express from 'express'
+import { initMetrics, metricsHandler } from './metrics'
 import { useConfig, ChainConfig, useProvider } from './config'
 import { updateGasPrice, gasPriceFormatted } from './wallet'
 import { handleCommandLineArgs } from './command'
@@ -64,6 +66,16 @@ async function main() {
   if (exitNow) {
     process.exit(0)
   }
+
+  initMetrics()
+
+  // Start the express server
+  const PORT = process.env.PORT || 9001;
+  express()
+    .use(`/`, metricsHandler())
+    .listen(PORT, () => {
+    console.log(`Listening on ${PORT} ⚡`)
+  });
 
   // The absence of a try/catch block below is deliberate. The execution of main() already has one.
   // For this startup stuff, on any error it's better to die early and let the process manager
