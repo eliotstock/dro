@@ -1,5 +1,5 @@
 import express from 'express'
-import client, {Gauge} from 'prom-client'
+import client, {Gauge, Histogram, Summary} from 'prom-client'
 
 // Use the global default registry
 const register: client.Registry = client.register
@@ -10,22 +10,17 @@ class Metrics {
         help: 'Unclaimed fees in USDC',
     });
 
-    gasPriceInGwei = new Gauge({
-        name: 'gas_price_gwei',
+    gasPrice = new Gauge({
+        name: 'gas_price',
         help: 'Gas price in Gwei',
     });
 
-    ethPriceInUsdc = new Gauge({
-        name: 'eth_price_usdc',
+    ethPrice = new Gauge({
+        name: 'eth_price',
         help: 'ETH price in USDC',
     });
 
-    blockTime = new Gauge({
-        name: 'block_time',
-        help: 'Time of last block in seconds since Unix epoch',
-    });
-
-    reRange = new Gauge({
+    reRangeTime = new Gauge({
         name: 'rerange_time',
         help: 'Time of last re-range in seconds since Unix epoch',
     });
@@ -38,8 +33,56 @@ class Metrics {
     balance = new Gauge({
         name: 'balance',
         help: 'Current wallet balance',
+        labelNames: ['currency'],
+    });
+
+    rangeUpperBound = new Gauge({ 
+        name: 'range_upper_bound', 
+        help: 'Upper bound of current range' 
+    });
+
+    rangeLowerBound = new Gauge({ 
+        name: 'range_lower_bound', 
+        help: 'Lower bound of current range' 
+    });
+
+    removeLiquidityTxnTimeMs = new Summary({
+        name: 'remove_liquidity_txn_time_ms',
+        help: 'Time to remove liquidity in milliseconds',
+    });
+
+    removeLiquidityGasCost = new Gauge({
+        name: 'remove_liquidity_gas_cost',
+        help: 'Gas cost to remove liquidity',
+    });
+
+    swapTxnTimeMs = new Summary({
+        name: 'swap_txn_time_ms',
+        help: 'Time to swap in milliseconds',
+    });
+
+    swapGasCost = new Gauge({
+        name: 'swap_gas_cost',
+        help: 'Gas cost to swap',
+    });
+
+    addLiquidityTxnTimeMs = new Summary({
+        name: 'add_liquidity_txn_time_ms',
+        help: 'Time to add liquidity in milliseconds',
+    });
+
+    addLiquidityTxnGasCost = new Gauge({
+        name: 'add_liquidity_txn_gas_cost',
+        help: 'Gas cost to add liquidity',
+    });
+
+    totoalRerangeTimeMs = new Summary({
+        name: 'total_rerange_time_ms',
+        help: 'Total time to re-range in milliseconds',
     });
 }
+
+export const metrics = new Metrics()
 
 export function initMetrics() {
     // Add a default label which is added to all metrics
@@ -48,10 +91,7 @@ export function initMetrics() {
     })
 
     // Enable the collection of default metrics
-    client.collectDefaultMetrics({ register })
-
-    const gauge = new client.Gauge({registers: [register], name: 'metric_name', help: 'metric_help' });
-    gauge.set(10); // Set to 10
+    //client.collectDefaultMetrics({ register })
 }
 
 export function metricsHandler() {

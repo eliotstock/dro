@@ -10,6 +10,7 @@ import { useConfig, ChainConfig, useProvider } from './config'
 import { price } from './uniswap'
 import JSBI from 'jsbi'
 import { formatUnits } from 'ethers/lib/utils';
+import { metrics } from './metrics'
 
 // Read our .env file
 config()
@@ -146,7 +147,11 @@ export class EthUsdcWallet extends ethers.Wallet {
 
         console.log(`Balances: USDC ${usdcBalanceReadable}, WETH ${wethBalanceReadable}, \
 ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
-    }
+
+        metrics.balance.labels({ currency: 'USDC' }).set(Number(usdcBalance));
+        metrics.balance.labels({ currency: 'WETH' }).set(Number(wethBalance));
+        metrics.balance.labels({ currency: 'ETH' }).set(Number(ethBalance));
+}
 
     async approveAll(address: string) {
         // A possible improvement here would b to add the allowance() method to the ABI and call it
@@ -262,6 +267,9 @@ export async function updateGasPrice(force: boolean) {
     // }
     const feeData = await useProvider().getFeeData()
     const p = feeData.gasPrice
+
+    metrics.gasPrice.set(Number(p));
+
 
     if (force) {
         const maxFeePerGas: string = feeData.maxFeePerGas == null ? 'unknown'

@@ -28,6 +28,7 @@ import {
     SqrtPriceMath
 } from '@uniswap/v3-sdk'
 import { CurrencyAmount } from '@uniswap/smart-order-router'
+import { metrics } from './metrics'
 
 // Read our .env file
 config()
@@ -153,11 +154,13 @@ export async function currentPosition(address: string): Promise<PositionWithToke
 
     if (tokenId === undefined) {
         console.log(`No existing position NFT`)
+        metrics.currentPositionNft.set(0);
 
         return undefined
     }
     else {
         console.log(`Position NFT: ${positionWebUrl(tokenId)}`)
+        metrics.currentPositionNft.set(Math.floor(tokenId)); // Why is the token id a float?
     }
 
     const position = await positionManagerContract.positions(tokenId)
