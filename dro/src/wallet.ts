@@ -268,9 +268,6 @@ export async function updateGasPrice(force: boolean) {
     const feeData = await useProvider().getFeeData()
     const p = feeData.gasPrice
 
-    metrics.gasPrice.set(Number(p));
-
-
     if (force) {
         const maxFeePerGas: string = feeData.maxFeePerGas == null ? 'unknown'
             : formatUnits(feeData.maxFeePerGas, 'gwei')
@@ -290,6 +287,8 @@ maxPriorityFeePerGas: ${maxPriorityFeePerGas} gwei, gasPrice: ${gasPriceForLogs}
     if (!p) return
 
     gasPrice = p.toBigInt()
+    
+    metrics.gasPrice.set(Number(gasPrice * 10n / 1_000_000_000n) / 10)
 }
 
 export function gasPriceFormatted(): string {
