@@ -44,8 +44,7 @@ async function onBlock(...args: Array<any>) {
   // Log the timestamp, block number and gas price (if we're checking it) first. Only log anything
   // when the price changes.
   if (priceFormatted() != price) {
-    log.info(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceFormatted()} \
-${priceFormatted()} USDC`)
+    log.info(`#${args} ${gasPriceFormatted()} ${priceFormatted()} USDC`)
 
     dro.onPriceChanged()
   }
