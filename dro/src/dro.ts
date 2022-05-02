@@ -7,6 +7,7 @@ import {
   TransactionRequest
 } from '@ethersproject/abstract-provider'
 import moment, { Duration } from 'moment'
+import { log } from './logger'
 import { useConfig, ChainConfig, useProvider } from './config'
 import { wallet, gasPrice, gasPriceFormatted, jsbiFormatted, updateGasPrice } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
@@ -139,7 +140,7 @@ export class DRO {
         const liquidityAfter = this.position.position.liquidity
 
         if (JSBI.notEqual(JSBI.BigInt(liquidityBefore), JSBI.BigInt(liquidityAfter))) {
-          console.log(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
+          log.info(`[${this.rangeWidthTicks}] removeLiquidity() Liquidity was \
   ${jsbiFormatted(liquidityBefore)} at opening of position/restarting and is now \
   ${jsbiFormatted(liquidityAfter)}`)
         }
@@ -197,7 +198,7 @@ export class DRO {
         maxUsdc = lowerTickPrice.toFixed(2, {groupSeparator: ','})
       }
 
-      console.log(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
+      log.info(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
     }
   
     setNewRange() {
@@ -239,7 +240,7 @@ export class DRO {
       this.lastRerangeTimestamp = moment().toISOString()
 
       if (notInitialRange) {
-        console.log(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRangeReadable}`)
+        log.info(`[${this.rangeWidthTicks}] Re-ranging ${direction} after ${timeInRangeReadable}`)
       }
     }
   
@@ -279,7 +280,7 @@ export class DRO {
         callOverrides)
 
       if (amount0 === undefined || amount1 === undefined) {
-        console.log(`[${this.rangeWidthTicks}] checkUnclaimedFees(): One amount is undefined`)
+        log.info(`[${this.rangeWidthTicks}] checkUnclaimedFees(): One amount is undefined`)
         return
       }
 
@@ -305,8 +306,8 @@ export class DRO {
 
       const readable = Number(unclaimedFeesTotalUsdc * 100n / n10ToThe6) / 100
 
-      console.log(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
-
+      log.info(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
+      
       metrics.unclaimedFeesInUsdc.set(readable)
     }
 
@@ -324,7 +325,7 @@ export class DRO {
 
       try {
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-        // console.log(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
+        // log.info(`${logLinePrefix} TX hash: ${txResponse.hash}`) 
         // console.dir(txResponse)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
@@ -334,7 +335,7 @@ export class DRO {
           formatUnits(txRequest.gasPrice, 'gwei')
 
         const stopwatchMillis = (Date.now() - stopwatchStart)
-        console.log(`${logLinePrefix} Transaction took ${Math.round(stopwatchMillis / 1_000)}s \
+        log.info(`${logLinePrefix} Transaction took ${Math.round(stopwatchMillis / 1_000)}s \
 at gas price ${gasPriceReadable} gwei bid`)
 
         return txReceipt
@@ -353,7 +354,7 @@ at gas price ${gasPriceReadable} gwei bid`)
           console.error(`${logLinePrefix} Error: ${e}`)
         }
 
-        console.log(`Ending dro process.`)
+        log.info(`Ending dro process.`)
         throw e
       }
     }
@@ -394,7 +395,7 @@ at gas price ${gasPriceReadable} gwei bid`)
 
       // Removing liquidity is the last tx in the set of three. We're interested in the total gas
       // cost of the roundtrip position.
-      console.log(`[${this.rangeWidthTicks}] removeLiquidity() Total gas cost: \
+      log.info(`[${this.rangeWidthTicks}] removeLiquidity() Total gas cost: \
 ${this.totalGasCost.toFixed(2)}`)
 
       // Forget our old position details so that we can move on.
@@ -422,13 +423,13 @@ ${this.totalGasCost.toFixed(2)}`)
 
       // Typical tx cost: USD 10.00
       if (wethBalance > enoughForThreeWorstCaseReRanges) {
-        console.log(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH. Unwrapping enough \
+        log.info(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH. Unwrapping enough \
 WETH for three wost case re-ranges.`)
 
         await wallet.unwrapWeth(enoughForThreeWorstCaseReRanges)
       }
       else {
-        console.log(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH but also on WETH. \
+        log.info(`[${this.rangeWidthTicks}] topUpEth() Running low on ETH but also on WETH. \
 Unwrapping just enough WETH for the next re-range.`)
 
         await wallet.unwrapWeth(deficit)
@@ -449,13 +450,13 @@ Unwrapping just enough WETH for the next re-range.`)
       const [usdc, weth, ratio] = await wallet.tokenBalancesAndRatio()
 
       if (usdc == 0n && weth == 0n) {
-        console.log(`This account has no USDC or WETH. Fatal. HFSP.`)
+        log.info(`This account has no USDC or WETH. Fatal. HFSP.`)
         process.exit(412)
       }
 
       // const [swapPool, wethFirstInSwapPool] = await useSwapPool()
 
-      // console.log(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
+      // log.info(`Token 0 symbol: ${token0.symbol}, token 1 symbol: ${token1.symbol}`)
 
       let inputToken: Token
       let outputToken: Token
@@ -492,7 +493,7 @@ Unwrapping just enough WETH for the next re-range.`)
       else if (ratio > 0.5 && ratio <= 1.5) {
         // This should only be the case when restarting after an error that occured after the swap
         // but before adding liquidity again.
-        console.log(`[${this.rangeWidthTicks}] swap() We already have\
+        log.info(`[${this.rangeWidthTicks}] swap() We already have\
  fairly even values of USDC and WETH. No need for a swap.`)
 
         return
@@ -562,7 +563,7 @@ Unwrapping just enough WETH for the next re-range.`)
       // Note: Never pass an argument to toFixed() here. If it's less than the decimals on the
       // token, this will fail an invariant. If it's not provided, we just get the decimals on
       // the token, which is what we want anyway.
-      console.log(`[${this.rangeWidthTicks}] swap() Optimal swap is from\
+      log.info(`[${this.rangeWidthTicks}] swap() Optimal swap is from\
  ${amountToSwap.toFixed()} ${amountToSwap.currency.symbol}`)
 
       // Note: Although Trade.exactIn(swapRoute, amountToSwap) looks to be exactly what we want,
@@ -663,12 +664,12 @@ spacing of ${this.rangeOrderPool.tickSpacing}. Can't create position.`
       })
 
 //       if (this.wethFirst) {
-//         console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
+//         log.info(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
 // USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount1.toString()} USDC, \
 // ${position.mintAmounts.amount0.toString()} WETH`)
 //       }
 //       else {
-//         console.log(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
+//         log.info(`[${this.rangeWidthTicks}] addLiquidity() Amounts available: ${availableUsdc} \
 // USDC, ${availableWeth} WETH. Mint amounts: ${position.mintAmounts.amount0.toString()} USDC, \
 // ${position.mintAmounts.amount1.toString()} WETH`)
 //       }
@@ -719,7 +720,7 @@ be able to remove this liquidity.`)
         this.position = new PositionWithTokenId(position, t)
 
         const webUrl = positionWebUrl(t)
-        console.log(`[${this.rangeWidthTicks}] addLiquidity() Position URL: ${webUrl}`)
+        log.info(`[${this.rangeWidthTicks}] addLiquidity() Position URL: ${webUrl}`)
       }
 
       const gasCost = this.gasCost(txReceipt)
@@ -734,7 +735,7 @@ be able to remove this liquidity.`)
 
       // Corresponds to "Gas Used by Transaction" on Etherscan
       const gasUsed = txReceipt.gasUsed.toBigInt()
-      // console.log(`Gas used: ${gasUsed}`)
+      // log.info(`Gas used: ${gasUsed}`)
 
       // txReceipt.cumulativeGasUsed: No idea what this is. Ignore it.
 
@@ -744,7 +745,7 @@ be able to remove this liquidity.`)
       if (txReceipt.effectiveGasPrice == undefined) return undefined
 
       const effectiveGasPrice = txReceipt.effectiveGasPrice.toBigInt()
-      // console.log(`Effective gas price: ${effectiveGasPrice}`)
+      // log.info(`Effective gas price: ${effectiveGasPrice}`)
 
       const p: bigint = price()
 
@@ -753,7 +754,7 @@ be able to remove this liquidity.`)
 
       const f: number = Number(usdCostOfTx * 100n / 1_000_000_000_000_000_000_000_000n) / 100
 
-      // console.log(`TX cost: USD ${f.toFixed(2)}`)
+      // log.info(`TX cost: USD ${f.toFixed(2)}`)
 
       return f
     }
@@ -832,12 +833,12 @@ be able to remove this liquidity.`)
       // Are we now out of range (or are we not yet in a position)?
       if (this.outOfRange() || !this.inPosition()) {
         if (this.locked) {
-          // console.log(`[${this.rangeWidthTicks}] Skipping block. Already busy re-ranging.`)
+          // log.info(`[${this.rangeWidthTicks}] Skipping block. Already busy re-ranging.`)
           return
         }
 
         if (gasPrice > CHAIN_CONFIG.gasPriceMax) {
-          console.log(`Gas price of ${gasPriceFormatted()} is over our max of \
+          log.info(`Gas price of ${gasPriceFormatted()} is over our max of \
 ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
           return
         }
@@ -894,7 +895,7 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
         metrics.reRangeTime.setToCurrentTime()
 
         const stopwatchMillis = (Date.now() - stopwatchStart)
-        console.log(`[${this.rangeWidthTicks}] Remove/swap/add roundtrip took \
+        log.info(`[${this.rangeWidthTicks}] Remove/swap/add roundtrip took \
 ${Math.round(stopwatchMillis / 1_000)}s`)
 
         // We should now hold as close to zero USDC and WETH as possible.

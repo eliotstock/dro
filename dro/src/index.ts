@@ -2,11 +2,13 @@ import { config } from 'dotenv'
 import moment from 'moment'
 import express from 'express'
 import { initMetrics, metricsHandler } from './metrics'
+import { log } from './logger'
 import { useConfig, ChainConfig, useProvider } from './config'
 import { updateGasPrice, gasPriceFormatted } from './wallet'
 import { handleCommandLineArgs } from './command'
 import { updateTick, priceFormatted } from './uniswap'
 import { DRO } from './dro'
+
 
 // Read our .env file
 config()
@@ -44,8 +46,7 @@ async function onBlock(...args: Array<any>) {
   // Log the timestamp, block number and gas price (if we're checking it) first. Only log anything
   // when the price changes.
   if (priceFormatted() != price) {
-    console.log(`${moment().format("MM-DD-HH:mm:ss")} #${args} ${gasPriceFormatted()} \
-${priceFormatted()} USDC`)
+    log.info(`#${args} ${gasPriceFormatted()} ${priceFormatted()} USDC`)
 
     dro.onPriceChanged()
   }
@@ -58,7 +59,7 @@ ${priceFormatted()} USDC`)
 }
 
 async function main() {
-  console.log(`Chain: ${CHAIN_CONFIG.name}`)
+  log.info(`Chain: ${CHAIN_CONFIG.name}`)
 
   // When invoked with the -n command line arg, don't execute any transactions.
   const [noops, exitNow] = await handleCommandLineArgs(rangeWidth)
@@ -92,6 +93,6 @@ async function main() {
 }
   
 main().catch((e) => {
-  console.error(e)
+  log.error(e)
   process.exitCode = 1
 })
