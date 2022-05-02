@@ -93,7 +93,7 @@ export class Position {
         else if (this.traded == Direction.Up) {
             const usdcValueOfWethFees = BigInt(this.feesWeth) * BigInt(this.priceAtClosing) / N_10_TO_THE_18
 
-            return BigInt(this.feesUsdcCalculated()) + usdcValueOfWethFees
+            return BigInt(this.feesUsdc) + usdcValueOfWethFees
         }
         else if (this.traded == Direction.Sideways) {
             // We don't currently support any calculations on positions that we closed when still in range.
@@ -109,12 +109,12 @@ export class Position {
         if (this.traded == Direction.Down) {
             const wethValueOfUsdcFees = BigInt(this.feesUsdc) * N_10_TO_THE_18 / BigInt(this.priceAtClosing)
 
-            return BigInt(this.feesUsdcCalculated()) + wethValueOfUsdcFees
+            return BigInt(this.feesWeth) + wethValueOfUsdcFees
         }
         else if (this.traded == Direction.Up) {
             const wethValueOfUsdcFees = BigInt(this.feesUsdcCalculated()) * N_10_TO_THE_18 / BigInt(this.priceAtClosing)
 
-            return BigInt(this.feesUsdc) + wethValueOfUsdcFees
+            return BigInt(this.feesWeth) + wethValueOfUsdcFees
         }
         else if (this.traded == Direction.Sideways) {
             // We don't currently support any calculations on positions that we closed when still in range.
@@ -189,6 +189,12 @@ export class Position {
         return timeInRange
     }
 
+    openingBlockNumber(): number {
+        if (this.addTxReceipt === undefined) return 0
+
+        return this.addTxReceipt.blockNumber
+    }
+
     closingBlockNumber(): number {
         if (this.removeTxReceipt === undefined) return 0
 
@@ -229,4 +235,5 @@ export class Position {
         // IL is negative when it's a loss.
         return fees - gas + il
     }
+
 }

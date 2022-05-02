@@ -643,3 +643,54 @@ ${formatEther(p.impermanentLossInEth())} = ${formatEther(p.netReturnInEth())}`)
       }
     }
 }
+
+// Balance before add tx + fees claimed - gas cost - observed IL = balance after remove tx.
+// or:
+// Observed IL = balance after remove tx - balance before add tx - fees claimed + gas cost.
+// TODO: Observed IL using this method is sometimes negative. IL in the sense used in the
+// literature is always a loss.
+//   When we trade down, IL in ETH terms here is negative (ie. a gain)
+//   When we trade up, IL in ETH terms here is positive (ie. a loss) 
+export async function generateCsvPnL(address: string, positions: Map<number, Position>,
+    contractWeth: Contract, contractUsdc: Contract, poolPrices: Map<number, bigint>,
+    provider: Provider) {
+    console.log(`Closing timestamp, closing ETH/USDC price, range width in bps, direction, \
+Observed IL = balance after remove tx - balance before add tx - fees claimed + gas cost`)
+
+    let previousPosition = undefined
+
+    for (let [tokenId, p] of positions) {
+      if (p.closedTimestamp === undefined) continue
+
+      if (previousPosition === undefined) {
+        console.log(`Skipping first posiiton`)
+      }
+      else {
+        const closingTimestamp = moment.unix(p.closedTimestamp).toISOString()
+
+        try {
+            // The opening balance of this position is the closing balance of the previous position.
+            const [openingBalanceInEth, openingBalanceInUsdc] = await getBalanceAtBlockNumber(address,
+                previousPosition.closingBlockNumber(), contractWeth, contractUsdc, poolPrices, provider)
+
+            const closingPrice = p.priceAtClosing != null ? p.priceAtClosing : 0n
+        
+            // These are *after* the remove tx.
+            const [closingBalanceInEth, closingBalanceInUsdc] = await getBalanceAtBlockNumber(address,
+                p.closingBlockNumber(), contractWeth, contractUsdc, poolPrices, provider)
+
+            const observedIl = closingBalanceInEth - openingBalanceInEth - p.feesTotalInEth()
+                + p.totalGasPaidInEth()
+    
+            console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${p.rangeWidthInBps}, \
+${p.traded}, ${formatEther(observedIl)} = ${formatEther(closingBalanceInEth)} - ${formatEther(openingBalanceInEth)} \
+- ${formatEther(p.feesTotalInEth())} + ${formatEther(p.totalGasPaidInEth())}`)
+        }
+        catch (e) {
+            console.log(e)
+        }
+      }
+
+      previousPosition = p
+    }
+}

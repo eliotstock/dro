@@ -13,7 +13,8 @@ import {
   getBalanceAtBlockNumber,
   generateCsvEthUsdcBalances,
   generateCsvLiquidityInEth,
-  generateCsvBreakdown
+  generateCsvBreakdown,
+  generateCsvPnL
 } from './functions'
 import moment from 'moment'
 import { formatEther, formatUnits } from '@ethersproject/units'
@@ -129,7 +130,10 @@ async function main() {
   // generateCsvLiquidityInEth(positions)
 
   // feesTotalInEth - totalGasPaidInEth - impermanentLossInEth = netReturnInEth
-  generateCsvBreakdown(positions)
+  // generateCsvBreakdown(positions)
+
+  // Observed IL = balance after remove tx - balance before add tx - fees claimed + gas cost.
+  await generateCsvPnL(address, positions, contractWeth, contractUsdc, poolPrices, PROVIDER_ALCHEMY)
 
   const stopwatchMillis = (Date.now() - stopwatchStart)
   console.log(`Done in ${Math.round(stopwatchMillis / 1_000 / 60)} mins`)
