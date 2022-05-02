@@ -1,4 +1,5 @@
 import yargs from 'yargs/yargs'
+import { log } from './logger'
 import { useConfig, ChainConfig } from './config'
 import { speedUpPendingTx, wallet } from './wallet'
 import { updateTick, createPoolOnTestnet } from './uniswap'
@@ -23,7 +24,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
   // `--n` means no-op.
   if (argv.n) {
     noops = true
-    console.log(`Running in no-op mode. No transactions will be executed.`)
+    log.info(`Running in no-op mode. No transactions will be executed.`)
   }
 
   // `--balances` means just log our available balances.
@@ -41,14 +42,14 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
 
   // `--private-key` means just log the private key for the account.
   if (argv.privateKey) {
-    console.log(`Private key: ${wallet.privateKey}`)
+    log.info(`Private key for Hardhat .env file: ${wallet.privateKey}`)
 
     return [noops, true]
   }
 
   // `--approve` means approve spending of USDC and WETH up to MaxInt.
   if (argv.approve) {
-    console.log(`Approving spending of USDC and WETH`)
+    log.info(`Approving spending of USDC and WETH`)
 
     // await wallet.approveAll(wallet.address)
 
@@ -64,7 +65,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
 
   // `--speedup` means speed up the given transaction by increasing the gas price on it.
   if (argv.speedUp != '') {
-    console.log(`Speeding up transaction ${argv.speedUp} only.`)
+    log.info(`Speeding up transaction ${argv.speedUp} only.`)
 
     await speedUpPendingTx(argv.speedUp)
 
@@ -73,7 +74,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
 
   // `--testnet-create-pool` means create a new Uniswap v3 pool with our own USDC token.
   if (argv.testnetCreatePool) {
-    console.log(`Creating pool on testnet`)
+    log.info(`Creating pool on testnet`)
 
     // Approve the position manager contract to spend our tokens.
     await wallet.approveAll(CHAIN_CONFIG.addrPositionManager)
@@ -94,7 +95,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
 
   // `--r` means remove liquidity from the dro and exit.
   if (argv.r) {
-    console.log(`Removing liquidity only.`)
+    log.info(`Removing liquidity only.`)
 
     await updateTick()
 
@@ -105,7 +106,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
       await dro.removeLiquidity()
     }
     else {
-      console.log(`dro with width ${rangeWidth} wasn't in position. No liquidity to remove.`)
+      log.info(`dro with width ${rangeWidth} wasn't in position. No liquidity to remove.`)
     }
 
     return [noops, true]

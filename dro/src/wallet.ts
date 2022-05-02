@@ -6,6 +6,7 @@ import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer";
 import { SigningKey } from "@ethersproject/signing-key";
 import { abi as ERC20ABI } from './abi/erc20.json'
 import { abi as WETHABI } from './abi/weth.json'
+import { log } from './logger'
 import { useConfig, ChainConfig, useProvider } from './config'
 import { price } from './uniswap'
 import JSBI from 'jsbi'
@@ -72,7 +73,7 @@ export class EthUsdcWallet extends ethers.Wallet {
         w.usdcContract = w.usdcContract.connect(w)
         w.wethContract = w.wethContract.connect(w)
 
-        console.log(`\nDRO account: ${w.address}`)
+        log.info(`DRO account: ${w.address}`)
 
         return w
     }
@@ -110,10 +111,10 @@ export class EthUsdcWallet extends ethers.Wallet {
 
         // This is USDC * 10e6, eg. 3_000_000_000 when the price of ETH is USD 3,000.
         const p: bigint = price()
-        // console.log(`price: ${p}`)
+        // log.info(`price: ${p}`)
 
-        // console.log(`usdc: ${usdc}`)
-        // console.log(`weth: ${weth}`) // 86_387_721_003_586_366
+        // log.info(`usdc: ${usdc}`)
+        // log.info(`weth: ${weth}`) // 86_387_721_003_586_366
         const ratio = EthUsdcWallet._tokenRatioByValue(usdc, weth, p)
 
         return [usdc, weth, ratio]
@@ -144,7 +145,7 @@ export class EthUsdcWallet extends ethers.Wallet {
 
         // const ratio = await this.tokenRatioByValue()
 
-        console.log(`Balances: USDC ${usdcBalanceReadable}, WETH ${wethBalanceReadable}, \
+        log.info(`Balances: USDC ${usdcBalanceReadable}, WETH ${wethBalanceReadable}, \
 ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
     }
 
@@ -152,13 +153,13 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
         // A possible improvement here would b to add the allowance() method to the ABI and call it
         // first. That should cost no gas. We can then only call approve() when we need to.
         
-        // console.log("Approving spending of max USDC")
+        // log.info("Approving spending of max USDC")
         const txResponseUsdc: TransactionResponse = await this.usdcContract.approve(address, ethers.constants.MaxUint256)
         // console.dir(txResponseUsdc)
         const txReceiptUsdc: TransactionReceipt = await txResponseUsdc.wait()
         // console.dir(txReceiptUsdc)
 
-        // console.log("Approving spending of max WETH")
+        // log.info("Approving spending of max WETH")
         const txResponseWeth: TransactionResponse = await this.wethContract.approve(address, ethers.constants.MaxUint256)
         // console.dir(txResponseWeth)
         const txReceiptWeth: TransactionReceipt = await txResponseWeth.wait()
@@ -166,7 +167,7 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
     }
 
     async wrapEth(amount: string) {
-        console.log(`Wrapping ${amount} ETH to WETH`)
+        log.info(`Wrapping ${amount} ETH to WETH`)
 
         const nonce = await this.getTransactionCount("latest")
 
@@ -186,11 +187,11 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
         }
 
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-        // console.log(`TX response`)
+        // log.info(`TX response`)
         // console.dir(txResponse)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
-        // console.log(`TX receipt`)
+        // log.info(`TX receipt`)
         // console.dir(txReceipt)
     }
 
@@ -198,17 +199,17 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
         const wethAmountReadable = ethers.utils.formatEther(
             amount - (amount % 100000000000000n))
 
-        console.log(`Unwrapping ${wethAmountReadable} WETH to ETH`)
+        log.info(`Unwrapping ${wethAmountReadable} WETH to ETH`)
 
         const nonce = await this.getTransactionCount("latest")
 
         // Native bigints do not work for passing to encodeFunctionData().
         const a = ethers.utils.parseUnits(amount.toString(), 'wei')
-        // console.log(`amountAsString: ${a}`) // 10_000_000_000_000_000 for 0.01 WETH input.
+        // log.info(`amountAsString: ${a}`) // 10_000_000_000_000_000 for 0.01 WETH input.
 
         const wethInterface = new ethers.utils.Interface(WETHABI)
         const calldata = wethInterface.encodeFunctionData('withdraw', [a])
-        // console.log(`calldata: ${calldata}`)
+        // log.info(`calldata: ${calldata}`)
 
         // Just bid the current gas price.
         if (gasPrice === undefined) {
@@ -227,11 +228,11 @@ ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
         }
 
         const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
-        // console.log(`TX response`)
+        // log.info(`TX response`)
         // console.dir(txResponse)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
-        // console.log(`TX receipt`)
+        // log.info(`TX receipt`)
         // console.dir(txReceipt)
     }
 }
@@ -275,7 +276,7 @@ export async function updateGasPrice(force: boolean) {
         // post-EIP-1559 gas prices.
         // Max fee per gas is the newer EIP-1559 measure of gas price (or more correctly one of
         // them)
-        console.log(`maxFeePerGas: ${maxFeePerGas} gwei, \
+        log.info(`maxFeePerGas: ${maxFeePerGas} gwei, \
 maxPriorityFeePerGas: ${maxPriorityFeePerGas} gwei, gasPrice: ${gasPriceForLogs} gwei`)
     }
 
@@ -289,7 +290,7 @@ export function gasPriceFormatted(): string {
         return 'unknown'
     }
 
-    // console.log(`Gas price as bigint: ${gasPrice} wei`) // 112_473_357_401
+    // log.info(`Gas price as bigint: ${gasPrice} wei`) // 112_473_357_401
 
     // Do BigInt operations in the middle and floating point operations on the outside.
     // L2 networks can do with one decimal of precision here.
@@ -303,10 +304,10 @@ export async function speedUpPendingTx(txHash: string) {
 
     const pendingTx: TransactionResponse = await useProvider().getTransaction(txHash)
 
-    console.log(`Pending TX response:`)
+    log.info(`Pending TX response:`)
     console.dir(pendingTx)
 
-    console.log(`Pending tx nonce: ${pendingTx.nonce}, pending nonce: ${nonce}`)
+    log.info(`Pending tx nonce: ${pendingTx.nonce}, pending nonce: ${nonce}`)
 
     const gasPriceBidNow = ethers.utils.parseUnits("40", "gwei").toBigInt()
 
@@ -322,7 +323,7 @@ export async function speedUpPendingTx(txHash: string) {
 
     try {
         const txResponse: TransactionResponse = await wallet.sendTransaction(newTxRequest)
-        console.log(`TX hash: ${txResponse.hash}`)
+        log.info(`TX hash: ${txResponse.hash}`)
         console.dir(txResponse)
 
         const txReceipt: TransactionReceipt = await txResponse.wait()
