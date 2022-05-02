@@ -35,11 +35,14 @@ export class Position {
 
     openingLiquidityWeth: bigint = 0n
     openingLiquidityUsdc: bigint = 0n
-    closingLiquidityWeth?: bigint
-    closingLiquidityUsdc?: bigint
 
-    priceAtOpening?: bigint // Quoted in USDC
-    priceAtClosing?: bigint // Quoted in USDC
+    // Excludes fees claimed at the time of the 'remove' tx.
+    closingLiquidityWeth: bigint = 0n
+    closingLiquidityUsdc: bigint = 0n
+
+    // Quoted in USDC atoms.
+    priceAtOpening?: bigint
+    priceAtClosing?: bigint
 
     swapTxGasPaid?: bigint
     addTxGasPaid?: bigint
@@ -54,8 +57,6 @@ export class Position {
 
     feesWethCalculated(): bigint {
         if (this.traded == Direction.Down) {
-            if (this.closingLiquidityWeth == undefined) throw `Missing closingLiquidityWeth: ${this.tokenId}`
-
             return (BigInt(this.withdrawnWeth) - BigInt(this.closingLiquidityWeth))
         }
             
@@ -64,8 +65,6 @@ export class Position {
 
     feesUsdcCalculated(): bigint {
         if (this.traded == Direction.Up) {
-            if (this.closingLiquidityUsdc == undefined) throw `Missing closingLiquidityUsdc: ${this.tokenId}`
-
             return (BigInt(this.withdrawnUsdc) - BigInt(this.closingLiquidityUsdc))
         }
 
@@ -133,24 +132,38 @@ export class Position {
         return BigInt(this.openingLiquidityUsdc) + usdcValueOfWethLiquidity
     }
 
-    totalGasPaidInEth(): bigint | undefined {
+    closingLiquidityTotalInUsdc(): bigint {
+        if (this.priceAtClosing == undefined) throw `No price at closing: ${this.tokenId}`
+    
+        const usdcValueOfWethLiquidity = BigInt(BigInt(this.closingLiquidityWeth) * BigInt(this.priceAtClosing)) / N_10_TO_THE_18
+
+        return BigInt(this.closingLiquidityUsdc) + usdcValueOfWethLiquidity
+    }
+
+    openingLiquidityTotalInEth(): bigint {
+        if (this.priceAtOpening == undefined) throw `No price at opening: ${this.tokenId}`
+    
+        const ethValueOfUsdcLiquidity = BigInt(BigInt(this.openingLiquidityUsdc) * N_10_TO_THE_18 / BigInt(this.priceAtOpening))
+
+        return BigInt(this.openingLiquidityWeth) + ethValueOfUsdcLiquidity
+    }
+
+    closingLiquidityTotalInEth(): bigint {
+        if (this.priceAtClosing == undefined) throw `No price at closing: ${this.tokenId}`
+    
+        const ethValueOfUsdcLiquidity = BigInt(BigInt(this.closingLiquidityUsdc) * N_10_TO_THE_18 / BigInt(this.priceAtClosing))
+
+        return BigInt(this.closingLiquidityWeth) + ethValueOfUsdcLiquidity
+    }
+
+    totalGasPaidInEth(): bigint {
         if (this.addTxGasPaid === undefined || this.removeTxGasPaid === undefined
-            || this.swapTxGasPaid === undefined) return undefined
+            || this.swapTxGasPaid === undefined) return 0n
 
         // As of 2022-04-21:
         // Max: 0.075_621_200 ETH (232 USD)
         // Min: 0.028_806_315 ETH (86 USD)
         return this.addTxGasPaid + this.removeTxGasPaid + this.swapTxGasPaid
-    }
-
-    netYieldInEth(): bigint {
-        const gasPaid = this.totalGasPaidInEth()
-
-        if (gasPaid == undefined) {
-            return 0n
-        }
-
-        return this.feesTotalInEth() + gasPaid
     }
 
     // Total fees claimed as a proportion of opening liquidity, in percent.
@@ -180,5 +193,40 @@ export class Position {
         if (this.removeTxReceipt === undefined) return 0
 
         return this.removeTxReceipt.blockNumber
+    }
+
+    // This is a gain when we trade up, so it's probably not what the literature considers to be
+    // impermanent loss.
+    impermanentLossInUsdc(): bigint {
+        const opening = this.openingLiquidityTotalInUsdc()
+        const closing = this.closingLiquidityTotalInUsdc()
+
+        if (opening == undefined || closing == undefined) return 0n
+
+        return BigInt(closing) - BigInt(opening)
+    }
+
+    // This is a gain when we trade down, so it's probably not what the literature considers to be
+    // impermanent loss.
+    impermanentLossInEth(): bigint {
+        const opening = this.openingLiquidityTotalInEth()
+        const closing = this.closingLiquidityTotalInEth()
+
+        if (opening == undefined || closing == undefined) return 0n
+
+        return BigInt(closing) - BigInt(opening)
+    }
+
+    netReturnInEth(): bigint {
+        const gas = this.totalGasPaidInEth()
+        const fees = this.feesTotalInEth()
+        const il = this.impermanentLossInEth()
+
+        if (gas == undefined || fees == undefined || il == undefined) {
+            return 0n
+        }
+
+        // IL is negative when it's a loss.
+        return fees - gas + il
     }
 }

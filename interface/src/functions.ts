@@ -21,7 +21,8 @@ import {
     ADDR_POOL,
     ADDR_ROUTER
 } from './constants'
-import { formatUnits } from '@ethersproject/units'
+import { formatEther, formatUnits } from '@ethersproject/units'
+import moment from 'moment'
 
 const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
@@ -354,6 +355,8 @@ export function setOpeningLiquidity(positions: Map<number, Position>) {
                 position.openingLiquidityUsdc = value
             }
         })
+
+        // Note that closing liquidity, excluding fees, is set at the same time as the fees.
     }
 }
 
@@ -563,4 +566,80 @@ export async function getBalanceAtBlockNumber(address: string, blockTag: number,
         + BigInt(usdcBalance)
 
     return [ethValue, usdcValue]
+}
+
+export async function generateCsvEthUsdcBalances(address: string, positions: Map<number, Position>,
+    contractWeth: Contract, contractUsdc: Contract, poolPrices: Map<number, bigint>,
+    provider: Provider) {
+    console.log(`Closing timestamp, closing ETH/USDC price, direction, time open in hours, ETH\
+ balance after remove tx, USDC balance after remove tx`)
+
+    for (let [tokenId, position] of positions) {
+      if (position.closedTimestamp === undefined) continue
+  
+      const closingTimestamp = moment.unix(position.closedTimestamp).toISOString()
+      const closingBlockNumber = position.closingBlockNumber()
+      const closingPrice = position.priceAtClosing != null ? position.priceAtClosing : 0n
+  
+      const [balanceInEth, balanceInUsdc] = await getBalanceAtBlockNumber(address,
+        closingBlockNumber, contractWeth, contractUsdc, poolPrices, provider)
+  
+      const timeOpenInHours = position.timeOpen().asHours()
+  
+      console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${position.traded}, \
+  ${timeOpenInHours}, ${formatEther(balanceInEth)}, ${formatUnits(balanceInUsdc, 6)}`)
+    }
+}
+
+export function generateCsvLiquiditySplit(positions: Map<number, Position>) {
+    console.log(`Closing timestamp, closing ETH/USDC price, range width in bps, direction, \
+openingLiquidityWeth, openingLiquidityUsdc, closingLiquidityWeth, closingLiquidityUsdc`)
+
+    for (let [tokenId, p] of positions) {
+      if (p.closedTimestamp === undefined) continue
+  
+      const closingTimestamp = moment.unix(p.closedTimestamp).toISOString()
+      const closingPrice = p.priceAtClosing != null ? p.priceAtClosing : 0n
+  
+      console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${p.rangeWidthInBps}, ${p.traded}, \
+  ${formatEther(p.openingLiquidityWeth)}, ${formatUnits(p.openingLiquidityUsdc, 6)}, \
+  ${formatEther(p.closingLiquidityWeth)}, ${formatUnits(p.closingLiquidityUsdc, 6)}`)
+    }
+}
+
+export function generateCsvLiquidityInEth(positions: Map<number, Position>) {
+    console.log(`Closing timestamp, closing ETH/USDC price, range width in bps, direction, \
+openingLiquidityTotalInEth, closingLiquidityTotalInEth, impermanentLossInEth`)
+
+    for (let [tokenId, p] of positions) {
+      if (p.closedTimestamp === undefined) continue
+  
+      const closingTimestamp = moment.unix(p.closedTimestamp).toISOString()
+      const closingPrice = p.priceAtClosing != null ? p.priceAtClosing : 0n
+  
+      console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${p.rangeWidthInBps}, \
+${p.traded}, ${formatEther(p.openingLiquidityTotalInEth())}, ${formatEther(p.closingLiquidityTotalInEth())}, \
+${formatEther(p.impermanentLossInEth())}`)
+    }
+}
+
+export function generateCsvBreakdown(positions: Map<number, Position>) {
+    console.log(`Closing timestamp, closing ETH/USDC price, range width in bps, direction, \
+feesTotalInEth - totalGasPaidInEth - impermanentLossInEth = netReturnInEth`)
+
+    for (let [tokenId, p] of positions) {
+      if (p.closedTimestamp === undefined) continue
+  
+      const closingTimestamp = moment.unix(p.closedTimestamp).toISOString()
+      const closingPrice = p.priceAtClosing != null ? p.priceAtClosing : 0n
+  
+      try {
+        console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${p.rangeWidthInBps}, \
+${p.traded}, ${formatEther(p.feesTotalInEth())} - ${formatEther(p.totalGasPaidInEth())} - \
+${formatEther(p.impermanentLossInEth())} = ${formatEther(p.netReturnInEth())}`)
+      }
+      catch (e) {
+          console.log(e)
+      }
+    }
 }
