@@ -1,6 +1,7 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
+import { log } from './logger'
 import { useConfig, ChainConfig, useProvider } from './config'
 import { wallet } from './wallet'
 import { TOKEN_USDC, TOKEN_WETH } from './tokens'
@@ -152,12 +153,12 @@ export async function currentPosition(address: string): Promise<PositionWithToke
     const tokenId = await currentTokenId(address)
 
     if (tokenId === undefined) {
-        console.log(`No existing position NFT`)
+        log.info(`No existing position NFT`)
 
         return undefined
     }
     else {
-        console.log(`Position NFT: ${positionWebUrl(tokenId)}`)
+        log.info(`Position NFT: ${positionWebUrl(tokenId)}`)
     }
 
     const position = await positionManagerContract.positions(tokenId)
@@ -182,12 +183,12 @@ export async function tokenOrderIsWethFirst(poolContract: ethers.Contract): Prom
 
     if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase() &&
         token1.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase()) {
-        // console.log(`Token order in the pool is 0: WETH, 1: USDC`)
+        // log.info(`Token order in the pool is 0: WETH, 1: USDC`)
         return true
     }
     else if (token0.toUpperCase() == CHAIN_CONFIG.addrTokenUsdc.toUpperCase() &&
         token1.toUpperCase() == CHAIN_CONFIG.addrTokenWeth.toUpperCase()) {
-        // console.log(`Token order in the pool is 0: USDC, 1: WETH`)
+        // log.info(`Token order in the pool is 0: USDC, 1: WETH`)
         return false
     }
     else {
@@ -255,13 +256,13 @@ export async function positionByTokenId(tokenId: number, wethFirst: boolean): Pr
         slot[1] // Tick
     )
 
-    // console.log(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
+    // log.info(`Tick lower, upper: ${position.tickLower}, ${position.tickUpper}`)
 
     // Note that in some previous versions of the Uniswap modules we used to have to replace the
     // position.liquidity property with a JSBI in order for removeCallParameters() to work. We no
     // longer need to, it seems.
     // const liquidityJsbi = JSBI.BigInt(position.liquidity)
-    // console.log(`Position liquidity: ${liquidityJsbi.toString()}`)
+    // log.info(`Position liquidity: ${liquidityJsbi.toString()}`)
 
     const usablePosition = new Position({
         pool: usablePool,
@@ -394,9 +395,9 @@ export function calculateRatioAmountInWithDebugging(
     // calculateRatioAmountIn() numerator: -29872368485216591554291206.81148793
     // calculateRatioAmountIn() amountToSwapRaw2: -443572924.69920674
     
-  console.log(`calculateRatioAmountIn() inputTokenPrice: ${inputTokenPrice.toFixed(8)}`)
-  console.log(`calculateRatioAmountIn() inputBalance.quotient: ${inputBalance.quotient}`)
-  console.log(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
+  log.info(`calculateRatioAmountIn() inputTokenPrice: ${inputTokenPrice.toFixed(8)}`)
+  log.info(`calculateRatioAmountIn() inputBalance.quotient: ${inputBalance.quotient}`)
+  log.info(`calculateRatioAmountIn() outputBalance.quotient: ${outputBalance.quotient}`) // 0
 
   // TODO: Our optimal ratio looks fine, but the amount to swap can be negative if optimalRatio * outputBalance > inputBalance
   // Consider:
@@ -409,24 +410,24 @@ export function calculateRatioAmountInWithDebugging(
 
   // 1_998_121_297
   const inputQuotient = new Fraction(inputBalance.quotient)
-  console.log(`calculateRatioAmountIn() inputQuotient: ${inputQuotient.toFixed(0)}`)
+  log.info(`calculateRatioAmountIn() inputQuotient: ${inputQuotient.toFixed(0)}`)
 
   // 39_476_363_836.45253787
   const optimalRatioByOutputBalanceQuotient = optimalRatio.multiply(outputBalance.quotient)
-  console.log(`calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: ${optimalRatioByOutputBalanceQuotient.toFixed(8)}`)
+  log.info(`calculateRatioAmountIn() optimalRatio multiplied by output balance quotient: ${optimalRatioByOutputBalanceQuotient.toFixed(8)}`)
 
   const optimalRatioByInputTokenPrice = optimalRatio.multiply(inputTokenPrice)
-  console.log(`calculateRatioAmountIn() optimalRatio multiplied by input token price: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
+  log.info(`calculateRatioAmountIn() optimalRatio multiplied by input token price: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
 
   const denominator = optimalRatioByInputTokenPrice.add(1)
-  console.log(`calculateRatioAmountIn() denominator: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
+  log.info(`calculateRatioAmountIn() denominator: ${optimalRatioByInputTokenPrice.toFixed(8)}`)
 
   // 1_998_121_297 - 39_476_363_836
   const numerator = inputQuotient.subtract(optimalRatioByOutputBalanceQuotient)
-  console.log(`calculateRatioAmountIn() numerator: ${numerator.toFixed(8)}`)
+  log.info(`calculateRatioAmountIn() numerator: ${numerator.toFixed(8)}`)
 
   const amountToSwapRaw2 = numerator.divide(denominator)
-  console.log(`calculateRatioAmountIn() amountToSwapRaw2: ${amountToSwapRaw2.toFixed(8)}`)
+  log.info(`calculateRatioAmountIn() amountToSwapRaw2: ${amountToSwapRaw2.toFixed(8)}`)
 
   // formula: amountToSwap = (inputBalance - (optimalRatio * outputBalance)) / ((optimalRatio * inputTokenPrice) + 1))
   let amountToSwapRaw = new Fraction(inputBalance.quotient)
@@ -485,7 +486,7 @@ export async function createPoolOnTestnet() {
 //     const availableUsdc = (await wallet.usdc()).toString()
 //     const availableWeth = (await wallet.weth()).toString()
 //     const availableEth = (await wallet.getBalance()).toString()
-//     console.log(`createPoolOnTestnet(): Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH, \
+//     log.info(`createPoolOnTestnet(): Amounts available: ${availableUsdc} USDC, ${availableWeth} WETH, \
 // ${availableEth} ETH`)
 
     // Eyeball these and make sure they're within our available amounts logged above and that we
@@ -537,15 +538,15 @@ export async function createPoolOnTestnet() {
     // Send the transaction to the provider.
     const txResponse: TransactionResponse = await wallet.sendTransaction(txRequest)
 
-    console.log(`createPoolOnTestnet() TX response:`)
+    log.info(`createPoolOnTestnet() TX response:`)
     console.dir(txResponse)
 
-    // console.log(`createPoolOnTestnet() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
-    // console.log(`createPoolOnTestnet() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
+    // log.info(`createPoolOnTestnet() Max fee per gas: ${txResponse.maxFeePerGas?.toString()}`) // 100_000_000_000 wei or 100 gwei
+    // log.info(`createPoolOnTestnet() Gas limit: ${txResponse.gasLimit?.toString()}`) // 450_000
 
     const txReceipt: TransactionReceipt = await txResponse.wait()
 
-    console.log(`createPoolOnTestnet() TX receipt:`)
+    log.info(`createPoolOnTestnet() TX receipt:`)
     console.dir(txReceipt)
 
     // If we get a revert with `Fail with error: 'STF'` here, STF is `safe transfer from` and this
@@ -575,7 +576,7 @@ async function currentTokenId(address: string): Promise<number | undefined> {
     // Check for zero liquidity in the position
     // This has been tested with an account with only old, closed positions.
     if (JSBI.EQ(JSBI.BigInt(0), JSBI.BigInt(position.liquidity))) {
-        // console.log(`currentTokenId(): Existing position with token ID ${tokenId} has no liquidity.\
+        // log.info(`currentTokenId(): Existing position with token ID ${tokenId} has no liquidity.\
  // Ignoring position.`)
 
         return undefined
