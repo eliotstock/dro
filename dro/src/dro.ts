@@ -174,8 +174,8 @@ export class DRO {
       let lowerTickPrice = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickLower)
       let upperTickPrice = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickUpper)
 
-      metrics.rangeUpperBound.set(Number(upperTickPrice.toFixed(2)));
-      metrics.rangeLowerBound.set(Number(lowerTickPrice.toFixed(2)));
+      metrics.rangeUpperBound.set(Number(upperTickPrice.toFixed(2)))
+      metrics.rangeLowerBound.set(Number(lowerTickPrice.toFixed(2)))
 
       let minUsdc
       let maxUsdc
