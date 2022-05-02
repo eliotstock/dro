@@ -2,7 +2,7 @@ import { createLogger, transports, format, config } from 'winston'
 
 // Define the log format
 const { splat, combine, timestamp, printf, colorize, json, metadata } = format;
-const myFormat = printf( ({ level, message, timestamp }) => {
+const myFormat = printf( ({ level, message, timestamp, ...metadata }) => {
     let msg = `${timestamp} [${level}] : ${message} `  
   
     if(metadata) {
