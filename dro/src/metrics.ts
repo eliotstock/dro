@@ -95,12 +95,12 @@ export function initMetrics() {
 }
 
 export function metricsHandler() {
-    const router = express.Router();
+    const router = express.Router()
     
     router.get('/metrics', async (_request, response, _next) => {
-        response.set('Content-Type', register.contentType);
-        response.send(await register.metrics());
+        response.set('Content-Type', register.contentType)
+        response.send(await register.metrics())
     });
 
-    return router;
+    return router
 };
