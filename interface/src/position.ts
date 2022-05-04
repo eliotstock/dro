@@ -156,6 +156,8 @@ export class Position {
         return BigInt(this.closingLiquidityWeth) + ethValueOfUsdcLiquidity
     }
 
+    // Note that if we have any failed transactions, this does not account for them. We're only
+    // looking at the transactions that succeeded.
     totalGasPaidInEth(): bigint {
         if (this.addTxGasPaid === undefined || this.removeTxGasPaid === undefined
             || this.swapTxGasPaid === undefined) return 0n
