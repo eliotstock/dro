@@ -3,10 +3,10 @@ import { createLogger, transports, format, config } from 'winston'
 // Define the log format
 const { splat, combine, timestamp, printf, colorize, json, metadata } = format;
 const myFormat = printf( ({ level, message, timestamp, ...metadata }) => {
-    let msg = `${timestamp} [${level}] : ${message} `  
+    let msg = `${timestamp} [${level}] ${message}`  
   
     if(metadata) {
-        msg += JSON.stringify(metadata)
+        msg += ` ` + JSON.stringify(metadata)
     }
 
     return msg

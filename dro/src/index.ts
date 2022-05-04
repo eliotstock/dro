@@ -75,7 +75,7 @@ async function main() {
   express()
     .use(`/`, metricsHandler())
     .listen(PORT, () => {
-    console.log(`Listening on ${PORT} ⚡`)
+    log.info(`Listening on ${PORT} ⚡`)
   });
 
   // The absence of a try/catch block below is deliberate. The execution of main() already has one.
