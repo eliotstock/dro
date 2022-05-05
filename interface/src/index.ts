@@ -3,7 +3,7 @@ import { ethers } from 'ethers'
 import { abi as NonfungiblePositionManagerABI }
     from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
 import { Log, TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider'
-import { AlchemyProvider, EtherscanProvider } from '@ethersproject/providers'
+import { AlchemyProvider, EtherscanProvider, JsonRpcProvider } from '@ethersproject/providers'
 import { ADDR_POSITIONS_NFT_FOR_FILTER, ADDR_TOKEN_USDC, ADDR_TOKEN_WETH } from './constants'
 import { abi as WethABI } from './abi/weth.json'
 import { abi as Erc20ABI } from './abi/erc20.json'
@@ -18,30 +18,34 @@ import {
 } from './functions'
 import moment from 'moment'
 import { formatEther, formatUnits } from '@ethersproject/units'
+import { Network } from '@ethersproject/networks'
 
 // Read our .env file
 config()
 
 // Data required for calculating the return of a given position:
-// * Time position was open in days (from timestamp of add and remove txs)
 // * Opening liquidity (in WETH and USDC, from add tx logs)
 // * Either:
 //   * Fees claimed (in WETH and USDC, from remove tx logs)
 //   * Gas cost (in WETH and in USDC terms) from add, remove and swap txs
 //   * Impermanent loss calculation, from opening liquidity and range width
-// * Or simply: closing liquidity (in WETH and USDC, from remove tx logs)
-// * Price history, to get from ETH gas costs to USD gas costs
+// * Or simply:
+//   * Opening and closing account balances (in WETH, USDC and ETH)
+// * Price history, to get from things in ETH to things in USD
+// * Time position was open in days (from timestamp of add and remove txs)
 
 async function main() {
   const stopwatchStart = Date.now()
 
-  const [address, etherscanApiKey, alchemyApiKey] = getArgsOrDie()
+  const [chainId, address, etherscanApiKey, alchemyApiKey] = getArgsOrDie()
 
   // Use Alchemy to get historical ETH and ERC-20 balances.
   // Use Etherscan for everything else.
   // Both require an API key. Neither require a paid tier account.
-  const PROVIDER_ALCHEMY = new AlchemyProvider(undefined, alchemyApiKey)
-  const PROVIDER_ETHERSCAN = new EtherscanProvider(undefined, etherscanApiKey)
+  const PROVIDER_ALCHEMY = new AlchemyProvider(chainId, alchemyApiKey)
+  // const network: Network = {name: 'optimism', chainId: 10}
+  const PROVIDER_ETHERSCAN = new EtherscanProvider(chainId, etherscanApiKey)
+  // const PROVIDER_ETHERSCAN = new JsonRpcProvider('https://api-optimistic.etherscan.io/api', network)
 
   const contractWeth = new ethers.Contract(ADDR_TOKEN_WETH, WethABI, PROVIDER_ALCHEMY)
   const contractUsdc = new ethers.Contract(ADDR_TOKEN_USDC, Erc20ABI, PROVIDER_ALCHEMY)

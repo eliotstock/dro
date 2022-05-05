@@ -28,7 +28,7 @@ const INTERFACE_POOL = new ethers.utils.Interface(IUniswapV3PoolABI)
 
 const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
 
-export function getArgsOrDie(): [string, string, string] {
+export function getArgsOrDie(): [number, string, string, string] {
     const argv = yargs(process.argv.slice(2)).options({
         address: { type: 'string' },
       }).parseSync()
@@ -42,6 +42,11 @@ export function getArgsOrDie(): [string, string, string] {
 
     console.log(`Address: ${address}`)
 
+    if (process.env.CHAIN_ID === undefined) {
+        console.log('Missing CHAIN_ID from .env file, or .env file itself')
+        process.exit(1)
+    }
+
     if (process.env.ETHERSCAN_API_KEY === undefined) {
         console.log('Missing ETHERSCAN_API_KEY from .env file, or .env file itself')
         process.exit(1)
@@ -52,7 +57,8 @@ export function getArgsOrDie(): [string, string, string] {
         process.exit(1)
     }
 
-    return [address, process.env.ETHERSCAN_API_KEY, process.env.ALCHEMY_API_KEY]
+    return [Number(process.env.CHAIN_ID), address, process.env.ETHERSCAN_API_KEY,
+        process.env.ALCHEMY_API_KEY]
 }
 
 export function createPositionsWithLogs(logss: Array<Array<Log>>): Map<number, Position> {
