@@ -19,6 +19,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
     speedUp: { type: 'string', default: '' },
     testnetCreatePool: { type: 'boolean', default: false },
     wrapEth: { type: 'boolean', default: false },
+    panic: { type: 'boolean', default: false }
   }).parseSync()
 
   // `--n` means no-op.
@@ -110,6 +111,24 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
     }
 
     return [noops, true]
+  }
+
+  if (argv.panic) {
+    log.info(`Removing liquidity and swapping everything to USDC.`)
+
+    await updateTick()
+
+    const dro: DRO = new DRO(rangeWidth, false)
+    await dro.init()
+
+    if (dro.inPosition()) {
+      await dro.reinitMutables()
+      await dro.removeLiquidity()
+      await dro.panicSwap()
+    }
+    else {
+      log.info(`dro with width ${rangeWidth} wasn't in position. No liquidity to remove.`)
+    }
   }
 
   return [noops, false]

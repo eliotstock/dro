@@ -36,6 +36,7 @@ import {
   Currency,
   CurrencyAmount,
   Fraction,
+  Percent,
   Token,
   TradeType
 } from '@uniswap/sdk-core'
@@ -593,6 +594,109 @@ Unwrapping just enough WETH for the next re-range.`)
         if (gasCost != undefined) this.totalGasCost += gasCost
     }
   
+    // Get into USDC completely.
+    async panicSwap() {
+      if (this.position !== undefined)
+         throw "Refusing to swap. Still in a position. Remove liquidity first."
+
+      if (this.swapPool == undefined || this.rangeOrderPool == undefined)
+          throw "Call refresh() first"
+
+      // What are our balances and the ratio of our USDC balance to the USDC value of our WETH
+      // balance?
+      const [usdc, weth, ratio] = await wallet.tokenBalancesAndRatio()
+
+      if (usdc == 0n && weth == 0n) {
+        log.info(`This account has no USDC or WETH. Fatal. HFSP.`)
+        process.exit(412)
+      }
+
+      let inputToken: Token
+      let outputToken: Token
+      let inputTokenPrice: Fraction
+      let inputBalance
+      let outputBalance
+      let swapRoute
+      let zeroForOne: boolean
+
+      // The input token is WETH.
+      // The output token is USDC.
+      // We want the price of WETH in terms of USDC.
+      inputToken = TOKEN_WETH
+      outputToken = TOKEN_USDC
+
+      // The order of the tokens here is significant. Input first.
+      swapRoute = new Route([this.swapPool], TOKEN_WETH, TOKEN_USDC)
+
+      if (this.wethFirstInSwapPool) {
+        inputTokenPrice = this.swapPool.token0Price
+        inputBalance = CurrencyAmount.fromRawAmount(this.swapPool.token0, weth.toString())
+        outputBalance = CurrencyAmount.fromRawAmount(this.swapPool.token1, usdc.toString())
+        zeroForOne = true // WETH for USDC, token zero for token one
+      }
+      else {
+        inputTokenPrice = this.swapPool.token1Price
+        inputBalance = CurrencyAmount.fromRawAmount(this.swapPool.token1, weth.toString())
+        outputBalance = CurrencyAmount.fromRawAmount(this.swapPool.token0, usdc.toString())
+        zeroForOne = false // WETH for USDC, token one for token zero
+      }
+
+      // Because we're using this tick to get the optimal ratio of assets to put into the range
+      // order position, use the range order pool here, not the swap pool.
+      const p = new Position({
+        pool: this.rangeOrderPool,
+        tickLower: this.tickLower,
+        tickUpper: this.tickUpper,
+        liquidity: 1 // calculateOptimalRatio() doesn't use the liquidity on the position
+      })
+
+      const sqrtRatioX96 = TickMath.getSqrtRatioAtTick(rangeOrderPoolTick)
+
+      // Call private method on AlphaRouter.
+      const optimalRatio: Fraction = this.alphaRouter['calculateOptimalRatio'](p, sqrtRatioX96,
+        zeroForOne)
+
+      const amountToSwap = CurrencyAmount.fromRawAmount(TOKEN_WETH, weth.toString())
+
+      if (JSBI.lessThan(amountToSwap.quotient, JSBI.BigInt(0))) {
+        // Tokens in wrong order?
+        // Optimal ratio inverted?
+        // zeroForOne wrong?
+        throw `Amount to swap is negative. Fatal.`
+      }
+
+      const trade: Trade<Currency, Currency, TradeType> = await Trade.createUncheckedTrade({
+        route: swapRoute,
+        inputAmount: amountToSwap,
+        outputAmount: CurrencyAmount.fromRawAmount(outputToken, 0), // Zero here means 'don't care'
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      const options: SwapOptions = {
+        slippageTolerance: new Percent(20, 1_000), // 2%, higher than from config
+        recipient: wallet.address,
+        deadline: moment().unix() + DEADLINE_SECONDS
+      }
+
+      const { calldata, value } = SwapRouter.swapCallParameters(trade, options)
+
+      const nonce = await wallet.getTransactionCount("latest")
+  
+      // Sending WETH, not ETH, so value is zero here. WETH amount is in the call data.
+      const txRequest = {
+        from: wallet.address,
+        to: CHAIN_CONFIG.addrSwapRouter,
+        value: VALUE_ZERO_ETHER,
+        nonce: nonce,
+        gasLimit: CHAIN_CONFIG.gasLimit,
+        gasPrice: this.gasPriceBid(),
+        data: calldata
+      }
+
+      const txReceipt: TransactionReceipt = await this.sendTx(
+        `[${this.rangeWidthTicks}] swap()`, txRequest)
+    }
+
     async addLiquidity() {
       if (this.position !== undefined)
         throw `[${this.rangeWidthTicks}] Can't add liquidity. Already in a position. Remove \
