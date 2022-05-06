@@ -113,6 +113,7 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
     return [noops, true]
   }
 
+  // `--panic` means remove liquidity from the dro, swap all WETH to USDC and exit.
   if (argv.panic) {
     log.info(`Removing liquidity and swapping everything to USDC.`)
 
@@ -129,6 +130,8 @@ export async function handleCommandLineArgs(rangeWidth: number): Promise<[boolea
     else {
       log.info(`dro with width ${rangeWidth} wasn't in position. No liquidity to remove.`)
     }
+
+    return [noops, true]
   }
 
   return [noops, false]

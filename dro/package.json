@@ -8,7 +8,7 @@
     "prod": "ts-node ./src/index.ts 2>&1 | tee -a ./out/dro.log",
     "n": "ts-node ./src/index.ts --n 2>&1 | tee -a ./out/dro.log",
     "r": "ts-node ./src/index.ts --r 2>&1 | tee -a ./out/dro.log",
-    "panic": "ts-node ./src/index.ts --panicSwap 2>&1 | tee -a ./out/dro.log",
+    "panic": "ts-node ./src/index.ts --panic 2>&1 | tee -a ./out/dro.log",
     "log": "tail -f -n 1000 ./out/dro.log",
     "balances": "ts-node ./src/index.ts --balances",
     "approve": "ts-node ./src/index.ts --approve"
