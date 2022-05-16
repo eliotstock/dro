@@ -43,9 +43,7 @@ async function main() {
   // Use Etherscan for everything else.
   // Both require an API key. Neither require a paid tier account.
   const PROVIDER_ALCHEMY = new AlchemyProvider(chainId, alchemyApiKey)
-  // const network: Network = {name: 'optimism', chainId: 10}
   const PROVIDER_ETHERSCAN = new EtherscanProvider(chainId, etherscanApiKey)
-  // const PROVIDER_ETHERSCAN = new JsonRpcProvider('https://api-optimistic.etherscan.io/api', network)
 
   const contractWeth = new ethers.Contract(ADDR_TOKEN_WETH, WethABI, PROVIDER_ALCHEMY)
   const contractUsdc = new ethers.Contract(ADDR_TOKEN_USDC, Erc20ABI, PROVIDER_ALCHEMY)
