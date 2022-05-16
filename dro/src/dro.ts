@@ -54,6 +54,7 @@ import {
 } from '@uniswap/v3-sdk'
 import { AlphaRouter } from '@uniswap/smart-order-router'
 import { formatUnits } from 'ethers/lib/utils'
+import { metrics } from './metrics'
 
 const OUT_DIR = './out'
 
@@ -171,6 +172,12 @@ export class DRO {
     }
 
     logRangeInUsdcTerms() {
+      let lowerTickPrice = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickLower)
+      let upperTickPrice = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickUpper)
+
+      metrics.rangeUpperBound.set(Number(upperTickPrice.toFixed(2)))
+      metrics.rangeLowerBound.set(Number(lowerTickPrice.toFixed(2)))
+
       let minUsdc
       let maxUsdc
 
@@ -180,16 +187,16 @@ export class DRO {
         // Arbitrum mainnet
         //   WETH is token 0, USDC is token 1
         //   Minimum USDC value per ETH corresponds to the minimum tick value
-        minUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickLower).toFixed(2, {groupSeparator: ','})
-        maxUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickUpper).toFixed(2, {groupSeparator: ','})
+        minUsdc = lowerTickPrice.toFixed(2, {groupSeparator: ','})
+        maxUsdc = upperTickPrice.toFixed(2, {groupSeparator: ','})
       }
       else {
         // Ethereum mainnet:
         //   USDC is token 0, WETH is token 1
         //   Minimum USDC value per ETH corresponds to the maximum tick value
         //   Counterintuitively, WETH is still the first token we pass to tickToPrice()
-        minUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickUpper).toFixed(2, {groupSeparator: ','})
-        maxUsdc = tickToPrice(TOKEN_WETH, TOKEN_USDC, this.tickLower).toFixed(2, {groupSeparator: ','})
+        minUsdc = upperTickPrice.toFixed(2, {groupSeparator: ','})
+        maxUsdc = lowerTickPrice.toFixed(2, {groupSeparator: ','})
       }
 
       log.info(`[${this.rangeWidthTicks}] Range: ${minUsdc} <-> ${maxUsdc}`)
@@ -301,6 +308,8 @@ export class DRO {
       const readable = Number(unclaimedFeesTotalUsdc * 100n / n10ToThe6) / 100
 
       log.info(`[${this.rangeWidthTicks}] Unclaimed fees: ${readable.toFixed(2)} USD`)
+      
+      metrics.unclaimedFeesInUsdc.set(readable)
     }
 
     // Note that we consciously do no error handing or retries here. These are now handled by the
@@ -374,11 +383,16 @@ at gas price ${gasPriceReadable} gwei bid`)
         data: calldata
       }
 
+      const end = metrics.removeLiquidityTxnTimeMs.startTimer()
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] removeLiquidity()`, txRequest)
+      end()
 
       const gasCost = this.gasCost(txReceipt)
-      if (gasCost != undefined) this.totalGasCost += gasCost
+      if (gasCost != undefined) {
+        this.totalGasCost += gasCost
+        metrics.removeLiquidityGasCost.set(gasCost)
+      }
 
       // Removing liquidity is the last tx in the set of three. We're interested in the total gas
       // cost of the roundtrip position.
@@ -587,11 +601,16 @@ Unwrapping just enough WETH for the next re-range.`)
         data: calldata
       }
 
+      const end = metrics.swapTxnTimeMs.startTimer()
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] swap()`, txRequest)
+      end()
 
-        const gasCost = this.gasCost(txReceipt)
-        if (gasCost != undefined) this.totalGasCost += gasCost
+      const gasCost = this.gasCost(txReceipt)
+      if (gasCost != undefined) {
+        this.totalGasCost += gasCost
+        metrics.swapGasCost.set(gasCost)
+      }
     }
   
     // Get into USDC completely.
@@ -790,8 +809,10 @@ spacing of ${this.rangeOrderPool.tickSpacing}. Can't create position.`
         data: calldata
       }
 
+      const end = metrics.addLiquidityTxnTimeMs.startTimer()
       const txReceipt: TransactionReceipt = await this.sendTx(
         `[${this.rangeWidthTicks}] addLiquidity()`, txRequest)
+      end()
 
       const t = extractTokenId(txReceipt)
 
@@ -807,7 +828,10 @@ be able to remove this liquidity.`)
       }
 
       const gasCost = this.gasCost(txReceipt)
-      if (gasCost != undefined) this.totalGasCost += gasCost
+      if (gasCost != undefined) {
+        this.totalGasCost += gasCost
+        metrics.addLiquidityTxnGasCost.set(gasCost)
+      }
     }
 
     gasCost(txReceipt: TransactionReceipt): number | undefined {
@@ -945,6 +969,7 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
 
         // Time our remove/swap/add roundtrip.
         const stopwatchStart = Date.now()
+        const endMetricsTimer = metrics.totoalRerangeTimeMs.startTimer()
 
         // Remove all of our liquidity now and close our position.
         await this.removeLiquidity()
@@ -968,6 +993,10 @@ ${CHAIN_CONFIG.gasPriceMaxFormatted()}. Not re-ranging yet.`)
 
         // Add all our WETH and USDC to a new liquidity position.
         await this.addLiquidity()
+
+        // stop and register our time for the remove/swap/add roundtrip
+        endMetricsTimer()
+        metrics.reRangeTime.setToCurrentTime()
 
         const stopwatchMillis = (Date.now() - stopwatchStart)
         log.info(`[${this.rangeWidthTicks}] Remove/swap/add roundtrip took \

@@ -1,16 +1,17 @@
 import { config } from 'dotenv'
 import { ethers } from 'ethers'
 import { TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider'
-import { Provider } from "@ethersproject/abstract-provider";
-import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer";
-import { SigningKey } from "@ethersproject/signing-key";
+import { Provider } from "@ethersproject/abstract-provider"
+import { ExternallyOwnedAccount } from "@ethersproject/abstract-signer"
+import { SigningKey } from "@ethersproject/signing-key"
 import { abi as ERC20ABI } from './abi/erc20.json'
 import { abi as WETHABI } from './abi/weth.json'
 import { log } from './logger'
 import { useConfig, ChainConfig, useProvider } from './config'
 import { price } from './uniswap'
 import JSBI from 'jsbi'
-import { formatUnits } from 'ethers/lib/utils';
+import { formatUnits } from 'ethers/lib/utils'
+import { metrics } from './metrics'
 
 // Read our .env file
 config()
@@ -147,6 +148,10 @@ export class EthUsdcWallet extends ethers.Wallet {
 
         log.info(`Balances: USDC ${usdcBalanceReadable}, WETH ${wethBalanceReadable}, \
 ETH ${ethBalanceReadable}`) // Removed: (token ratio by value: ${ratio})
+
+        metrics.balance.labels({ currency: 'USDC' }).set(Number(usdcBalance))
+        metrics.balance.labels({ currency: 'WETH' }).set(Number(wethBalance))
+        metrics.balance.labels({ currency: 'ETH' }).set(Number(ethBalance))
     }
 
     async approveAll(address: string) {
@@ -283,6 +288,8 @@ maxPriorityFeePerGas: ${maxPriorityFeePerGas} gwei, gasPrice: ${gasPriceForLogs}
     if (!p) return
 
     gasPrice = p.toBigInt()
+    
+    metrics.gasPrice.set(Number(gasPrice * 10n / 1_000_000_000n) / 10)
 }
 
 export function gasPriceFormatted(): string {
