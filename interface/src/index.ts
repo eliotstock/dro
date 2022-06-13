@@ -14,7 +14,9 @@ import {
   generateCsvEthUsdcBalances,
   generateCsvLiquidityInEth,
   generateCsvBreakdown,
-  generateCsvPnL
+  generateCsvPnL,
+  generateCsvLiquiditySplit,
+  generateCsvLiquidityInUsdc
 } from './functions'
 import moment from 'moment'
 import { formatEther, formatUnits } from '@ethersproject/units'
@@ -93,7 +95,7 @@ async function main() {
   }
 
   // Start getting prices from the pool event logs now, in parallel to the work below.
-  const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER_ETHERSCAN)
+  // const poolPricesPromise: Promise<Map<number, bigint>> = getPrices(blockNumbers, PROVIDER_ETHERSCAN)
 
   const positions = createPositionsWithLogs(allLogs)
 
@@ -116,10 +118,13 @@ async function main() {
   await setGasPaid(positions, PROVIDER_ETHERSCAN)
 
   // Block till we've got our prices.
-  const poolPrices: Map<number, bigint> = await poolPricesPromise
+  // const poolPrices: Map<number, bigint> = await poolPricesPromise
 
   // Find prices at the blocks when we opened and closed each position.
-  setOpeningClosingPrices(positions, poolPrices)
+  // setOpeningClosingPrices(positions, poolPrices)
+
+  // TODO: Get the opening price from the swap TX, swap event log, tick data. Use tick2Price from
+  // the Uniswap repo.
 
   // Find the timestamps for opening and closing the position.
   await setTimestamps(positions, PROVIDER_ETHERSCAN)
@@ -129,13 +134,13 @@ async function main() {
   //   PROVIDER_ALCHEMY)
 
   // Opening and closing liquidity for each position.
-  // generateCsvLiquidityInEth(positions)
+  generateCsvLiquiditySplit(positions)
 
   // feesTotalInEth - totalGasPaidInEth - impermanentLossInEth = netReturnInEth
   // generateCsvBreakdown(positions)
 
   // Observed IL = balance after remove tx - balance before add tx - fees claimed + gas cost.
-  await generateCsvPnL(address, positions, contractWeth, contractUsdc, poolPrices, PROVIDER_ALCHEMY)
+  // await generateCsvPnL(address, positions, contractWeth, contractUsdc, poolPrices, PROVIDER_ALCHEMY)
 
   const stopwatchMillis = (Date.now() - stopwatchStart)
   console.log(`Done in ${Math.round(stopwatchMillis / 1_000 / 60)} mins`)

@@ -413,6 +413,8 @@ export async function setAddRemoveTxReceipts(positions: Map<number, Position>, p
     }
 }
 
+// Note that this works for the DROs, where the swap is always on Uniswap directly, but not for the
+// manual range order account, where most of the swaps were on Cowswap.
 export async function setSwapTx(positions: Map<number, Position>,
     allTxs: Array<TransactionResponse>, provider: Provider) {
 
@@ -598,18 +600,18 @@ export async function generateCsvEthUsdcBalances(address: string, positions: Map
 }
 
 export function generateCsvLiquiditySplit(positions: Map<number, Position>) {
-    console.log(`Closing timestamp, closing ETH/USDC price, range width in bps, direction, \
-openingLiquidityWeth, openingLiquidityUsdc, closingLiquidityWeth, closingLiquidityUsdc`)
+    console.log(`Closing timestamp, range width in bps, direction, \
+openingLiquidityWeth, openingLiquidityUsdc, closingLiquidityWeth, closingLiquidityUsdc, totalGasPaidEth`)
 
     for (let [tokenId, p] of positions) {
       if (p.closedTimestamp === undefined) continue
   
       const closingTimestamp = moment.unix(p.closedTimestamp).toISOString()
-      const closingPrice = p.priceAtClosing != null ? p.priceAtClosing : 0n
   
-      console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${p.rangeWidthInBps}, ${p.traded}, \
+      console.log(`${closingTimestamp}, ${p.rangeWidthInBps}, ${p.traded}, \
   ${formatEther(p.openingLiquidityWeth)}, ${formatUnits(p.openingLiquidityUsdc, 6)}, \
-  ${formatEther(p.closingLiquidityWeth)}, ${formatUnits(p.closingLiquidityUsdc, 6)}`)
+  ${formatEther(p.closingLiquidityWeth)}, ${formatUnits(p.closingLiquidityUsdc, 6)}, \
+  ${formatEther(p.totalGasPaidInEth())}`)
     }
 }
 
@@ -626,6 +628,21 @@ openingLiquidityTotalInEth, closingLiquidityTotalInEth, impermanentLossInEth`)
       console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${p.rangeWidthInBps}, \
 ${p.traded}, ${formatEther(p.openingLiquidityTotalInEth())}, ${formatEther(p.closingLiquidityTotalInEth())}, \
 ${formatEther(p.impermanentLossInEth())}`)
+    }
+}
+
+export function generateCsvLiquidityInUsdc(positions: Map<number, Position>) {
+    console.log(`Closing timestamp, closing ETH/USDC price, range width in bps, direction, \
+openingLiquidityTotalInUsdc, closingLiquidityTotalInUsdc`)
+
+    for (let [tokenId, p] of positions) {
+      if (p.closedTimestamp === undefined) continue
+  
+      const closingTimestamp = moment.unix(p.closedTimestamp).toISOString()
+      const closingPrice = p.priceAtClosing != null ? p.priceAtClosing : 0n
+  
+      console.log(`${closingTimestamp}, ${formatUnits(closingPrice, 6)}, ${p.rangeWidthInBps}, \
+${p.traded}, ${formatUnits(p.openingLiquidityTotalInUsdc(), 6)}, ${formatUnits(p.closingLiquidityTotalInUsdc(), 6)}`)
     }
 }
 
