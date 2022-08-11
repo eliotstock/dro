@@ -12,7 +12,7 @@ Goals: low power, no fan, secure, simple.
 1. Unplug the ethernet cable before booting. Goal: this server has never been online before it's been hardened a bit.
 1. Boot the target. Wait for cloud-init to run before logging in.
     1. Default u & p: `ubuntu`/`ubuntu`.
-    1. You're required to change your password. Don't worry much about the strength of it too much cause we're going to remove the `ubuntu` user in a tick.
+    1. You're required to change your password. Don't worry about the strength of it cause we're going to remove the `ubuntu` user in a tick.
 1. Remember `Ctrl-Alt F1` through `F6` are there for switching to new terminals and multitasking.
 1. Add a new user and remove the default `ubuntu` one.
     1. `sudo adduser [username]`.
@@ -38,7 +38,7 @@ Goals: low power, no fan, secure, simple.
         1. The DNS servers here are Google's and Cloudflare's.
         1. We might also consider using 9.9.9.9 in future (Quad9, does filtering of known malware sites).
         1. `.yaml` files use spaces for indentation (either 2 or 4), not tabs.
-    ```
+```
 network:
   version: 2
   renderer: networkd
