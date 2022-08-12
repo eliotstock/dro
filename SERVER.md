@@ -38,6 +38,8 @@ Goals: low power, no fan, secure, simple.
         1. The DNS servers here are Google's and Cloudflare's.
         1. We might also consider using 9.9.9.9 in future (Quad9, does filtering of known malware sites).
         1. `.yaml` files use spaces for indentation (either 2 or 4), not tabs.
+    1. `sudo netplan apply`
+    1. Don't plug the ethernet cable in yet though
 ```
 network:
   version: 2
@@ -51,8 +53,6 @@ network:
       nameservers:
         addresses: [8.8.8.8, 1.1.1.1, 1.0.0.1]
 ```
-    1. `sudo netplan apply`
-    1. Don't plug the ethernet cable in yet though
 1. Change the ssh port from the default
     1. `sudo nano /etc/ssh/sshd_config`
     1. Uncomment the `Port` line. Pick a memorable port number/make a note of it.
