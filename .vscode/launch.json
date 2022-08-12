@@ -6,6 +6,30 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Attach by Process ID",
+            "processId": "${command:PickProcess}",
+            "request": "attach",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node"
+        },
+        {
+            "name": "interface",
+            "type": "node",
+            "runtimeVersion": "16.10.0",
+            "program": "${workspaceFolder}/interface/src/index.ts",
+            "request": "launch",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "tsc: build - interface/tsconfig.json",
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "cwd": "${workspaceFolder}/interface"
+        },
+        {
             "name": "dro",
             "type": "node",
             "runtimeVersion": "16.10.0",
