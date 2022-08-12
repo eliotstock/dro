@@ -1,5 +1,22 @@
 # Uniswap v3 dynamic range order
 
+## About
+
+An expert knowledge of Uniswap v3 is assumed here. Dynamic range orders are Uniswap v3 liquidity provision positions that are always in range. This code will watch the price in the pool for when it moves out of range. It will then remove liquidity, rebalance to a 50:50 asset ratio and add liquidity in a new range centred on the current price.
+
+Your PnL as an algorithmic LP using this approach is:
+
+```
++ trading fees
+- impermanent loss
+- swap costs
+- gas costs
+------------------
+= profit
+```
+
+Which is to say, it is your goal that trading fees paid to you by the protocol outweigh these costs. Of these costs, the IL incurred as the price moves to the edge of your range is by far the most significant.
+
 ## Build & run
 
 1. `nvm use`
@@ -31,3 +48,10 @@ When developing locally, forget `proc` and just run `dro` directly:
 1. `npm run prod`
 
 The process will crash on the first 4xx or 5xx error repsonse from the provider's RPC URL.
+
+## Warning
+
+You will probably not make a tonne of money running this code, for these reasons:
+
+1. The IL is significant. It cannot be ignored simply because you value both assets in the pool (eg. ETH/USDC) and don't mind if the price falls in the medium term. Every time you re-range, you're compounding your loses.
+1. Uniswap v3 now has many JIT bots providing liquidity. These bots will provide liquidity immediately before and remove it immediately after a large swap. They are highly concentrated on the price at the swap and suffer much less IL. Because the big swaps generate the most trading fees, these guys will take the lion's share of the trading fees in the pool. They are very difficult to compete with.
