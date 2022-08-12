@@ -64,7 +64,7 @@ export function logsByTokenId(txMap: Map<string, EventLog[]>): Map<number, Event
     for (let [txHash, logs] of txMap) {
         logs.forEach(function(log: EventLog) {
             // The position's token ID is given by the event log with address
-            // 'Uniswap v3: Positions NFT', event Transfer(), last topic of the set of four tpoics.
+            // 'Uniswap v3: Positions NFT', event Transfer(), last topic of the set of four topics.
             if (log.address == ADDR_POSITIONS_NFT && log.topics[0] == TOPIC_TRANSFER) {
                 const tokenId: number = Number(log.topics[3])
 

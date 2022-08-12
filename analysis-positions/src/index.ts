@@ -9,6 +9,7 @@ import { logsByTxHash, logsByTokenId, positionsByTokenId, setDirectionAndFilterT
 config()
 
 async function main() {
+    // These are event log rows, each with one data field and an array of up to four topics.
     let [adds, removes, prices] = await getData()
 
     console.log(`Analysing...`)

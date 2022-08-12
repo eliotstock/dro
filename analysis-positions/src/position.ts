@@ -2,6 +2,24 @@ import moment from "moment"
 
 const N_10_TO_THE_18 = BigInt(1_000_000_000_000_000_000)
 
+// cf. Ethers.js Log:
+/*
+interface Log {
+    blockNumber: number;
+    blockHash: string;
+    transactionIndex: number;
+
+    removed: boolean;
+
+    address: string;
+    data: string;
+
+    topics: Array<string>;
+
+    transactionHash: string;
+    logIndex: number;
+}
+*/
 export interface EventLog {
     block_timestamp: {value: string}
     transaction_hash: string
