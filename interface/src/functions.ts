@@ -190,6 +190,8 @@ export function setDirection(positions: Map<number, Position>) {
           const amount0: number = parsedLog.args['amount0']
           const amount1: number = parsedLog.args['amount1']
   
+          // Note: these may end up being reversed on Arbitrum, depending on the order of assets
+          // in thge pool.
           if (amount0 == 0) {
             // Position closed out of range and the market traded down into WETH.
             p.traded = Direction.Down
@@ -299,7 +301,10 @@ export function setFees(positions: Map<number, Position>) {
 export function tickToNativePrice(tick: number): bigint {
     // tickToPrice() returns a Price<Token, Token> which extends Fraction in which numerator
     // and denominator are both JSBIs.
+    // Mainnet:
     const p = tickToPrice(TOKEN_WETH, TOKEN_USDC, tick)
+    // Arbitrum One? Nope, this doesn't fix the 'Error: Invariant failed: TICK' errors.
+    // const p = tickToPrice(TOKEN_USDC, TOKEN_WETH, tick)
   
     // The least bad way to get from JSBI to BigInt is via strings for numerator and denominator.
     const num = BigInt(p.numerator.toString())
@@ -576,6 +581,18 @@ export async function getBalanceAtBlockNumber(address: string, blockTag: number,
     return [ethValue, usdcValue]
 }
 
+// Excludes the liquidity in any open position at the time of the block.
+export async function getErc20BalancesAtBlockNumber(address: string, blockTag: number,
+    contractWeth: Contract, contractUsdc: Contract): Promise<[bigint, bigint]> {
+    // Passing the blockTag here requires an archive node. Alchemy provides this.
+    const [wethBalance, usdcBalance] = await Promise.all([
+        contractWeth.balanceOf(address, {blockTag}),
+        contractUsdc.balanceOf(address, {blockTag})
+    ])
+
+    return [wethBalance, usdcBalance]
+}
+
 export async function generateCsvEthUsdcBalances(address: string, positions: Map<number, Position>,
     contractWeth: Contract, contractUsdc: Contract, poolPrices: Map<number, bigint>,
     provider: Provider) {
@@ -599,6 +616,25 @@ export async function generateCsvEthUsdcBalances(address: string, positions: Map
     }
 }
 
+export async function generateCsvErc20Balances(address: string, positions: Map<number, Position>,
+    contractWeth: Contract, contractUsdc: Contract) {
+    console.log(`Closing timestamp, direction, WETH\
+ balance after remove tx, USDC balance after remove tx`)
+
+    for (let [tokenId, position] of positions) {
+      if (position.closedTimestamp === undefined) continue
+  
+      const closingTimestamp = moment.unix(position.closedTimestamp).toISOString()
+      const closingBlockNumber = position.closingBlockNumber()
+  
+      const [weth, usdc] = await getErc20BalancesAtBlockNumber(address,
+        closingBlockNumber, contractWeth, contractUsdc)
+  
+      console.log(`${closingTimestamp}, ${position.traded}, ${formatEther(weth)}, \
+      ${formatUnits(usdc, 6)}`)
+    }
+}
+
 export function generateCsvLiquiditySplit(positions: Map<number, Position>) {
     console.log(`Closing timestamp, range width in bps, direction, \
 openingLiquidityWeth, openingLiquidityUsdc, closingLiquidityWeth, closingLiquidityUsdc, totalGasPaidEth`)
@@ -608,10 +644,19 @@ openingLiquidityWeth, openingLiquidityUsdc, closingLiquidityWeth, closingLiquidi
   
       const closingTimestamp = moment.unix(p.closedTimestamp).toISOString()
   
-      console.log(`${closingTimestamp}, ${p.rangeWidthInBps}, ${p.traded}, \
-  ${formatEther(p.openingLiquidityWeth)}, ${formatUnits(p.openingLiquidityUsdc, 6)}, \
-  ${formatEther(p.closingLiquidityWeth)}, ${formatUnits(p.closingLiquidityUsdc, 6)}, \
-  ${formatEther(p.totalGasPaidInEth())}`)
+      // Arbitrum hacks:
+      // Why are the USDC amounts out by a factor of 10^9 but ONLY on the closing lqiuidity?
+      // Compensate by using formatUnits(p.closingLiquidityUsdc, 15) for now.
+      // And why are the WETH amounts out by a factor of 10^9 but ONLY on the closing liquidity?
+      // Compensate by using formatUnits(p.closingLiquidityUsdc, 9) for now.
+//       console.log(`${closingTimestamp}, ${p.rangeWidthInBps}, ${p.traded}, \
+//   ${formatEther(p.openingLiquidityWeth)}, ${formatUnits(p.openingLiquidityUsdc, 6)}, \
+//   ${formatUnits(p.closingLiquidityWeth, 9)}, ${formatUnits(p.closingLiquidityUsdc, 15)}, \
+//   ${formatEther(p.totalGasPaidInEth())}`)
+    console.log(`${closingTimestamp}, ${p.rangeWidthInBps}, ${p.traded}, \
+    ${formatEther(p.openingLiquidityWeth)}, ${formatUnits(p.openingLiquidityUsdc, 6)}, \
+    ${formatEther(p.closingLiquidityWeth)}, ${formatUnits(p.closingLiquidityUsdc, 6)}, \
+    ${formatEther(p.totalGasPaidInEth())}`)
     }
 }
 

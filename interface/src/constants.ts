@@ -19,10 +19,16 @@ export const ADDR_POSITIONS_NFT_FOR_LOGS = '0xC36442b4a4522E871399CD717aBDD847Ab
 export const ADDR_ROUTER = '0xE592427A0AEce92De3Edee1F18E0157C05861564'
 
 // WETH (checksum case)
-export const ADDR_TOKEN_WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+// Mainnet:
+// export const ADDR_TOKEN_WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+// Arbitrum:
+export const ADDR_TOKEN_WETH = '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1'
 
 // USDC (checksum case)
-export const ADDR_TOKEN_USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+// Mainnet:
+// export const ADDR_TOKEN_USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+// Arbitrum:
+export const ADDR_TOKEN_USDC = '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8'
 
 // Topics. Logs from provider have these all in lower case.
 export const TOPIC_MINT = '0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde'

@@ -12,6 +12,7 @@ import {
   setGasPaid, getPrices, setOpeningClosingPrices, setSwapTx, setAddRemoveTxReceipts, setTimestamps,
   getBalanceAtBlockNumber,
   generateCsvEthUsdcBalances,
+  generateCsvErc20Balances,
   generateCsvLiquidityInEth,
   generateCsvBreakdown,
   generateCsvPnL,
@@ -84,6 +85,10 @@ async function main() {
   for (const txResponse of allTxs) {
     if (txResponse.blockNumber === undefined) return
 
+    // Hack: Just look at the txs spanning 2022-04-01 to 2023-03-27 (NZ tax year)
+    // if (txResponse.blockNumber < 9006836) continue
+    // if (txResponse.blockNumber > 74348504) continue
+
     blockNumbers.push(txResponse.blockNumber)
     if (txResponse.blockHash != undefined) blockHashes.push(txResponse.blockHash)
 
@@ -102,11 +107,12 @@ async function main() {
   // Set direction on each position
   setDirection(positions)
 
-  // Set fees earned on each position
+  // Set fees earned on each position, and closing liquidity.
   setFees(positions)
   
   // Set the range width based on the tick upper and lower from the logs.
-  setRangeWidth(positions)
+  // Causes "Error: Invariant failed: TICK" on Arbitrum:
+  // setRangeWidth(positions)
 
   // Set the opening liquidity based on the token transfers from the logs.
   setOpeningLiquidity(positions)
@@ -133,8 +139,10 @@ async function main() {
   // await generateCsvEthUsdcBalances(address, positions, contractWeth, contractUsdc, poolPrices,
   //   PROVIDER_ALCHEMY)
 
+  generateCsvErc20Balances(address, positions, contractWeth, contractUsdc)
+
   // Opening and closing liquidity for each position.
-  generateCsvLiquiditySplit(positions)
+  // generateCsvLiquiditySplit(positions)
 
   // feesTotalInEth - totalGasPaidInEth - impermanentLossInEth = netReturnInEth
   // generateCsvBreakdown(positions)
